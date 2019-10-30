@@ -1,0 +1,49 @@
+# this is a template for writing new pipeline rules,
+# copy the template and replace or delete the marked parts.
+# see documentation for more information
+
+rule <rule_name>:
+	""" <description of rule> """
+	input:
+		# an input file
+		pph.file_path(step = "<input_rule>", extension = "<file_extension>", <additional wildcards>),
+		
+		# choose from different input files
+		pph.choose_input(choice_name = "<choice_name>", options = [
+		dict(step = "<input_rule_option1>", extension = "<file_extension>", <additional wildcards>),
+		dict(step = "<input_rule_option2>", extension = "<file_extension>", <additional wildcards>)
+		]),
+		
+		# get many input files, expanding over samples (mapping pipeline) or contrasts (DE pipeline);
+		# to expand over something else use snakemakes expand() with pph.file_path()
+		pph.expand_path(step = "input_rule>", extension = "<file_extension>", <additional wildcards>)
+	output:
+		pph.file_path(step = "<rule_name>", extension = "<file_extension>", <additional wildcards>)
+	log:
+		# logging an R script
+		r_script = pph.file_path(step = "<rule_name>", extension = "R",            log=True, <additional wildcards>),
+		r_output = pph.file_path(step = "<rule_name>", extension = "r_output.log", log=True, <additional wildcards>),
+		
+		# logging a shell script
+		sh_script = pph.file_path(step = "<rule_name>", extension = "sh",            log=True, <additional wildcards>),
+		sh_output = pph.file_path(step = "<rule_name>", extension = "sh_output.log", log=True, <additional wildcards>)
+	run:
+		######## 1.) pre-compute, format
+		
+		#TODO: python code ...
+		
+		######## 2.) write script (variables are inserted at wildcard positions)
+		
+		script = textwrap.dedent(r"""
+		
+		#TODO: script code ...
+		
+		""")
+		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
+		
+		######## 3.) run the script with corresponding command
+		
+		# run R
+		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		# or run sh
+		shell("{log.sh_script} &> {log.sh_output}")

@@ -1,0 +1,8 @@
+<!---
+initialize contrast variables
+-->
+
+```{r init_{{ENTRY_ID}}, include=FALSE}
+RES         <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
+CONTRAST_ID <- "{{ENTRY_ID}}"
+```

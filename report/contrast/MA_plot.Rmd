@@ -1,0 +1,12 @@
+### MA plot
+
+A MA plot of the contrast {{ENTRY_NAME}}.
+
+```{r MA_{{ENTRY_ID}}}
+#----- load results
+res <- readRDS(subset(file_tab, step=="contrast" & extension=="rds" & contrast==CONTRAST_ID)$filename)
+
+#----- MA plot
+plotMA(res, ylim=c(-2,2))
+```
+

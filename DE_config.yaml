@@ -1,0 +1,59 @@
+#--- organism annotation
+
+organism_defaults: ### FILL HERE ###  (e.g. Homo_sapiens.yaml) 
+
+organism:
+  __options__: [name, genus, taxon, files, star_index, salmon_index, R]
+  ### OVERWRITE ###  organism defaults (e.g. gtf, genome and indices)
+
+
+#--- information about experiment
+
+experiment:
+  __options__: [covariate_file, design_formula, columns]
+  
+  design_formula: ### FILL HERE ###  (e.g. "~ group")
+
+    
+#--- creation of contrasts
+
+contrasts:
+  __options__: [defaults, contrast_list]
+  
+  contrast_list:
+    - title: ### FILL HERE ###  (unique title)
+      column: ### FILL HERE ###
+      numerator: ### FILL HERE ###
+      denominator: ### FILL HERE ###
+
+
+#--- general pipeline parameters
+
+pipeline_param:
+  __options__: [out_path_pattern, log_path_pattern, in_path_pattern, report_snippets, input_choice]
+
+
+#--- filtering of count matrices
+
+filters:
+  __options__: [low_counts, experiment_blacklist, experiment_whitelist]
+
+
+#--- normalization parameters
+
+normalization:
+  __options__: [DESeq2_parameters]
+
+
+#--- QC parameters
+
+QC:
+  __options__: [count_heatmap, sample_similarity, samples_pca]
+
+
+#--- report parameters
+
+report:
+  __options__: [defaults, report_snippets]
+ 
+ 

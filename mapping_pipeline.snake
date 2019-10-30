@@ -1,0 +1,436 @@
+## SeA-SnaP mapping pipeline for RNA-seq analysis
+## version: 0.8.0
+## author: J.P.Pett (patrick.pett@bihealth.de)
+
+#TODO: dupradar in snakefile
+#TODO: save scripts for mapping pipeline
+
+
+import os, sys
+from time import asctime, localtime, time
+from warnings import warn
+from pathlib import Path
+from snakemake.utils import report
+from tools.pipeline_tools import MappingPipelinePathHandler
+
+# source files
+SNAKEDIR  = Path(workflow.current_basedir)
+SNAKEFILE = workflow.snakefile
+SCRIPTDIR = str(SNAKEDIR / "external_scripts")
+
+# assemble config
+configfile: str(SNAKEDIR / "defaults" / "mapping_config_defaults.yaml")
+configfile: "mapping_config.yaml"
+configfile: "sample_info.yaml"
+if config["organism_defaults"]:
+	configfile: str(SNAKEDIR / "defaults" / config["organism_defaults"])
+	configfile: "mapping_config.yaml"
+
+# create path handler
+pph = MappingPipelinePathHandler(config)
+
+# link indices
+pph.link_index(step="star_index",   sample="allSample", flowcell="allFlowcell", lane="allLane")
+pph.link_index(step="salmon_index", sample="allSample", flowcell="allFlowcell", lane="allLane")
+
+# exclude symbols '.' and '/' from wildcards
+wildcard_constraints: 
+	sample="[^./]+",
+	name  ="[^./]+"
+	
+shell.prefix("set -e  pipefail;")
+
+onstart:
+	# draw a dag
+	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", sample="allSample", flowcell="allFlowcell", lane="allLane")
+	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
+	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
+	# info about the pipeline run
+	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", sample="allSample", flowcell="allFlowcell", lane="allLane")
+	os.makedirs(os.path.dirname(info_file), exist_ok=True)
+	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+
+##-------------------- starting point ----------------------------------------------------------------------
+
+def get_inputs_all():
+	inputs = []
+		
+	# mapping results
+	mapping_choices = config["pipeline_param"]["mapping_results"]
+	if "star-gene_counts" in mapping_choices:
+		inputs += pph.expand_path("star", "bam", flowcell="allFlowcell", lane="allLane")
+		inputs += pph.expand_path("feature_counts", "feature_counts", flowcell="allFlowcell", lane="allLane")
+	if "salmon-transcript_counts" in mapping_choices:
+		inputs += pph.expand_path("salmon", "sf", flowcell="allFlowcell", lane="allLane")
+		
+	# QC results
+	qc_choices = config["pipeline_param"]["QC_results"]
+	if "fastqc" in qc_choices:
+		inputs += pph.expand_path("fastqc", "zip", name_ext = "paired_end_extensions")
+		inputs += [pph.file_path("fastqc_summary", "tsv", sample="allSample", flowcell="allFlowcell", lane="allLane")]
+	if "dupradar" in qc_choices:
+		if "star-gene_counts" in mapping_choices:
+			inputs += pph.expand_path("dupradar", "done", flowcell="allFlowcell", lane="allLane")
+		else:
+			warn("cannot run dupradar, because 'star-gene_counts' was not selected as mapping output")
+	if "infer_experiment" in qc_choices:
+		if "star-gene_counts" in mapping_choices:
+			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="allFlowcell", lane="allLane")
+		else:
+			warn("cannot run infer_experiment, because 'star-gene_counts' was not selected as mapping output")
+	if "qc" in qc_choices:
+		if "star-gene_counts" in mapping_choices:
+			inputs += pph.expand_path("qc", "done", flowcell="allFlowcell", lane="allLane")
+		else:
+			warn("cannot run qc, because 'star-gene_counts' was not selected as mapping output")
+	
+	return inputs
+
+
+shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.html", sample="allSample", flowcell="allFlowcell", lane="allLane")))
+
+rule all:
+	input:
+		get_inputs_all()
+	output:
+		html = pph.file_path(step="pipeline_report", extension="report.html", sample="allSample", flowcell="allFlowcell", lane="allLane")
+	run:
+		mappers = "".join(["- {}\n".format(mapper) for mapper in config["pipeline_param"]["mapping_results"]])
+		quality_control = "".join(["- {}\n".format(qc) for qc in config["pipeline_param"]["QC_results"]])
+		loctime = asctime(localtime(time()))
+		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", sample="allSample", flowcell="allFlowcell", lane="allLane")
+		summary        = pph.file_path("pipeline_report", "summary.csv",        sample="allSample", flowcell="allFlowcell", lane="allLane")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt",   sample="allSample", flowcell="allFlowcell", lane="allLane")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     sample="allSample", flowcell="allFlowcell", lane="allLane")
+		dag = rule_execution.split("/")[-1]
+		shell("conda list > {}".format(version_info))
+		shell("conda info > {}".format(conda_info))
+		report("""
+		=======================
+		RNAseq mapping pipeline
+		=======================
+		
+		**Finished: {loctime}**
+
+		Produce mapping results:
+		
+		{mappers}
+		
+		Produce quality control results:
+		
+		{quality_control}
+		
+		.. image:: {dag}
+		
+		File status at pipeline start:
+		==============================
+		
+		.. csv-table::
+			:file: {summary}
+			
+		Version info:
+		=============
+		
+		.. include:: {version_info}
+			:literal:
+		
+		Conda info:
+		===========
+		
+		.. include:: {conda_info}
+			:literal:
+		
+		""", output.html, graph = rule_execution, table = summary)
+
+##-------------------- fastqc -------------------------------------------------------------------------------
+
+rule fastqc:
+	input: 
+		pph.get_fastq_pairs
+	output:
+		fzip = pph.file_path(step="fastqc", extension="zip",  name="{name}"),
+		html = pph.file_path(step="fastqc", extension="html", name="{name}")
+	log:
+		pph.file_path(step="fastqc", extension="log", name="{name}", log=True)
+	params:
+		outdir = pph.out_dir_name(step="fastqc")
+	threads:
+		lambda wildcards: len(pph.get_fastq_pairs(wildcards))
+	run:
+		reads = " ".join(input)
+		shell(r"""
+		set -eux
+		fastqc --version &> {log}
+		rm -fr {params.outdir}/*; rm -fr $(dirname {log})/*
+		fastqc -o {params.outdir} -t {threads} {reads} &>> {log}
+		
+		# rename fastqc default output:
+		find {params.outdir} -type f -name '*.zip' > {params.outdir}/.fastqc_name.txt #used by collect_fastqc
+		mv $(cat {params.outdir}/.fastqc_name.txt) {output.fzip}
+		find {params.outdir} -type f -name '*.html' -exec mv '{{}}' {output.html} \;
+		""")
+		
+rule collect_fastqc:
+	input:
+		pph.expand_path(step="fastqc", extension="zip", name_ext="paired_end_extensions")
+	output:
+		pph.file_path(step="fastqc_summary", extension="tsv")
+	log:
+		pph.file_path(step="fastqc_summary", extension="log", log=True)
+	run:
+		for file in input:
+			file_path = "/".join(file.split("/")[:-1])
+			shell(r"""
+			set -eux
+			unzip -c {file} $(basename $(cat {file_path}/.fastqc_name.txt) .zip)/summary.txt | tail -n+3 | grep -v '^$' >> {output} 2> {log}
+			""")
+
+##-------------------- star ---------------------------------------------------------------------------------
+
+rule star_index:
+	input:
+		genome = config["organism"]["files"]["genome"],
+		gtf    = config["organism"]["files"]["gtf"]
+	output:
+		index = pph.out_dir_name(step = "star_index")+"/SA"
+	log:
+		pph.file_path(step="star_index", extension="log", log=True)
+	params:
+		options = config["rule_options"]["star_index"]["cmd_opt"]
+	threads: 8
+	run:
+		shell(r"""
+		set -eux
+		rm -fr $(dirname {output.index})/*; rm -fr $(dirname {log})/*
+		printf "\n-----------STAR index: " > {log}; STAR --version >> {log}
+		STAR --runMode genomeGenerate --genomeDir $(dirname {output}) --outFileNamePrefix $(dirname {log})/ --genomeFastaFiles {input.genome} --sjdbGTFfile {input.gtf} --runThreadN {threads} {params.options} &>> {log}
+		""")
+
+rule star:
+	input:
+		index = pph.out_dir_name(step = "star_index", sample = "allSample", flowcell="allFlowcell", lane="allLane")+"/SA",
+		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, name_ext="paired_end_extensions", mate=0),
+		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, name_ext="paired_end_extensions", mate=1) #identical if unstranded
+	output:
+		bam         = pph.file_path(step="star", extension="bam"),
+		usrt_bam    = temp(pph.file_path(step="star", extension="unsorted.bam")),
+		gene_counts = pph.file_path(step="star", extension="gene_counts.tab")
+	log:
+		pph.file_path(step="star", extension="log", log=True)
+	params:
+		outdir = pph.out_dir_name(step="star"),
+		options = config["rule_options"]["star"]["cmd_opt"],
+		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False
+	threads: 8
+	run:
+		# prepare read input
+		reads = ",".join(input.reads1)
+		stranded = input.reads1 != input.reads2
+		if stranded: reads += " " + ",".join(input.reads2)
+		# output column for gene counts
+		count_col = {"unstranded":2, "forward":3, "reverse":4}[config["sample_info"][wildcards.sample]["stranded"]]
+		# prepare trimming option
+		file_ext = config["sample_info"][wildcards.sample]["read_extension"].split(".")[-1]
+		if params.trim:
+			trim_cmd = "--readFilesCommand \"trimadap-mt -p {}\"".format(threads // 2)
+		elif file_ext == "fastq":
+			trim_cmd = ""
+		elif file_ext == "gz":
+			trim_cmd = "--readFilesCommand zcat"
+		else:
+			raise ValueError("STAR input: file extension {} not supported.".format(file_ext))
+		# run
+		shell(r"""
+		set -eux
+		rm -fr {params.outdir}/*; rm -fr $(dirname {log})/*
+		printf "\n-----------STAR: " > {log}; STAR --version >> {log}
+		
+		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} &>> {log}
+		mv {params.outdir}/Log.* $(dirname {log})
+		echo "more log files in $(dirname {log})" >> {log}
+		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
+		
+		# sort BAM
+		printf "\n-----------samtools sort: " >> {log}; samtools --version >> {log}
+		samtools sort -@ $(expr {threads} / 2) -m $(expr 10000 / {threads})M -T {params.outdir}/sort -o {output.bam} {params.outdir}/Aligned.out.bam 2>> {log}
+		mv {params.outdir}/Aligned.out.bam {output.usrt_bam}
+		
+		# mark duplicates
+		printf "\n-----------picard MarkDuplicates:\n" >> {log}
+		picard MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir} &>> {log}
+		mv {params.outdir}/{wildcards.sample}.mdup.bam {output.bam}
+
+		# generate BAM index (.bai)
+		printf "\n-----------samtools index, stats, flagstat, idxstats: " >> {log}; samtools --version >> {log}
+		samtools index {output.bam} &>> {log}
+
+		# compute statistics
+		samtools stats {output.bam} > $(dirname {log})/star.{wildcards.sample}.bamstats.txt 2>> {log}
+		samtools flagstat {output.bam} > $(dirname {log})/star.{wildcards.sample}.flagstat.log 2>> {log}
+		samtools idxstats {output.bam} > $(dirname {log})/star.{wildcards.sample}.idxstats.log 2>> {log}
+		""")
+
+##-------------------- salmon -------------------------------------------------------------------------------
+
+rule generate_transcriptome:
+	input:
+		genome = config["organism"]["files"]["genome"],
+		gtf    = config["organism"]["files"]["gtf"]
+	output:
+		pph.file_path(step = "generate_transcriptome", extension="fa")
+	log:
+		pph.file_path(step = "generate_transcriptome", extension="log", log=True)
+	threads: 8
+	run:
+		shell(r"""
+		set -eux
+		rm -fr $(dirname {output})/*; rm -fr $(dirname {log})/*
+		printf "\n-----------rsem-prepare-reference: " > {log}
+		
+		rsem-prepare-reference --gtf {input.gtf} {input.genome} $(dirname {output})/$(basename {output} .fa) &>> {log}
+		mv $(dirname {output})/$(basename {output} .fa).idx.fa {output}
+		""")
+
+rule salmon_index:
+	input:
+		transcriptome = pph.file_path(step = "generate_transcriptome", extension="fa")
+	output:
+		index = pph.out_dir_name(step = "salmon_index")+"/sa.bin"
+	log:
+		pph.file_path(step = "salmon_index", extension="log", log=True)
+	params:
+		options = config["rule_options"]["salmon_index"]["cmd_opt"]
+	run:
+		shell(r"""
+		set -eux
+		rm -fr $(dirname {output.index})/*; rm -fr $(dirname {log})/*
+		printf "\n-----------salmon index: " > {log}; salmon --version >> {log}
+		
+		salmon index -t {input.transcriptome} -i $(dirname {output.index}) {params.options} &>> {log}
+		""")
+
+rule salmon:
+	input:
+		index = pph.out_dir_name(step = "salmon_index", sample = "allSample", flowcell="allFlowcell", lane="allLane")+"/sa.bin",
+		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, name_ext="paired_end_extensions", mate=0),
+		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, name_ext="paired_end_extensions", mate=1) #identical if unstranded
+	output:
+		sf = pph.file_path(step = "salmon", extension="sf")
+	log:
+		pph.file_path(step = "salmon", extension="log", log=True)
+	params:
+		options = config["rule_options"]["salmon"]["cmd_opt"],
+		trim = True if config["rule_options"]["salmon"]["trim"]=="yes" else False
+	threads: 8
+	run:
+		# prepare read input and trimming
+		unstranded = input.reads1 == input.reads2
+		print(input.reads1)
+		if params.trim:
+			if unstranded:
+				reads = "-r <(for var in {rds}; do trimadap-mt $var -p {thr}; done)".format(thr=threads//2, rds=" ".join(input.reads1))
+			else:
+				reads = "-1 <(trimadap-mt -p {thr} {rds1}) -2 <(trimadap-mt -p {thr} {rds2})".format(thr=threads//2, rds1=" ".join(input.reads1), rds2=" ".join(input.reads2))
+		else:
+			if unstranded:
+				reads = "-r {rds}".format(rds=" ".join(input.reads1))
+			else:
+				reads = "-1 {rds1} -2 {rds2}".format(rds1=" ".join(input.reads1), rds2=" ".join(input.reads2))
+		# run
+		shell(r"""
+		set -eux
+		rm -fr $(dirname {output.sf})/*; rm -fr $(dirname {log})/*
+		printf "\n-----------salmon: " > {log}; salmon --version >> {log}
+		
+		salmon quant -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf}) &>> {log}
+		mv $(dirname {output.sf})/quant.sf {output.sf}
+		mv $(dirname {output.sf})/aux_info $(dirname {output.sf})/logs $(dirname {output.sf})/libParams $(dirname {output.sf})/cmd_info.json $(dirname {log})/
+		echo "more log files in $(dirname {log})" >> {log}
+		""")
+
+##-------------------- feature counts -----------------------------------------------------------------------
+
+rule feature_counts:
+	input:
+		bam = pph.file_path(step="star", extension="unsorted.bam"),
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		pph.file_path(step="feature_counts", extension="feature_counts")
+	log:
+		pph.file_path(step="feature_counts", extension="log", log=True)
+	params:
+		nsrt_bam = pph.file_path(step="feature_counts", extension="name_sorted.bam")
+	threads: 2
+	run:
+		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
+		paired   = "-p" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		shell(r"""
+		set -eux
+		printf "\n-----------samtools sort: " > {log}; samtools --version >> {log}
+		samtools sort -n -@ $(expr {threads} \* 2) -m $(expr 2500 / {threads})M -T $(dirname {output})/sort -o {params.nsrt_bam} {input.bam} 2>> {log}
+		printf "\n-----------feature counts: " >> {log}
+		featureCounts -T {threads} -t exon -g gene_id -a {input.gtf} -s {protocol} {paired} -o {output} {params.nsrt_bam} &>> {log}
+		rm {params.nsrt_bam}
+		""")
+
+##-------------------- dupradar -----------------------------------------------------------------------------
+
+rule dupradar:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		touch(pph.file_path(step="dupradar", extension="done"))
+	log:
+		pph.file_path(step="dupradar", extension="log", log=True)
+	threads: 8
+	run:
+		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
+		paired  = "TRUE" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "FALSE"
+		shell(r"""
+		set -eux
+		printf "\n-----------dupradar: " > {log}
+		Rscript --vanilla {SCRIPTDIR}/dupradar.R {input.bam} {wildcards.sample} {input.gtf} {protocol} {paired} {threads} $(dirname {output}) &>> {log}
+		""")
+
+##-------------------- infer experiment ---------------------------------------------------------------------
+
+rule infer_experiment:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+		bed = config["organism"]["files"]["bed"]
+	output:
+		pph.file_path(step="infer_experiment", extension="strand_stat.txt")
+	log:
+		pph.file_path(step="infer_experiment", extension="log", log=True)
+	run:
+		shell(r"""
+		set -eux
+		printf "\n-----------infer_experiment: " > {log}
+		infer_experiment.py -r {input.bed} -i {input.bam} -q 255 > {output} &>> {log}
+		""")
+
+##-------------------- qc -----------------------------------------------------------------------------------
+
+#TODO: keep script? rename, several steps, hard coded star report file path
+rule qc:
+	input:
+		genome = config["organism"]["files"]["genome"],
+		gtf = config["organism"]["files"]["seqc_gtf"],
+		bam = pph.file_path(step="star", extension="bam"),
+		fastqc = pph.file_path(step="fastqc", extension="zip")
+	output:
+		touch(pph.file_path(step="qc", extension="done"))
+	log:
+		pph.file_path(step="qc", extension="log", log=True)
+	run:
+		paired = '' if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else '-e'
+		shell(r"""
+		set -eux
+		printf "\n-----------qc: " > {log}
+		if [ ! -f {input.genome}.fai ] ; then exit 1; fi
+        {SCRIPTDIR}/run_my_qc.sh {paired} -l $(dirname {input.bam})/../report/Log.final.out -f $(dirname {input.fastqc}) -b {input.bam} -g {input.gtf} -r {input.genome} -o $(dirname {output}) &>> {log}
+        if [ ! -f $(dirname {output})/RNA-SeQC/metrics.tsv ] ; then exit 1; fi
+		""")
+
+

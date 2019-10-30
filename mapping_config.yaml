@@ -1,0 +1,23 @@
+#--- organism annotation
+
+organism_defaults: ### FILL HERE ###  (e.g. Homo_sapiens.yaml)
+
+organism:
+  __options__: [name, genus, taxon, files, star_index, salmon_index, R]
+  ### OVERWRITE ###  organism defaults (e.g. gtf, genome and indices)
+
+
+#--- general pipeline parameters
+
+pipeline_param:
+  __options__: [out_path_pattern, log_path_pattern, in_path_pattern, mapping_results, QC_results]
+  
+  in_path_pattern: ### FILL HERE ###  (path pattern where fastq files are stored)
+
+
+#--- parameters for rules
+
+rule_options:
+  __options__: [star, star_index, salmon, salmon_index]
+ 
+

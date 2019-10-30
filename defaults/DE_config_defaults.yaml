@@ -1,0 +1,87 @@
+#---------------------------------------- general pipeline parameters
+pipeline_param:
+  # adjust pattern of stored files
+  out_path_pattern: DE/{contrast}/{step}/out/{step}.{contrast}.{extension}
+  log_path_pattern: DE/{contrast}/{step}/report/{step}.{contrast}.{extension}
+  in_path_pattern: mapping/{step}/{sample}/out/{step}.{name}.{extension}
+  
+  # base dir of report snippet library ("" for the default in git repo)
+  report_snippets: ""
+
+  # define choices for choose_input()
+  input_choice:
+    mapping:
+      - import_gene_counts
+      - import_sf
+
+#---------------------------------------- organism annotation (needs to be set)
+#organism_defaults: null
+
+#---------------------------------------- information about experiment
+experiment:
+  covariate_file:
+    salmon: covariate_file.txt
+    star: covariate_file.txt
+  design_formula: "~ group"
+  #columns: null
+      
+#---------------------------------------- filtering of count matrices
+filters:
+  low_counts: 0
+  experiment_blacklist: {} # {<Column>: [<Level1>,...]} for columns of covariate file
+  experiment_whitelist: {}
+  
+#---------------------------------------- normalization parameters
+normalization:
+  DESeq2_parameters:
+    min_mu: 0
+
+#---------------------------------------- description of contrasts
+contrasts:
+  defaults:
+    max_p_adj: 0.1
+    ranking_by: log2FoldChange
+    ranking_order: "-abs(x)"
+    results_parameters:
+      lfcThreshold: 0
+      altHypothesis: greaterAbs
+      independentFiltering: yes
+    lfcShrink_parameters:
+      type: none
+    GO:
+      fdr_threshold: 0.1
+  #contrast_list: null
+
+#---------------------------------------- QC parameters
+QC:
+  count_heatmap:
+    plot: yes
+    transform_type: normTransform #options.. ["normTransform", "vst", "rlog"]
+    annotation_col:
+      - group
+      - group
+  sample_similarity:
+    plot: yes
+    transform_type: vst
+    annotation_col:
+      - group
+  samples_pca:
+    plot: yes
+    transform_type: vst
+    annotation_col:
+      - group
+
+#---------------------------------------- report parameters
+report:
+  defaults:
+    contrast:
+      - Init_code.Rmd
+      - MA_plot.Rmd
+      - Result_table.Rmd
+  report_snippets:
+    - Covariate_table.Rmd
+    - PCA_plot.Rmd
+    - SampleSimilarity_plot.Rmd
+    - contrast: __all__
+
+

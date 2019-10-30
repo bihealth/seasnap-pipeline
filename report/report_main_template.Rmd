@@ -1,0 +1,46 @@
+---
+title: "DE Pipeline Report"
+date: "Last update: `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+        collapsed: true
+        smooth_scroll: true
+    toc_depth: 3
+    fig_caption: yes
+    number_sections: true
+fontsize: 14pt
+---
+
+<!---
+- Compile from command-line
+Rscript -e "rmarkdown::render('report.Rmd', c('html_document'), clean=FALSE)"
+-->
+
+```{r setup, echo=FALSE, message=FALSE}
+library(DESeq2)
+library(yaml)
+working_dir <- "{{WORKING_DIRECTORY}}"
+
+knitr::opts_knit$set(root.dir = working_dir)
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/', echo=F, warning=T, message=F)
+
+# variables and functions accessible from all chunks
+setwd(working_dir)
+config   <- yaml.load_file("DE_config.yaml")
+r_common <- "{{R_COMMON}}"
+file_tab <- data.frame(read.table("{{FILE_TABLE}}", sep="\t", header = TRUE))
+file_tab$filename <- as.character(file_tab$filename)
+source(paste0(r_common, "/basic_funcs.R"))
+source(paste0(r_common, "/basic_plots.R"))
+DDS <- readRDS("{{DESeq2-rds}}")
+```
+
+#>--------------------------------------------INSERT--------------------------------------------<#
+# Session Info
+
+```{r sessionInfo, message=TRUE}
+sessionInfo()
+```
+

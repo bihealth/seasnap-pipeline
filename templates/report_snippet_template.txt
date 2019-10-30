@@ -1,0 +1,31 @@
+# this is a template for writing new R snippets,
+# copy the template and replace or delete the marked parts.
+# see documentation for more information
+#----------------------------------------------------------
+
+# <snippet title> or 
+### <snippet title> in snippet sub-folders
+
+<snippet description>
+
+```{r <chunk_name>}
+
+#TODO: R code
+
+# access contents of DE config file:
+<variable> <- config$<key1>$<key2>$<key3>
+
+# name of an output file:
+<file_name> <- subset(file_tab, step=="<rule_name>" & extension=="<file_extension>" & <additional wildcards>)$filename
+# or
+<file_name> <- "{{<rule_name>-<file_extension>}}"
+# only in snippet sub-folders:
+<file_name> <- "{{<rule_name>-<file_extension>-{{ENTRY_ID}}}}"
+
+# these wildcards will also be filled:
+{{WORKING_DIRECTORY}} # the path to the working directory during pipeline execution
+{{R_COMMON}}          # the path to a folder with generic R functions to be used in snippets
+# only in snippet sub-folders:
+{{ENTRY_NAME}}
+{{ENTRY_ID}}
+```

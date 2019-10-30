@@ -1,0 +1,31 @@
+#---------------------------------------- general pipeline parameters
+pipeline_param:
+  # adjust pattern of stored files
+  out_path_pattern: mapping/{step}/{sample}/out/{step}.{name}.{extension}
+  log_path_pattern: mapping/{step}/{sample}/report/{step}.{name}.{extension}
+  in_path_pattern: ../input/{sample}/{name}
+  
+  # adjust which files to produce
+  mapping_results:
+    - "salmon-transcript_counts"
+    - "star-gene_counts"
+  QC_results:
+    - "fastqc"
+    - "dupradar"
+    - "infer_experiment"
+
+#---------------------------------------- organism annotation
+organism_defaults: null
+
+#---------------------------------------- parameters for rules
+rule_options:
+  star: 
+    cmd_opt: "--outSAMunmapped Within --outFilterType BySJout --outFilterMultimapNmax 20 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverLmax 0.04 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000 --genomeLoad NoSharedMemory --outSAMattributes NH HI AS NM MD --outSAMtype BAM Unsorted --outSAMattrRGline \"ID:{wildcards.sample}\" \"SM:{wildcards.sample}\" \"PL:Illumina\""
+    trim: yes
+  star_index: 
+    cmd_opt: "--sjdbOverhang 49" # optimally sjdbOverhang = <read_length> - 1
+  salmon_index:
+    cmd_opt: "-k 31"             # (k the default k-mer size of 31 is suitable for read length around 75)
+  salmon: 
+    cmd_opt: "--validateMappings"
+    trim: yes

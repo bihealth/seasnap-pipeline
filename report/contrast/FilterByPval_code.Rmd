@@ -1,0 +1,8 @@
+<!---
+reorder the results
+-->
+
+```{r reorder_{{ENTRY_ID}}, include=FALSE}
+RES <- RES[RES$padj < 0.1,]
+```
+

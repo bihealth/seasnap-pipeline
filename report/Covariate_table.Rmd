@@ -1,0 +1,15 @@
+# Processed data
+
+This is an interactive table of the covariate data.
+
+```{r DataTable}
+#----- import packages
+library(DT)
+
+#----- load DESeqDataSet
+dds <- readRDS("{{DESeq2-rds}}")
+
+#----- create table
+datatable(as.data.frame(colData(dds)), options = list(scrollX = TRUE))
+```
+

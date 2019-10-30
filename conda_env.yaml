@@ -1,0 +1,37 @@
+name: sea_snap
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - r=3.5.1 #=5.1 for bioconductor
+
+  - bioconductor-deseq2
+  - bioconductor-genomicfeatures
+  - bioconductor-annotationdbi
+  - bioconductor-org.hs.eg.db # annotation for human
+  - bioconductor-tximport
+  - bioconductor-goseq
+  - bioconductor-apeglm
+  - bioconductor-dupradar
+  - r-blob=1.2.0 #for deseq2
+  - r-readr
+  - r-ashr
+  - r-pheatmap
+  - rpy2
+
+  - drmaa
+  - snakemake
+
+  - star
+  - samtools
+  - fastqc
+  - picard
+  - rsem
+  - rna-seqc
+  - bedtools
+  - subread
+  - trimadap=r9
+  - salmon
+  - rseqc

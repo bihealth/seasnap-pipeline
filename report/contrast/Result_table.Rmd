@@ -1,0 +1,15 @@
+### Results table
+
+An interactive data table of the contrast results for {{ENTRY_NAME}}.
+
+```{r table_{{ENTRY_ID}}}
+#----- import packages
+library(DT)
+
+#----- load results
+res <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
+
+#----- MA plot
+datatable(as.data.frame(res), options = list(scrollX = TRUE))
+```
+
