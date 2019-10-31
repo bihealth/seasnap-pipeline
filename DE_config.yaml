@@ -48,7 +48,7 @@ normalization:
 #--- QC parameters
 
 QC:
-  __options__: [count_heatmap, sample_similarity, samples_pca]
+  __options__: [countMatrix_heatmap, sample_similarity, samples_pca]
 
 
 #--- report parameters

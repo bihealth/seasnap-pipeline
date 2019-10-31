@@ -28,7 +28,7 @@ knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/', echo=F, warn
 
 # variables and functions accessible from all chunks
 setwd(working_dir)
-config   <- yaml.load_file("DE_config.yaml")
+config   <- yaml.load_file("{{pipeline_report-yaml}}")
 r_common <- "{{R_COMMON}}"
 file_tab <- data.frame(read.table("{{FILE_TABLE}}", sep="\t", header = TRUE))
 file_tab$filename <- as.character(file_tab$filename)

@@ -2,7 +2,7 @@
 ## version: 0.9.5
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
-import os, re, hashlib, itertools, yaml, pandas as pd
+import sys, os, re, hashlib, itertools, yaml, pandas as pd
 from collections import namedtuple, Mapping
 from copy import deepcopy
 from warnings import warn
@@ -773,7 +773,7 @@ class ReportTool(PipelinePathHandler):
 		if config_dict["pipeline_param"]["report_snippets"]:
 			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
 		else:
-			self.report_snippet_base_dir = Path(sys.path[0]) / ".." / "report"
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report"
 		
 		self.report_snippet_building_plan = config_dict["report"]["report_snippets"]
 		
@@ -826,7 +826,7 @@ class ReportTool(PipelinePathHandler):
 		# add subsection entries
 		assert len(snippet)==1
 		entries = list(snippet.values())[0]
-		if type(entries) is str: entries = self.contrast_list if entries is "__all__" else [entries]
+		if type(entries) is str: entries = self.contrast_list if entries == "__all__" else [entries]
 		for entry in entries:
 			if type(entry) is str:
 			

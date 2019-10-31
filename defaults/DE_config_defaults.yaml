@@ -54,7 +54,7 @@ contrasts:
 
 #---------------------------------------- QC parameters
 QC:
-  count_heatmap:
+  countMatrix_heatmap:
     plot: yes
     transform_type: normTransform #options.. ["normTransform", "vst", "rlog"]
     annotation_col:
