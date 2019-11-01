@@ -51,6 +51,10 @@ onstart:
 	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", contrast="all")
 	os.makedirs(os.path.dirname(info_file), exist_ok=True)
 	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+	# save merged config
+	config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
+	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
+
 
 
 ##-------------------- starting point ----------------------------------------------------------------------
@@ -64,11 +68,11 @@ def get_inputs_all():
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds"))
 	
 	#QC
-	if config["QC"]["count_heatmap"]["plot"]=="yes": 
+	if config["QC"]["countMatrix_heatmap"]["plot"]: 
 		inputs.append(pph.file_path("countMatrix_heatmap", "pdf", contrast = "all"))
-	if config["QC"]["sample_similarity"]["plot"]=="yes": 
+	if config["QC"]["sample_similarity"]["plot"]: 
 		inputs.append(pph.file_path("sample_similarity",   "png", contrast = "all"))
-	if config["QC"]["samples_pca"]["plot"]=="yes": 
+	if config["QC"]["samples_pca"]["plot"]: 
 		inputs.append(pph.file_path("samples_pca",         "pdf", contrast = "all"))
 	return inputs
 
@@ -185,21 +189,74 @@ rule import_gene_counts:
 		#----- import data
 		sample_df <- read.table("{input.samples}", header=TRUE)
 		files     <- as.character(sample_df$filename); print(files)
-		samples   <- as.character(sample_df$group)
+		samples   <- as.character(sample_df$label)
 
 		#----- merge count files from star
-		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", col.names=c("ID", samples[i]))))
-		count_dat <- Reduce(function(...) merge(..., all=TRUE), df_list); rownames(count_dat) <- count_dat$ID
-
-		#----- import counts in DESeq2
-		rownames(sample_df) <- sample_df$group; count_dat <- count_dat[, rownames(sample_df)]
-		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = ~ condition)
+		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", col.names=c("ID", samples[i]), check.names=FALSE)))
+		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
 		
 		#----- change levels
 		level_cols <- {level_list}
 		for (col in names(level_cols)) {{
-			attr(dds, col) <- factor(attr(dds, col), levels = level_cols[col])
+			sample_df[,col] <- factor(sample_df[,col], levels = level_cols[[col]])
 		}}
+
+		#----- import counts in DESeq2
+		rownames(sample_df) <- sample_df$label; count_dat <- count_dat[, rownames(sample_df)]
+		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = {DESIGN})
+		
+		#----- save as rds
+		saveRDS(dds, file="{output}")
+		""")
+		
+		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
+		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+
+rule import_featurecounts:
+	""" collect count files (featurecounts) and build count matrix """
+	input:
+		samples = config["experiment"]["covariate_file"]["star"]
+	output:
+		pph.file_path("import_featurecounts", "rds", contrast = "all")
+	log:
+		r_script = pph.file_path("import_featurecounts", "R",            contrast = "all", log=True),
+		r_output = pph.file_path("import_featurecounts", "r_output.log", contrast = "all", log=True)
+	run:
+		column_filter = "TRUE"
+		if config["filters"]["experiment_whitelist"]:
+			column_filter  = "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+								for k,v in config["filters"]["experiment_whitelist"].items())
+		if config["filters"]["experiment_blacklist"]:
+			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+								for k,v in config["filters"]["experiment_blacklist"].items())
+		level_list  = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) 
+							for n,l in config["experiment"]["columns"].items()))
+		
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(DESeq2)
+		
+		{R_SESSION_INFO}
+		
+		#----- import data
+		sample_df <- read.table("{input.samples}", header=TRUE)
+		files     <- as.character(sample_df$filename); print(files)
+		samples   <- as.character(sample_df$label)
+
+		#----- merge count files from star
+                read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"), col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
+		df_list   <- lapply(1:length(files), function(i) as.data.frame(read_fc(files[i], samples[i])))
+		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
+		
+		#----- change levels
+		level_cols <- {level_list}
+		for (col in names(level_cols)) {{
+			sample_df[,col] <- factor(sample_df[,col], levels = level_cols[[col]])
+		}}
+
+		#----- import counts in DESeq2
+		rownames(sample_df) <- sample_df$label; count_dat <- count_dat[, rownames(sample_df)]
+		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = {DESIGN})
 		
 		#----- save as rds
 		saveRDS(dds, file="{output}")
@@ -221,10 +278,10 @@ rule import_sf:
 	run:
 		column_filter = "TRUE"
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter  = "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_blacklist"].items())
 		level_list = "list({})".format(",".join("{}=c({})".format( k, ",".join('"'+l+'"' for l in v) ) 
 								for k,v in config["experiment"]["columns"].items()))
@@ -245,18 +302,18 @@ rule import_sf:
 		
 		#----- use tximport on input files
 		sample_df  <- read.table("{input.samples}", header=TRUE)
-		sample_df  <- samples[{column_filter},]
+		sample_df  <- sample_df[{column_filter},]
 		files      <- as.character(sample_df$filename); print(files)
 		txi        <- tximport(files, type = "salmon", tx2gene = tx2gene)
-		
-		#----- import txi in DESeq2
-		dds <- DESeqDataSetFromTximport(txi, colData = sample_df, design = {DESIGN})
 		
 		#----- change levels
 		level_cols <- {level_list}
 		for (col in names(level_cols)) {{
-			attr(dds, col) <- factor(attr(dds, col), levels = level_cols[col])
+			sample_df[,col] <- factor(sample_df[,col], levels = level_cols[[col]])
 		}}
+		
+		#----- import txi in DESeq2
+		dds <- DESeqDataSetFromTximport(txi, colData = sample_df, design = {DESIGN})
 		
 		#----- save as rds
 		saveRDS(dds, file="{output}")
@@ -271,8 +328,9 @@ rule DESeq2:
 	""" run DESeq2 on a count matrix """
 	input:
 		pph.choose_input(choice_name = "mapping", options = [
-		dict(step = "import_gene_counts", extension = "rds", contrast = "all"),
-		dict(step = "import_sf",          extension = "rds", contrast = "all")
+		dict(step = "import_gene_counts",   extension = "rds", contrast = "all"),
+		dict(step = "import_featurecounts", extension = "rds", contrast = "all"),
+		dict(step = "import_sf",            extension = "rds", contrast = "all")
 		])
 	output:
 		pph.file_path("DESeq2", "rds", contrast = "all")
@@ -332,7 +390,10 @@ rule contrast:
 			r_contrast  = 'c("{}","{}","{}")'.format(column, numerator, denominator)
 			apeglm_coef = "{}_{}_vs_{}".format(column, numerator, denominator)
 		else:
-			r_contrast = apeglm_coef = contrast["r_contrast"]
+			r_contrast  = apeglm_coef = contrast["r_contrast"]
+                        column      =               contrast["column"]
+                        numerator   =               ""
+                        denominator =               ""
 			
 		cutoff_FDR           =           contrast["max_p_adj"]
 		lfcThreshold         =           contrast["results_parameters"]["lfcThreshold"]
@@ -378,8 +439,8 @@ rule contrast:
 		res <- res[order({rank_order}),]
 		
 		#----- annotation
-		res$symbol <- mapIds({params.annot_pkg}, keys=row.names(res), column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-		res$entrez <- mapIds({params.annot_pkg}, keys=row.names(res), column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), column="ENTREZID", keytype="ENSEMBL", multiVals="first")
 		
 		#----- save as rds
 		saveRDS(res, file="{output}")
@@ -439,6 +500,7 @@ rule goseq:
 		assayed.genes <- rownames(res)
 		de.genes <- assayed.genes[which(res$padj < {fdr_threshold})]
 		gene.vector <- as.integer(assayed.genes %in% de.genes); names(gene.vector) <- assayed.genes
+                names(gene.vector) <- sub("\\.[0-9]+", "", names(gene.vector))
 		
 		#----- get gene lengths
 		TxDb <- loadDb(file = "{input.txdb}")
@@ -483,8 +545,8 @@ rule countMatrix_heatmap:
 		r_script = pph.file_path("countMatrix_heatmap", "R",            contrast = "all", log=True),
 		r_output = pph.file_path("countMatrix_heatmap", "r_output.log", contrast = "all", log=True)
 	run:
-		annot  = "c({})".format(",".join('"'+s+'"' for s in config["QC"]["count_heatmap"]["annotation_col"]))
-		transf = config["QC"]["count_heatmap"]["transform_type"]
+		annot  = "c({})".format(",".join('"'+s+'"' for s in config["QC"]["countMatrix_heatmap"]["annotation_col"]))
+		transf = config["QC"]["countMatrix_heatmap"]["transform_type"]
 		script = snakemake_format(textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
