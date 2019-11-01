@@ -337,7 +337,7 @@ rule contrast:
 		cutoff_FDR           =           contrast["max_p_adj"]
 		lfcThreshold         =           contrast["results_parameters"]["lfcThreshold"]
 		altHypothesis        =           contrast["results_parameters"]["altHypothesis"]
-		independentFiltering = "TRUE" if contrast["results_parameters"]["independentFiltering"]=="yes" else "FALSE"
+		independentFiltering = "TRUE" if contrast["results_parameters"]["independentFiltering"] else "FALSE"
 		lfc_shrink_type      =           contrast["lfcShrink_parameters"]["type"]
 		rank_by              =           contrast["ranking_by"]
 		rank_order           =           contrast["ranking_order"].replace("x", "res$"+rank_by)

@@ -26,7 +26,19 @@ class PipelinePathHandler:
 	required_wildcards_out_log = ["step", "extension"]
 	required_wildcards_in      = []
 	
-	def __init__(self, config, test_allowed_wildcards=True):
+	def __init__(self, config, test_config, test_allowed_wildcards=True):
+		# load test_config for validity check of config values
+		if type(test_config) is dict:
+			self.test_config = test_config
+		elif isinstance(test_config, str):
+			with open(test_config, "r") as stream:
+				try:
+					self.test_config = yaml.safe_load(stream)
+				except yaml.YAMLError as exc:
+					print(exc)
+		else:
+			raise TypeError("Wrong type of argument test_config: must be dict or str.")
+	
 		self.out_path_pattern = config["pipeline_param"]["out_path_pattern"]
 		self.log_path_pattern = config["pipeline_param"]["log_path_pattern"]
 		self.in_path_pattern  = config["pipeline_param"]["in_path_pattern"]
@@ -57,6 +69,7 @@ class PipelinePathHandler:
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
 	
 	def _test_config_input(self, test_allowed_wildcards):
+		""" test whether wildcards in path patterns are valid """
 		if test_allowed_wildcards:
 			# test if all wildcards allowed
 			if not all(x in self.allowed_wildcards for x in self.out_path_wildcards+self.log_path_wildcards+self.in_path_wildcards):
@@ -69,6 +82,40 @@ class PipelinePathHandler:
 		if not all(x in self.in_path_wildcards for x in self.required_wildcards_in):
 			raise ValueError("Error in config file: 'step', 'extension', 'sample' and 'name' must be wildcards "
 					"in out_path_pattern and log_path_pattern")
+
+	def _test_config_general(self, base_dict, check_dict):
+		""" test whether values set in the config are valid """
+		for key, val in check_dict.items():
+		
+			if key not in base_dict and key not in ["__num__", "__opt__", "__any__", "__any_other__"]:
+				raise IndexError("Error in config file: The required key {} was not defined!".format(key))
+			
+			# if number
+			if key == "__num__":
+				if not isinstance(base_dict[key], (int, float)):
+					raise ValueError("Error in config file: value of {} must be a number!".format(key))
+				assert len(val)==2
+				if val[0] and not base_dict[key] > val[0]: 
+					raise ValueError("Error in config file: value of {} must be >{}!".format(key, val[0]))
+				if val[1] and not base_dict[key] < val[1]: 
+					raise ValueError("Error in config file: value of {} must be <{}!".format(key, val[1]))
+			
+			# if string
+			if isinstance(val, str):
+				if isinstance(base_dict[key], str):
+					if not re.fullmatch(base_dict[key], val):
+						raise ValueError("Error in config file: value of {} does not match {}!".format(key, val))
+				else:
+					raise ValueError("Error in config file: value of {} should be a string! got: {}".format(key, val))
+			# if dict
+			elif isinstance(val, dict):
+				pass
+			
+			if key in base_dict and isinstance(base_dict[key], dict) and isinstance(check_dict[key], Mapping):
+				base_dict[key] = dict_merge(base_dict[key], check_dict[key])
+			else:
+				base_dict[key] = check_dict[key]
+		return base_dict
 		
 	def _set_input_choice(self, config):
 		""" create input choice dictionary from config ensuring a standardized structure """
@@ -762,7 +809,7 @@ class ReportTool(PipelinePathHandler):
 			config_dict = config
 		elif isinstance(config, str):
 			# try reading from yaml file
-			with open(config_yaml, "r") as stream:
+			with open(config, "r") as stream:
 				try:
 					config_dict = yaml.safe_load(stream)
 				except yaml.YAMLError as exc:
