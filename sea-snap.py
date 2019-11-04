@@ -42,7 +42,8 @@ def setup_working_directory(args):
 	for configf in config_files:
 		shutil.copy(str(configf), str(working_dir / configf.name))
 		
-	shutil.copy(CLUSTER_CONFIG, str(working_dir / Path(CLUSTER_CONFIG).name))
+	cl_config = SCRIPT_DIR / CLUSTER_CONFIG
+	shutil.copy(str(cl_config), str(working_dir / cl_config.name))
 
 	# symlink to wrapper
 	(working_dir / "sea-snap").symlink_to(SCRIPT_DIR / "sea-snap.py")

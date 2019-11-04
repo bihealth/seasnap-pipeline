@@ -26,18 +26,18 @@ class PipelinePathHandler:
 	required_wildcards_out_log = ["step", "extension"]
 	required_wildcards_in      = []
 	
-	def __init__(self, config, test_config, test_allowed_wildcards=True):
+	def __init__(self, config, test_allowed_wildcards=True):
 		# load test_config for validity check of config values
-		if type(test_config) is dict:
-			self.test_config = test_config
-		elif isinstance(test_config, str):
-			with open(test_config, "r") as stream:
-				try:
-					self.test_config = yaml.safe_load(stream)
-				except yaml.YAMLError as exc:
-					print(exc)
-		else:
-			raise TypeError("Wrong type of argument test_config: must be dict or str.")
+		#if type(test_config) is dict:
+		#	self.test_config = test_config
+		#elif isinstance(test_config, str):
+		#	with open(test_config, "r") as stream:
+		#		try:
+		#			self.test_config = yaml.safe_load(stream)
+		#		except yaml.YAMLError as exc:
+		#			print(exc)
+		#else:
+		#	raise TypeError("Wrong type of argument test_config: must be dict or str.")
 	
 		self.out_path_pattern = config["pipeline_param"]["out_path_pattern"]
 		self.log_path_pattern = config["pipeline_param"]["log_path_pattern"]

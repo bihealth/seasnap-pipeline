@@ -179,13 +179,13 @@ You can set individual covariate files for Salmon and STAR under `config: experi
 To run the pipeline locally you can use:
 
 ```
-./sea-snap mapping -l
+./sea-snap mapping l
 ```
 
 or
 
 ```
-./sea-snap DE -l
+./sea-snap DE l
 ```
 
 for the mapping- and DE pipelines, respectively.
@@ -195,13 +195,13 @@ You can also add any [`snakemake options`](https://snakemake.readthedocs.io/en/s
 To run the pipeline on the cluster, type:
 
 ```
-./sea-snap mapping -c
+./sea-snap mapping c
 ```
 
 or
 
 ```
-./sea-snap DE -c
+./sea-snap DE c
 ```
 
 Also note the file `cluster_config.json`, which was added to the working directory together with `mapping_config.yaml` and `DE_config.yaml`.
