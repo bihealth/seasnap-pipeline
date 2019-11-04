@@ -26,18 +26,20 @@ class PipelinePathHandler:
 	required_wildcards_out_log = ["step", "extension"]
 	required_wildcards_in      = []
 	
-	def __init__(self, config, test_allowed_wildcards=True):
-		# load test_config for validity check of config values
-		#if type(test_config) is dict:
-		#	self.test_config = test_config
-		#elif isinstance(test_config, str):
-		#	with open(test_config, "r") as stream:
-		#		try:
-		#			self.test_config = yaml.safe_load(stream)
-		#		except yaml.YAMLError as exc:
-		#			print(exc)
-		#else:
-		#	raise TypeError("Wrong type of argument test_config: must be dict or str.")
+	def __init__(self, config, test_config=False, test_allowed_wildcards=True):
+		self.test_config = None
+		if test_config:
+			# load test_config for validity check of config values
+			if type(test_config) is dict:
+				self.test_config = test_config
+			elif isinstance(test_config, str):
+				with open(test_config, "r") as stream:
+					try:
+						self.test_config = yaml.safe_load(stream)
+					except yaml.YAMLError as exc:
+						print(exc)
+			else:
+				raise TypeError("Wrong type of argument test_config: must be dict or str.")
 	
 		self.out_path_pattern = config["pipeline_param"]["out_path_pattern"]
 		self.log_path_pattern = config["pipeline_param"]["log_path_pattern"]
@@ -87,35 +89,67 @@ class PipelinePathHandler:
 		""" test whether values set in the config are valid """
 		for key, val in check_dict.items():
 		
-			if key not in base_dict and key not in ["__num__", "__opt__", "__any__", "__any_other__"]:
-				raise IndexError("Error in config file: The required key {} was not defined!".format(key))
+			## key test
+			# if wildcard
+			if key == "__any__":
+				for glob_key in base_dict:
+					if glob_key not in check_dict:
+						self._test_config_general(base_dict, {glob_key: val})
+			# if reference
+			elif key == "__any_other__":
+				ref_dict = self.test_config
+				for r_key in val.split(":"): ref_dict = ref_dict[r_key]
+				for opt_key in ref_dict:
+					if opt_key in base_dict:
+						self._test_config_general(base_dict, {opt_key: ref_dict[opt_key]})
+			# if missing
+			elif key not in base_dict:
+				raise KeyError("Error in config file: The required key {} was not defined!".format(key))
 			
-			# if number
-			if key == "__num__":
-				if not isinstance(base_dict[key], (int, float)):
-					raise ValueError("Error in config file: value of {} must be a number!".format(key))
-				assert len(val)==2
-				if val[0] and not base_dict[key] > val[0]: 
-					raise ValueError("Error in config file: value of {} must be >{}!".format(key, val[0]))
-				if val[1] and not base_dict[key] < val[1]: 
-					raise ValueError("Error in config file: value of {} must be <{}!".format(key, val[1]))
-			
+			## value test
 			# if string
-			if isinstance(val, str):
+			elif isinstance(val, str):
 				if isinstance(base_dict[key], str):
 					if not re.fullmatch(base_dict[key], val):
 						raise ValueError("Error in config file: value of {} does not match {}!".format(key, val))
 				else:
-					raise ValueError("Error in config file: value of {} should be a string! got: {}".format(key, val))
+					raise TypeError("Error in config file: value of {} should be a string! got: {}".format(key, val))
+			# if list
+			elif isinstance(val, list):
+				if isinstance(base_dict[key], list):
+					for item in base_dict[key]:
+						self._test_config_general({key: item}, check_dict)
+				else:
+					raise TypeError("Error in config file: value of {} should be a string! got: {}".format(key, val))
 			# if dict
 			elif isinstance(val, dict):
-				pass
 			
-			if key in base_dict and isinstance(base_dict[key], dict) and isinstance(check_dict[key], Mapping):
-				base_dict[key] = dict_merge(base_dict[key], check_dict[key])
-			else:
-				base_dict[key] = check_dict[key]
-		return base_dict
+				# if number range
+				if len(val)==1 and list(val)[0] == "__num__":
+					if not isinstance(base_dict[key], (int, float)):
+						raise TypeError("Error in config file: value of {} must be a number!".format(key))
+					num_range = list(val.values())
+					assert len(num_range)==2
+					if num_range[0] and not base_dict[key] > num_range[0]: 
+						raise ValueError("Error in config file: value of {} must be >{}!".format(key, num_range[0]))
+					if num_range[1] and not base_dict[key] < num_range[1]: 
+						raise ValueError("Error in config file: value of {} must be <{}!".format(key, num_range[1]))	
+				# if option list
+				elif len(val)==1 and list(val)[0] == "__opt__":
+					options = list(val.values())[0]
+					error_num  = 0
+					for option in options:
+						try:
+							self._test_config_general(base_dict, option)
+						except (KeyError, ValueError, TypeError) as e:
+							if not re.match("Error in config file", str(e)):
+								raise
+							error_num += 1
+					if error_num == len(options):
+						raise ValueError("Error in config file: no valid option for {}! must be one of: {}".format(key, options))
+				else:
+					self._test_config_general(base_dict[key], val)
+			
 		
 	def _set_input_choice(self, config):
 		""" create input choice dictionary from config ensuring a standardized structure """

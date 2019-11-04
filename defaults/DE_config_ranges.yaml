@@ -59,7 +59,7 @@ contrasts:
       column: \S+
       numerator: \S+
       denominator: \S+
-      __any_other__: "contrasts:defaults:"
+      __any_other__: "contrasts:defaults"
 
 #---------------------------------------- QC parameters
 QC:
