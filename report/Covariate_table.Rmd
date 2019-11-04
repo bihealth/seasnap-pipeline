@@ -10,6 +10,6 @@ library(DT)
 dds <- readRDS("{{DESeq2-rds}}")
 
 #----- create table
-datatable(as.data.frame(colData(dds)), options = list(scrollX = TRUE))
+datatable(as.data.frame(colData(dds)), rownames=F, options = list(scrollX = TRUE))
 ```
 

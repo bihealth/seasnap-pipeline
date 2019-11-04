@@ -5,7 +5,8 @@
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
 
-import os, sys, time, shutil, argparse, json
+import os, sys, time, shutil, argparse, json, yaml, re
+import pandas as pd
 from pathlib import Path
 from tools.pipeline_tools import CovariateFileTool, SampleInfoTool
 
@@ -94,6 +95,23 @@ def generate_covariate_file(args):
 	# write to file
 	cft.write_covariate_file(args.output)
 	print("\ncovariate file {} auto-generated. EDIT BEFORE RUNNING PIPELINE!".format(args.output))
+
+def show_matrix(args):
+	"""
+	print a model matrix to console
+	"""
+	with open(args.config_file, 'r') as stream:
+		try:
+			config_dict = yaml.safe_load(stream)
+		except yaml.YAMLError as exc:
+			print(exc)
+	design = config_dict["experiment"]["design_formula"]
+	col_names =  re.findall("[^~()/:*+\s]+", design)
+	cov_data = pd.read_csv(args.covariate_file, sep="\t", header=0, dtype=str)
+	expressions = ["-e \"{} <- c('{}')\"".format(col_name, "','".join(cov_data[col_name])) for col_name in col_names]
+	cmd = "Rscript --vanilla {} -e \"model.matrix({})\"".format(" ".join(expressions), design)
+	print(cmd)
+	os.system(cmd)
 	
 def cleanup_cluster_log(args):
 	"""
@@ -213,6 +231,13 @@ parser_DE = subparsers.add_parser('DE', help="run DE pipeline")
 parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
+
+#--- parser for show_matrix
+parser_covariate_file = subparsers.add_parser('show_matrix', help="print model matrix for DE pipeline", description=
+"print model.matrix() based on config- and covariate file to console")
+parser_covariate_file.add_argument('--config_file',    '-conf', default="DE_config.yaml",     help="config file to be loaded")
+parser_covariate_file.add_argument('--covariate_file', '-cov' , default="covariate_file.txt", help="name of covariate file")
+parser_covariate_file.set_defaults(func=show_matrix)
 
 #--- parser for cleanup_cluster_log
 parser_cleanup_log = subparsers.add_parser('cleanup_log', help="delete log files from cluster execution")
