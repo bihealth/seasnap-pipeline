@@ -64,13 +64,6 @@ def get_inputs_all():
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds")),
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds"))
 	
-	#QC
-	if config["QC"]["countMatrix_heatmap"]["plot"]: 
-		inputs.append(pph.file_path("countMatrix_heatmap", "pdf", contrast = "all"))
-	if config["QC"]["sample_similarity"]["plot"]: 
-		inputs.append(pph.file_path("sample_similarity",   "png", contrast = "all"))
-	if config["QC"]["samples_pca"]["plot"]: 
-		inputs.append(pph.file_path("samples_pca",         "pdf", contrast = "all"))
 	return inputs
 
 
@@ -330,17 +323,25 @@ rule DESeq2:
 		dict(step = "import_sf",            extension = "rds", contrast = "all")
 		])
 	output:
-		pph.file_path("DESeq2", "rds", contrast = "all")
+		dds       = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
+		rld_blind = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
+		rld_model = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
+		rld_csv   = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
 	log:
 		r_script = pph.file_path("DESeq2", "R",            contrast = "all", log=True),
 		r_output = pph.file_path("DESeq2", "r_output.log", contrast = "all", log=True)
 	params:
-		coef_names = pph.file_path("DESeq2", "coef_names.txt", contrast = "all")
+		coef_names = pph.file_path("DESeq2", "coef_names.txt", contrast = "all"),
+		rld_names  = pph.file_path("DESeq2", "rld.model.csv", contrast = "all"),
+		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
-		count_threshold = config["filters"]["low_counts"]
+		count_threshold       = config["filters"]["low_counts"]
+                normalized_expression = config["normalization"]["normalized_expression"]
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
+		library(AnnotationDbi)
+		library({params.annot_pkg})
 		
 		{R_SESSION_INFO}
 		
@@ -352,11 +353,31 @@ rule DESeq2:
 		dds  <- dds[keep,]
 		
 		#----- DESeq2
-		dds <- DESeq(dds, test="Wald")
-		
+		dds <- DESeq(dds, betaPrior=FALSE, test="Wald")
+
+		# ----- Normalised expression values
+		rld_blind <- switch("{normalized_expression}",
+			"rld"=rlog(dds, blind=TRUE),
+			"vst"=vst(dds, blind=TRUE)
+		)
+		rld_model <- switch("{normalized_expression}",
+			"rld"=rlog(dds, blind=FALSE),
+			"vst"=vst(dds, blind=FALSE)
+		)
+
 		#----- save as rds
-		saveRDS(dds, file="{output}")
+		saveRDS(dds, file="{output.dds}")
+		saveRDS(rld_blind, file="{output.rld_blind}")
+		saveRDS(rld_model, file="{output.rld_model}")
+
+		#----- save other files
 		writeLines(resultsNames(dds), "{params.coef_names}")
+		write.table(data.frame(
+			gene_id=rownames(rld_model),
+			assays(rld_model),
+			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+			), file="{output.rld_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
 		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
 		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
@@ -367,9 +388,10 @@ rule DESeq2:
 rule contrast:
 	""" make a contrast """
 	input:
-		pph.file_path("DESeq2", "rds", contrast = "all")
+		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
 	output:
-		pph.file_path("contrast", "rds")
+		rds = pph.file_path("contrast", "rds"),
+		csv = pph.file_path("contrast", "csv")
 	log:
 		r_script = pph.file_path("contrast", "R",            log=True),
 		r_output = pph.file_path("contrast", "r_output.log", log=True),
@@ -382,16 +404,31 @@ rule contrast:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
-		if not "r_contrast" in contrast:
-			column, numerator, denominator = (contrast[key] for key in ["column", "numerator", "denominator"])
-			r_contrast  = 'c("{}","{}","{}")'.format(column, numerator, denominator)
-			apeglm_coef = "{}_{}_vs_{}".format(column, numerator, denominator)
+		contrast_def    = ""
+		lfc_def         = ""
+		contrast_type   = ""
+		contrast_column = "group"
+		contrast_ref    = ""
+		contrast_coef   = ""
+		contrast_ratio  = ""
+		contrast_vect   = ""
+		if "coef" in contrast:
+			contrast_def  = 'name="{}"'.format(contrast["coef"])
+			lfc_def       = 'coef="{}"'.format(contrast["coef"])
+			contrast_type = "coef"
 		else:
-			r_contrast  = apeglm_coef = contrast["r_contrast"]
-                        column      =               contrast["column"]
-                        numerator   =               ""
-                        denominator =               ""
-			
+			if "ratio" in contrast:
+				contrast_def    = 'contrast=c("{}", "{}", "{}")'.format(contrast["ratio"]["column"], contrast["ratio"]["numerator"], contrast["ratio"]["denominator"])
+				lfc_def         = contrast_def
+				contrast_type   = "ratio"
+				contrast_column = contrast["ratio"]["column"]
+				contrast_ref    = contrast["ratio"]["denominator"]
+			else:
+				if "vector" in contrast:
+					contrast_def  = "contrast=c(" + ", ".join(contrast["vector"]) + ")"
+					lfc_def         = contrast_def
+					contrast_type = "vector"
+		
 		cutoff_FDR           =           contrast["max_p_adj"]
 		lfcThreshold         =           contrast["results_parameters"]["lfcThreshold"]
 		altHypothesis        =           contrast["results_parameters"]["altHypothesis"]
@@ -412,45 +449,31 @@ rule contrast:
 		dds <- readRDS("{input}")
 		
 		#----- contrast
-		if ("{lfc_shrink_type}"!="apeglm"){{
-			res <- results(dds, contrast={r_contrast}, alpha={cutoff_FDR}, 
-					lfcThreshold={lfcThreshold}, altHypothesis="{altHypothesis}", 
-					independentFiltering={independentFiltering})
+		if ("{contrast_type}" == "ratio") {{
+			dds${contrast_column} = relevel(dds${contrast_column}, ref="{contrast_ref}")
+			dds <- nbinomWaldTest(dds)
 		}}
-					
+		res <- results(dds, {contrast_def}, alpha={cutoff_FDR}, lfcThreshold={lfcThreshold}, altHypothesis="{altHypothesis}", independentFiltering={independentFiltering})
+
+		#----- log-fold-change shrinkage
+		res$lfcShrunk   <- res$log2FoldChange
+		res$lfcShrunkSE <- res$lfcSE
 		if ("{lfc_shrink_type}"!="none"){{
-			if ("{lfc_shrink_type}"=="apeglm"){{
-				dds${column} <- relevel(dds${column}, ref = "{denominator}")
-				dds <- nbinomWaldTest(dds)
-				res <- results(dds, alpha={cutoff_FDR}, lfcThreshold={lfcThreshold}, 
-						altHypothesis="{altHypothesis}", independentFiltering={independentFiltering})
-				res <- lfcShrink(dds, res=res, coef="{column}_{numerator}_vs_{denominator}", 
-						lfcThreshold={lfcThreshold}, type="apeglm")
-			}} else {{
-				res <- lfcShrink(dds, res=res, contrast={r_contrast}, 
-						lfcThreshold={lfcThreshold}, type="{lfc_shrink_type}")
-			}}
+			lfc <- lfcShrink(dds, {lfc_def}, lfcThreshold={lfcThreshold}, type="{lfc_shrink_type}")
+			res$lfcShrunk   <- lfc$log2FoldChange
+			res$lfcShrunkSE <- lfc$lfcSE
 		}}
 		
 		#----- ranking
 		res <- res[order({rank_order}),]
 		
-		#----- annotation
+		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
 		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), column="SYMBOL", keytype="ENSEMBL", multiVals="first")
 		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), column="ENTREZID", keytype="ENSEMBL", multiVals="first")
 		
-		#----- save as rds
-		saveRDS(res, file="{output}")
-		
-		#----- MA plot
-		pdf("{params.ma_plot}")
-		plotMA(res, ylim=c(-2,2))
-		dev.off()
-		
-		#----- count plot
-		pdf("{params.count_plot}")
-		plotCounts(dds, gene=which.min(res$padj), intgroup="{column}")
-		dev.off()
+		#----- save as rds & csv
+		saveRDS(res, file="{output.rds}")
+		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
 		
 		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
@@ -535,7 +558,7 @@ rule goseq:
 rule countMatrix_heatmap:
 	""" plot count matrix as a heatmap """
 	input:
-		pph.file_path("DESeq2", "rds", contrast = "all")
+		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
 	output:
 		pph.file_path("countMatrix_heatmap", "pdf", contrast = "all")
 	log:
@@ -577,7 +600,7 @@ rule countMatrix_heatmap:
 rule sample_similarity:
 	""" plot sample similarity as a heatmap """
 	input:
-		pph.file_path("DESeq2", "rds", contrast = "all")
+		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
 	output:
 		pph.file_path("sample_similarity", "png", contrast = "all")
 	log:
@@ -622,7 +645,7 @@ rule sample_similarity:
 rule samples_pca:
 	""" plot PCA of sample similarity """
 	input:
-		pph.file_path("DESeq2", "rds", contrast = "all")
+		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
 	output:
 		pph.file_path("samples_pca", "pdf", contrast = "all")
 	log:
