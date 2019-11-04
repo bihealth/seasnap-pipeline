@@ -703,6 +703,7 @@ Available commands in the `./sea-snap` wrapper:
 - `working_dir` to set up a new working directory for pipeline results
 - `sample_info` to generate a yaml file with sample information used by the mapping pipeline
 - `covariate_file` to generate a table with information required by the DE pipeline
+- `show_matrix` parse the DE config- and covariate files and print the model matrix to console
 - `mapping` run the mapping pipeline
 - `DE` run the DE pipeline
 
