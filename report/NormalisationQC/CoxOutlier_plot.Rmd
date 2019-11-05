@@ -1,0 +1,15 @@
+## Cox outliers
+
+```{r normalisedQCOutliers}
+p <- data.frame(gene_id=rownames(DDS), SummarizedExperiment::assays(DDS)[["cooks"]], check.names=FALSE) %>%
+    tidyr::gather(Sample, cook, -gene_id) %>%
+    dplyr::mutate(cook=log10(cook)) %>%
+    ggplot2::ggplot(ggplot2::aes(x=Sample, y=cook)) +
+    ggplot2::geom_boxplot() + 
+    ggplot2::theme(axis.text.x=ggplot2::element_text(angle=90, vjust=0.5, hjust=1))
+
+fn <- file.path(PLOTS_DIR, "cook.pdf")
+multiplot(p, fn=fn)
+```
+
+[Download plot](`r fn`)

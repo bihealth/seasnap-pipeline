@@ -1,0 +1,19 @@
+## Hierarchical clustering
+
+The hierarchical clustering shown below was generated using the most varying `r config$report$snippet_parameters$Normalisation_QC$n_most_varying` genes across all samples.
+The expression values are obtained by the "`r config$normalization$normalized_expression`" method, where the normalisation doesn't take into account the experimental design.
+The clustering is using euclidian distance for both the rows (genes) and columns (samples). In both cases, the distance between clusters is defined as the maximum of the distances between elements pairs from each cluster.
+
+The hierarchical clustering can provide clues on which groups of genes could affect the clustering of samples.
+
+```{r normalisationQCHclust}
+tmp <- SummarizedExperiment::assay(RLD_BLIND)
+tmp <- tmp[order(apply(tmp, 1, sd), decreasing=TRUE),,drop=FALSE]
+tmp <- tmp[1:min(nrow(tmp), config$report$snippet_parameters$Normalisation_QC$n_most_varying),,drop=FALSE]
+
+fn <- file.path(PLOTS_DIR, "HClust.pdf")
+p <- ggplotify::as.ggplot(pheatmap::pheatmap(tmp, show_rownames=(nrow(tmp)<=30), silent=TRUE))
+multiplot(p, fn=fn)
+```
+
+[Download plot](`r fn`)
