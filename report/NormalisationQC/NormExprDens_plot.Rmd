@@ -1,0 +1,16 @@
+## Normalised expression densities
+
+The expression values are obtained by the "`r config$normalization$normalized_expression`" method, where the experimental design has been used for normalisation.
+
+```{r normalisationQCDensity}
+tmp <- SummarizedExperiment::assay(RLD_MODEL)
+
+fn <- file.path(PLOTS_DIR, "Densities.pdf")
+p <- data.frame(gene_id=rownames(tmp), tmp, check.names=FALSE) %>%
+    tidyr::gather(Sample, Expression, -gene_id) %>%
+    ggplot2::ggplot(ggplot2::aes(x=Expression, color=Sample)) +
+    ggplot2::geom_density()
+multiplot(p, fn=fn)
+```
+
+[Download plot](`r fn`)

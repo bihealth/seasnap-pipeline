@@ -35,6 +35,7 @@ filters:
 normalization:
   DESeq2_parameters:
     min_mu: 0
+  normalized_expression: vst
 
 #---------------------------------------- description of contrasts
 contrasts:
@@ -60,19 +61,13 @@ QC:
     annotation_col:
       - group
       - group
-  sample_similarity:
-    plot: yes
-    transform_type: vst
-    annotation_col:
-      - group
-  samples_pca:
-    plot: yes
-    transform_type: vst
-    annotation_col:
-      - group
 
 #---------------------------------------- report parameters
 report:
+  snippet_parameters:
+    Normalisation_QC:
+      n_most_varying: 500
+      annotation_columns: [ "group" ]
   defaults:
     contrast:
       - Init_code.Rmd
@@ -80,8 +75,14 @@ report:
       - Result_table.Rmd
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
-    - contrast: __all__
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - HierarchicalClustering_plot.Rmd
+        - SampleSimilarity_plot.Rmd
+        - NormExprDens_plot.Rmd
+        - DESeq2Norm_plot.Rmd
+        - CoxOutlier_plot.Rmd
+    - contrast:
+        - __list__: __contrasts__
 
 

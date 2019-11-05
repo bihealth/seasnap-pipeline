@@ -808,7 +808,6 @@ class ReportTool(PipelinePathHandler):
 		if type(config) is dict:
 			config_dict = config
 		elif isinstance(config, str):
-			# try reading from yaml file
 			with open(config, "r") as stream:
 				try:
 					config_dict = yaml.safe_load(stream)
@@ -827,6 +826,9 @@ class ReportTool(PipelinePathHandler):
 		self.report_snippet_defaults      = config_dict["report"]["defaults"]
 		
 		self.contrast_list = [contr["title"] for contr in config_dict["contrasts"]["contrast_list"]] if "contrasts" in config_dict else ""
+		
+		# define substitutions for report generation
+		self.substitutions = {"__contrasts__": self.contrast_list}
 		
 		self.id_dicts = id_dicts
 	
@@ -857,28 +859,17 @@ class ReportTool(PipelinePathHandler):
 	def _rem_entry_heading_code(self, template_text):
 		return re.sub(self.entry_heading_pattern, "", template_text)
 		
-	def _assemble_entries(self, snippet, path, sub_template_name):
+	def _assemble_entries(self, entries, path, snippet_name, entry_heading_code):
 		""" assemble entry list (e.g. list of contrasts) """
 	
-		# load template
-		sub_template_path  = path / (sub_template_name + "_main_template.Rmd")
-		sub_template_text  = sub_template_path.read_text()
-		# extract heading
-		entry_heading_code = self._get_entry_heading_code(sub_template_text)
-		sub_template_text  = self._rem_entry_heading_code(sub_template_text)
-		# prepare for insert
-		temp_begin, temp_end = self._split_template(sub_template_text)
-		entry_text           = []
+		entry_text = []
 		
 		# add subsection entries
-		assert len(snippet)==1
-		entries = list(snippet.values())[0]
-		if type(entries) is str: entries = self.contrast_list if entries == "__all__" else [entries]
+		if type(entries) is str: entries = self.substitutions[entries] if entries in self.substitutions else [entries]
 		for entry in entries:
 			if type(entry) is str:
 			
 				entry_name = entry
-				snippet_name = list(snippet)[0]
 				if snippet_name not in self.report_snippet_defaults:
 					raise KeyError("Error compiling report snippets for {snip} {entr}! (no snippets provided and "
 							"key {snip} not found in config defaults)".format(snip=snippet_name, entr=entry))
@@ -894,11 +885,12 @@ class ReportTool(PipelinePathHandler):
 			else:
 				raise TypeError("Error in report snippet building plan! (expected str or dict, got {})".format(type(entry)))
 			
-			entry_text += [self._get_entry_heading(entry_heading_code, entry_name), "\n\n" , self._assemble_template(sub_snippet_list, path, (entry_name, sub_template_name))]
+			entry_text += [self._get_entry_heading(entry_heading_code, entry_name), "\n\n" , 
+					self._assemble_template(sub_snippet_list, path, snippet_name, entry_heading_code, (entry_name, snippet_name))]
 			
-		return temp_begin + "".join(entry_text) + temp_end
+		return "".join(entry_text)
 		
-	def _assemble_template(self, snippet_list, path, entry=("","")):
+	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("","")):
 		""" assemble snippet list """
 		
 		snippet_text = []
@@ -913,9 +905,25 @@ class ReportTool(PipelinePathHandler):
 					
 			elif isinstance(snippet, dict):
 				assert len(snippet)==1
-				sub_template_name = list(snippet.keys())[0]
+				snippet_key   = list(snippet.keys())[0]
+				snippet_value = list(snippet.values())[0]
 				
-				snippet_text.append( self._assemble_entries(snippet, path/sub_template_name, sub_template_name) )
+				if snippet_key == "__list__":
+					# add list entries
+					snippet_text.append( self._assemble_entries(snippet_value, path, snippet_name, entry_heading_code) )
+				else:
+					# load template
+					sub_template_path  = path / snippet_key / (snippet_key + "_main_template.Rmd")
+					sub_template_text  = sub_template_path.read_text()
+					# extract heading
+					entry_heading_code = self._get_entry_heading_code(sub_template_text)
+					sub_template_text  = self._rem_entry_heading_code(sub_template_text)
+					# prepare for insert
+					temp_begin, temp_end = self._split_template(sub_template_text)
+					
+					# add sub-section
+					sub_section_text = self._assemble_template(snippet_value, path/snippet_key, snippet_key, entry_heading_code, entry)
+					snippet_text.append(temp_begin + sub_section_text + temp_end)
 				
 			else:
 				raise TypeError("Error in report snippet building plan! (expected str or dict, got {})".format(type(snippet)))
@@ -937,9 +945,10 @@ class ReportTool(PipelinePathHandler):
 		
 		# generate report
 		temp_begin, temp_end = self._split_template(template_text)
-		report_text = temp_begin + self._assemble_template(self.report_snippet_building_plan, self.report_snippet_base_dir) + temp_end
+		report_text = self._assemble_template(self.report_snippet_building_plan, self.report_snippet_base_dir, 
+							snippet_name="other", entry_heading_code="# {{ENTRY_NAME}}")
 		
-		return report_text
+		return temp_begin + report_text + temp_end
 
 
 

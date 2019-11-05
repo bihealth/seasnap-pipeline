@@ -22,9 +22,13 @@ contrasts:
   
   contrast_list:
     - title: ### FILL HERE ###  (unique title)
-      column: ### FILL HERE ###
-      numerator: ### FILL HERE ###
-      denominator: ### FILL HERE ###
+      ### One of coef, ratio or vector must be set for each contrast
+      coef:
+      ratio:
+        column:
+        numerator:
+        denominator:
+      vector:
 
 
 #--- general pipeline parameters

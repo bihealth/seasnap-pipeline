@@ -20,6 +20,7 @@ dependencies:
   - r-readr
   - r-ashr
   - r-pheatmap
+  - r-shiny
   - rpy2
 
   - drmaa

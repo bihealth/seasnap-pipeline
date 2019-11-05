@@ -1,0 +1,29 @@
+## Principal component analysis
+
+The principal component analysis plot shown below was generated using the most varying `r config$report$snippet_parameters$Normalisation_QC$n_most_varying` genes across all samples.
+The expression values are obtained by the "`r config$normalization$normalized_expression`" method, where the normalisation doesn't take into account the experimental design.
+
+In presence of strong biological signal, the samples should cluster with the biological condition.
+When samples are clustered according to other effects (for example patient, or technical batch), great care must be used when interpreting the results, as the other effects will considerably reduce the ability to extract meaningful biological information.
+
+```{r normalisationQCPCA}
+intgroups <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
+intgroups <- intgroups[1:min(2,length(intgroups))]
+tmp <- plotPCA(RLD_BLIND, intgroup=intgroups, returnData=TRUE)
+percentVar <- 100 * attr(tmp, "percentVar")
+
+if (length(intgroups) == 1) {
+    p <- ggplot2::ggplot(tmp, ggplot2::aes_string(x="PC1", y="PC2", color=intgroups[1]))
+} else {
+    p <- ggplot2::ggplot(tmp, ggplot2::aes_string(x="PC1", y="PC2", color=intgroups[1], shape=intgroups[2]))
+}
+p <- p +
+    ggplot2::geom_point(size=3) +
+    ggplot2::labs(x=sprintf("PC1: %.0f %% variance", percentVar[1]), y=sprintf("PC2: %.0f %% variance", percentVar[2])) + 
+    ggplot2::coord_fixed()
+
+fn <- file.path(PLOTS_DIR, "PCA.pdf")
+multiplot(p, fn=fn)
+```
+
+[Download plot](`r fn`)

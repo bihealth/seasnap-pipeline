@@ -1,0 +1,16 @@
+## DESeq2 normalisation
+
+```{r normalisationQCDeseq2prepare, include=FALSE}
+DESeq2::plotDispEsts(DDS)
+gridGraphics::grid.echo()
+ps <- list(ggplotify::as.ggplot(grid::grid.grab()))
+```
+
+```{r normalisationQCDeseq2, fig.height=7, fig.width=12}
+ps <- c(ps, list(vsn::meanSdPlot(SummarizedExperiment::assay(RLD_MODEL), plot=FALSE)$gg))
+
+fn <- file.path(PLOTS_DIR, "DESeq2_norm.pdf")
+multiplot(plotlist=ps, cols=2, fn=fn)
+```
+
+[Download plot](`r fn`)

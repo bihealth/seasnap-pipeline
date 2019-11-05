@@ -1,0 +1,19 @@
+# Normalisation quality control metrics {.tabset}
+
+```{r normalisationQCsetup}
+require(magrittr)
+
+#----- load DESeqDataSet
+DDS       <- readRDS(subset(file_tab, step=="DESeq2" & extension=="deseq2.rds" & contrast=="all")$filename)
+RLD_BLIND <- readRDS(subset(file_tab, step=="DESeq2" & extension=="rld.blind.rds" & contrast=="all")$filename)
+RLD_MODEL <- readRDS(subset(file_tab, step=="DESeq2" & extension=="rld.model.rds" & contrast=="all")$filename)
+
+report_dir <- file.path(working_dir, dirname(subset(file_tab, step=="report" & extension=="tsv" & contrast=="all")$filename))
+PLOTS_DIR <- file.path(report_dir, "plots", "NormalisationQC")
+dir.create(PLOTS_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
+```
+
+#HSTART
+## {{ENTRY_NAME}}
+#HEND
+#>--------------------------------------------INSERT--------------------------------------------<#
