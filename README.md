@@ -46,7 +46,7 @@ Quick-Start
 After cloning this git repository:
 
 ```
-git clone <final location>
+git clone git@cubi-gitlab.bihealth.org:CUBI/Pipelines/sea-snap.git
 ```
 
 all required tools and packages can be installed via conda.
