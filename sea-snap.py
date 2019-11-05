@@ -93,6 +93,13 @@ def generate_covariate_file(args):
 	# write to file
 	cft.write_covariate_file(args.output)
 	print("\ncovariate file {} auto-generated. EDIT BEFORE RUNNING PIPELINE!".format(args.output))
+
+def select_contrast(args):
+	"""
+	run a GUI (Shiny) to help setting contrasts for DE pipeline
+	"""
+	tool_path = SCRIPT_DIR / "tools" / "ContrastSelector.R"
+	os.system('R --vanilla -e "source(\'{}\'); app"'.format(str(tool_path)))
 	
 def cleanup_cluster_log(args):
 	"""
@@ -198,6 +205,11 @@ parser_covariate_file.add_argument('--config_files', nargs='+', default=["DE_con
 parser_covariate_file.add_argument('--output', default="covariate_file.txt", help="name of covariate file")
 parser_covariate_file.add_argument('--col', nargs='+',   action='append', dest='add_cols', help="add a column, use e.g.: --col NAME gr1:lvl1 gr2:lvl1 gr3:lvl2 ...")
 parser_covariate_file.set_defaults(func=generate_covariate_file)
+
+#--- parser for cleanup_cluster_log
+parser_select_contrast = subparsers.add_parser('select_contrast', help="run a GUI to help choosing contrast", description=
+"Runs a Shiny App to help choosing contrasts. Open the displayed link in a browser to view.")
+parser_select_contrast.set_defaults(func=select_contrast)
 
 ### PIPELINES
 
