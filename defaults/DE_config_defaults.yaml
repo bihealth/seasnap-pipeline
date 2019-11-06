@@ -53,15 +53,6 @@ contrasts:
       fdr_threshold: 0.1
   #contrast_list: null
 
-#---------------------------------------- QC parameters
-QC:
-  countMatrix_heatmap:
-    plot: yes
-    transform_type: normTransform #options.. ["normTransform", "vst", "rlog"]
-    annotation_col:
-      - group
-      - group
-
 #---------------------------------------- report parameters
 report:
   snippet_parameters:
