@@ -456,12 +456,14 @@ rule contrast:
 		               altHypothesis="{altHypothesis}", independentFiltering={independentFiltering})
 
 		#----- log-fold-change shrinkage
-		res$lfcShrunk   <- res$log2FoldChange
-		res$lfcShrunkSE <- res$lfcSE
+		#res$lfcShrunk   <- res$log2FoldChange
+		#res$lfcShrunkSE <- res$lfcSE
 		if ("{lfc_shrink_type}"!="none"){{
 			lfc <- lfcShrink(dds, {lfc_def}, lfcThreshold={lfcThreshold}, type="{lfc_shrink_type}")
-			res$lfcShrunk   <- lfc$log2FoldChange
-			res$lfcShrunkSE <- lfc$lfcSE
+			res$log2FoldChange_orig <- res$log2FoldChange
+			res$log2FoldChange      <- lfc$log2FoldChange
+			res$lfcSE_orig          <- res$lfcSE
+			res$lfcSE               <- lfc$lfcSE
 		}}
 		
 		#----- ranking
