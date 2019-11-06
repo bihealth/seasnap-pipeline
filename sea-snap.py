@@ -225,9 +225,13 @@ parser_covariate_file.add_argument('--output', default="covariate_file.txt", hel
 parser_covariate_file.add_argument('--col', nargs='+',   action='append', dest='add_cols', help="add a column, use e.g.: --col NAME gr1:lvl1 gr2:lvl1 gr3:lvl2 ...")
 parser_covariate_file.set_defaults(func=generate_covariate_file)
 
-#--- parser for cleanup_cluster_log
-parser_select_contrast = subparsers.add_parser('select_contrast', help="run a GUI to help choosing contrast", description=
-"Runs a Shiny App to help choosing contrasts. Open the displayed link in a browser to view.")
+#--- parser for select_contrast
+parser_select_contrast = subparsers.add_parser('select_contrast', help="display information to help choosing contrast", description=
+"""Runs a Shiny App to help choosing contrasts (Open the displayed link in a browser to view).
+With --console set, instead prints a model matrix based on config- and covariate file to console.""")
+parser_select_contrast.add_argument('--console',        '-c',    action="store_const", const=show_matrix, dest="func", help="print model matrix to console")
+parser_select_contrast.add_argument('--config_file',    '-conf', default="DE_config.yaml",     help="with --console: config file to be loaded")
+parser_select_contrast.add_argument('--covariate_file', '-cov' , default="covariate_file.txt", help="with --console: name of covariate file")
 parser_select_contrast.set_defaults(func=select_contrast)
 
 ### PIPELINES
@@ -243,13 +247,6 @@ parser_DE = subparsers.add_parser('DE', help="run DE pipeline")
 parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
-
-#--- parser for show_matrix
-parser_covariate_file = subparsers.add_parser('show_matrix', help="print model matrix for DE pipeline", description=
-"print model.matrix() based on config- and covariate file to console")
-parser_covariate_file.add_argument('--config_file',    '-conf', default="DE_config.yaml",     help="config file to be loaded")
-parser_covariate_file.add_argument('--covariate_file', '-cov' , default="covariate_file.txt", help="name of covariate file")
-parser_covariate_file.set_defaults(func=show_matrix)
 
 #--- parser for cleanup_cluster_log
 parser_cleanup_log = subparsers.add_parser('cleanup_log', help="delete log files from cluster execution")
