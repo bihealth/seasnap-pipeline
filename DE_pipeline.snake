@@ -407,31 +407,23 @@ rule contrast:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
-		contrast_def    = ""
-		lfc_def         = ""
-		contrast_type   = ""
-		contrast_column = "group"
-		contrast_ref    = ""
-		contrast_coef   = ""
-		contrast_ratio  = ""
-		contrast_vect   = ""
+		# variants of contrast definition
+		contrast_column, contrast_ref = "group", ""
 		if "coef" in contrast:
-			contrast_def  = 'name="{}"'.format(contrast["coef"])
-			lfc_def       = 'coef="{}"'.format(contrast["coef"])
-			contrast_type = "coef"
+			contrast_type          = "coef"
+			arg_val                = '="{}"'.format(contrast["coef"])
+			contrast_def, lfc_def  = "name" + arg_val, "coef" + arg_val
+		elif "ratio" in contrast:
+			contrast_type, ratio   = "ratio", contrast["ratio"]
+			contrast_column, contrast_num, contrast_ref = ratio["column"], ratio["numerator"], ratio["denominator"]
+			contrast_def = lfc_def = 'contrast=c("{}", "{}", "{}")'.format(contrast_column, contrast_num, contrast_ref)
+		elif "vector" in contrast:
+			contrast_type          = "vector"
+			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(contrast["vector"]))
 		else:
-			if "ratio" in contrast:
-				contrast_def    = 'contrast=c("{}", "{}", "{}")'.format(contrast["ratio"]["column"], contrast["ratio"]["numerator"], contrast["ratio"]["denominator"])
-				lfc_def         = contrast_def
-				contrast_type   = "ratio"
-				contrast_column = contrast["ratio"]["column"]
-				contrast_ref    = contrast["ratio"]["denominator"]
-			else:
-				if "vector" in contrast:
-					contrast_def  = "contrast=c(" + ", ".join(contrast["vector"]) + ")"
-					lfc_def         = contrast_def
-					contrast_type = "vector"
+			raise ValueError("Error in contrast: no valid contrast definition! must be one of {}".format(["coef:", "ratio:", "vector:"]))
 		
+		# parameters
 		cutoff_FDR           =           contrast["max_p_adj"]
 		lfcThreshold         =           contrast["results_parameters"]["lfcThreshold"]
 		altHypothesis        =           contrast["results_parameters"]["altHypothesis"]
@@ -456,7 +448,8 @@ rule contrast:
 			dds${contrast_column} = relevel(dds${contrast_column}, ref="{contrast_ref}")
 			dds <- nbinomWaldTest(dds)
 		}}
-		res <- results(dds, {contrast_def}, alpha={cutoff_FDR}, lfcThreshold={lfcThreshold}, altHypothesis="{altHypothesis}", independentFiltering={independentFiltering})
+		res <- results(dds, {contrast_def}, alpha={cutoff_FDR}, lfcThreshold={lfcThreshold}, 
+		               altHypothesis="{altHypothesis}", independentFiltering={independentFiltering})
 
 		#----- log-fold-change shrinkage
 		res$lfcShrunk   <- res$log2FoldChange
