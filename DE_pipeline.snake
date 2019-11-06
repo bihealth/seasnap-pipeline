@@ -185,7 +185,8 @@ rule import_gene_counts:
 		samples   <- as.character(sample_df$label)
 
 		#----- merge count files from star
-		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", col.names=c("ID", samples[i]), check.names=FALSE)))
+		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", 
+		                                                                        col.names=c("ID", samples[i]), check.names=FALSE)))
 		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
 		
 		#----- change levels
@@ -237,7 +238,8 @@ rule import_featurecounts:
 		samples   <- as.character(sample_df$label)
 
 		#----- merge count files from star
-                read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"), col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
+                read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"), 
+                                                     col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read_fc(files[i], samples[i])))
 		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
 		
@@ -378,8 +380,10 @@ rule DESeq2:
 		write.table(data.frame(
 			gene_id=rownames(rld_model),
 			assays(rld_model),
-			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
-			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			              column="SYMBOL", keytype="ENSEMBL", multiVals="first")
 			), file="{output.rld_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
 		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
@@ -464,8 +468,10 @@ rule contrast:
 		res <- res[order({rank_order}),]
 		
 		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
-		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
 		
 		#----- save as rds & csv
 		saveRDS(res, file="{output.rds}")
