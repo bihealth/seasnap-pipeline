@@ -3,12 +3,14 @@
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
 import sys, os, re, hashlib, itertools, yaml, pandas as pd
-from collections import namedtuple, Mapping
+from collections import namedtuple, Mapping, OrderedDict
 from copy import deepcopy
 from warnings import warn
 from pathlib import Path
 from glob import iglob, glob
 #from snakemake.io import glob_wildcards
+
+yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
 
 ##################################################################################################################################
 #---------------------------------------------- base class for handling file paths ----------------------------------------------#
@@ -26,7 +28,7 @@ class PipelinePathHandler:
 	required_wildcards_out_log = ["step", "extension"]
 	required_wildcards_in      = []
 	
-	def __init__(self, config, test_allowed_wildcards=True):
+	def __init__(self, workflow, test_allowed_wildcards=True):
 		# load test_config for validity check of config values
 		#if type(test_config) is dict:
 		#	self.test_config = test_config
@@ -39,9 +41,11 @@ class PipelinePathHandler:
 		#else:
 		#	raise TypeError("Wrong type of argument test_config: must be dict or str.")
 	
-		self.out_path_pattern = config["pipeline_param"]["out_path_pattern"]
-		self.log_path_pattern = config["pipeline_param"]["log_path_pattern"]
-		self.in_path_pattern  = config["pipeline_param"]["in_path_pattern"]
+		self.snakemake_workflow = workflow
+		
+		self.out_path_pattern = self.snakemake_workflow.config["pipeline_param"]["out_path_pattern"]
+		self.log_path_pattern = self.snakemake_workflow.config["pipeline_param"]["log_path_pattern"]
+		self.in_path_pattern  = self.snakemake_workflow.config["pipeline_param"]["in_path_pattern"]
 		
 		self.out_dir_pattern = "/".join(self.out_path_pattern.split("/")[:-1])
 		
@@ -50,7 +54,7 @@ class PipelinePathHandler:
 		self.in_path_wildcards     = self._get_wildcard_list(self.in_path_pattern)
 		self.outdir_path_wildcards = self._get_wildcard_list(self.out_dir_pattern)
 		
-		self.input_choice = self._set_input_choice(config)
+		self.input_choice = self._set_input_choice(self.snakemake_workflow.config)
 		
 		# check consistency of loaded input and output patterns
 		self._test_config_input(test_allowed_wildcards)
@@ -137,6 +141,14 @@ class PipelinePathHandler:
 		
 	def _make_name(self, description):
 		return re.sub("\.|/|-|\s", "_", description)
+		
+	@staticmethod
+	def _md5(fname):
+		hash_md5 = hashlib.md5()
+		with open(fname, "rb") as f:
+			for chunk in iter(lambda: f.read(4096), b""):
+				hash_md5.update(chunk)
+		return hash_md5.hexdigest()
 		
 	def _get_wildcard_combinations(self, wildcard_values):
 		""" go through wildcard values and get combinations """
@@ -230,6 +242,48 @@ class PipelinePathHandler:
 		:returns: a function that is used by snakemake to obtain the input file path
 		"""
 		return lambda wildcards: self._choose_input(wildcards, choice_name, options)
+		
+	def log(self, out_log, script, step, extension, **kwargs):
+		"""
+		create various log files and return a path to the script file for execution
+		
+		:param out_log: the main log file of rule 'step' that will contain output and error messages
+		:param script: the script with wildcards filled by snakemake
+		:param step: the rule for which logs shall be generated
+		:param extension: the extension of the script file, e.g. '.R' or '.sh'
+		:returns: path to a file containing the script
+		"""
+		script_file = self.file_path(step, extension,        log=True, **kwargs)
+		config_yaml = self.file_path(step, "config.yaml",    log=True, **kwargs)
+		conda_list  = self.file_path(step, "conda_list.txt", log=True, **kwargs)
+		conda_info  = self.file_path(step, "conda_info.txt", log=True, **kwargs)
+		conda_env   = self.file_path(step, "conda_env.yaml", log=True, **kwargs)
+		
+		# write script to file
+		with open(script_file, "w") as f: f.write(script)
+		
+		# dump merged config
+		with open(config_yaml, "w") as f: yaml.dump(self.snakemake_workflow.config, f, default_flow_style=False)
+		
+		# write conda logs
+		os.system("conda list > {}".format(conda_list))
+		os.system("conda info > {}".format(conda_info))
+		os.system("conda env export > {}".format(conda_env))
+		
+		# git and snakefile info to out_log
+		git_dir     = self.snakemake_workflow.basedir
+		out_log_abs = str(Path(out_log).resolve())
+		os.system('echo "--------------- git info ---------------" >> {}'.format(out_log))
+		os.system('cd {}; echo "name:" $(git rev-parse --show-toplevel) >> {}'.format(git_dir, out_log_abs))
+		os.system('cd {}; echo "branch:" $(git symbolic-ref HEAD) >> {}'.format(git_dir, out_log_abs))
+		os.system('cd {}; echo "hash:" $(git rev-parse HEAD) >> {}'.format(git_dir, out_log_abs))
+		os.system('cd {}; {{ echo "status:"; git status -sb; }} >> {}'.format(git_dir, out_log_abs))
+		os.system('echo "--------------- snakefile --------------" >> {}'.format(out_log))
+		os.system('echo "snakefile name: {}" >> {}'.format(self.snakemake_workflow.snakefile, out_log))
+		os.system('echo "snakefile md5 : {}" >> {}'.format(self._md5(self.snakemake_workflow.snakefile), out_log))
+		os.system('echo "----------------------------------------" >> {}'.format(out_log))
+		
+		return script_file
 		
 		
 ##################################################################################################################################
@@ -434,11 +488,11 @@ class DEPipelinePathHandler(PipelinePathHandler):
 	required_wildcards_out_log = ["step", "extension", "contrast"]
 	required_wildcards_in      = ["step", "extension", "sample", "name"]
 	
-	def __init__(self, config):
-		super().__init__(config)
+	def __init__(self, workflow):
+		super().__init__(workflow)
 		
-		self.contrasts         = config["contrasts"]["contrast_list"]
-		self.contrast_defaults = config["contrasts"]["defaults"]
+		self.contrasts         = self.snakemake_workflow.config["contrasts"]["contrast_list"]
+		self.contrast_defaults = self.snakemake_workflow.config["contrasts"]["defaults"]
 		self.contrast_ids = [self._make_name(contr["title"]) + "_ID{}".format(index) for index, contr in enumerate(self.contrasts)] #used in pipeline to fill in wildcards
 		
 		# write log with parsed values to file for debugging
@@ -624,14 +678,6 @@ class CovariateFileTool(PipelinePathHandler):
 				seen.add(kwargs_id_tup)
 				pattern_list.append(self.in_path_pattern.format(step=step, extension=extension, **kwargs_filled))
 		return [path for pat in pattern_list for path in iglob(pat)]
-		
-	@staticmethod
-	def _md5(fname):
-		hash_md5 = hashlib.md5()
-		with open(fname, "rb") as f:
-			for chunk in iter(lambda: f.read(4096), b""):
-				hash_md5.update(chunk)
-		return hash_md5.hexdigest()
 		
 		
 	#---------------------------------------------------- access methods ----------------------------------------------------#

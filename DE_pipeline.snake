@@ -28,7 +28,7 @@ if config["organism_defaults"]:
 	configfile: "DE_config.yaml"
 
 # create path handler
-pph = DEPipelinePathHandler(config)
+pph = DEPipelinePathHandler(workflow)
 
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 
@@ -54,7 +54,6 @@ onstart:
 	# save merged config
 	config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
-
 
 
 ##-------------------- starting point ----------------------------------------------------------------------
@@ -116,6 +115,7 @@ rule all:
 		
 		""", output.html, graph = rule_execution, table = summary)
 	
+
 ##-------------------- make TxDb -----------------------------------------------------------------------------
 
 rule TxDb_from_GTF:
@@ -125,8 +125,7 @@ rule TxDb_from_GTF:
 	output:
 		pph.file_path(step = "TxDb_from_GTF", extension = "sqlite", contrast = "all")
 	log:
-		r_script = pph.file_path(step = "TxDb_from_GTF", extension = "R",            log=True, contrast = "all"),
-		r_output = pph.file_path(step = "TxDb_from_GTF", extension = "r_output.log", log=True, contrast = "all")
+		out = pph.file_path("TxDb_from_GTF", "output.log", contrast = "all", log=True)
 	run:
 		genus = config["organism"]["genus"]
 		taxon = config["organism"]["taxon"]
@@ -143,9 +142,9 @@ rule TxDb_from_GTF:
 		#----- save Db
 		saveDb(TxDb, "{output}")
 		""")
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
 		
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="TxDb_from_GTF", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 
 ##-------------------- import -------------------------------------------------------------------------------
@@ -160,8 +159,7 @@ rule import_gene_counts:
 	output:
 		pph.file_path("import_gene_counts", "rds", contrast = "all")
 	log:
-		r_script = pph.file_path("import_gene_counts", "R",            contrast = "all", log=True),
-		r_output = pph.file_path("import_gene_counts", "r_output.log", contrast = "all", log=True)
+		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
 		column_filter = "TRUE"
 		if config["filters"]["experiment_whitelist"]:
@@ -203,8 +201,8 @@ rule import_gene_counts:
 		saveRDS(dds, file="{output}")
 		""")
 		
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 rule import_featurecounts:
 	""" collect count files (featurecounts) and build count matrix """
@@ -213,8 +211,7 @@ rule import_featurecounts:
 	output:
 		pph.file_path("import_featurecounts", "rds", contrast = "all")
 	log:
-		r_script = pph.file_path("import_featurecounts", "R",            contrast = "all", log=True),
-		r_output = pph.file_path("import_featurecounts", "r_output.log", contrast = "all", log=True)
+		out = pph.file_path("import_featurecounts", "output.log", contrast = "all", log=True)
 	run:
 		column_filter = "TRUE"
 		if config["filters"]["experiment_whitelist"]:
@@ -257,8 +254,8 @@ rule import_featurecounts:
 		saveRDS(dds, file="{output}")
 		""")
 		
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="import_featurecounts", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 	
 rule import_sf:
 	""" collect sf files (Salmon) and build count matrix """
@@ -268,8 +265,7 @@ rule import_sf:
 	output:
 		pph.file_path("import_sf", "rds", contrast = "all")
 	log:
-		r_script = pph.file_path("import_sf", "R",            contrast = "all", log=True),
-		r_output = pph.file_path("import_sf", "r_output.log", contrast = "all", log=True)
+		out = pph.file_path("import_sf", "output.log", contrast = "all", log=True)
 	run:
 		column_filter = "TRUE"
 		if config["filters"]["experiment_whitelist"]:
@@ -313,9 +309,9 @@ rule import_sf:
 		#----- save as rds
 		saveRDS(dds, file="{output}")
 		""")
-		
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="import_sf", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
 
 ##-------------------- DESeq2 -------------------------------------------------------------------------------
 
@@ -333,8 +329,7 @@ rule DESeq2:
 		rld_model = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
 		rld_csv   = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
 	log:
-		r_script = pph.file_path("DESeq2", "R",            contrast = "all", log=True),
-		r_output = pph.file_path("DESeq2", "r_output.log", contrast = "all", log=True)
+		out = pph.file_path("DESeq2", "output.log", contrast = "all", log=True)
 	params:
 		coef_names = pph.file_path("DESeq2", "coef_names.txt", contrast = "all"),
 		rld_names  = pph.file_path("DESeq2", "rld.model.csv", contrast = "all"),
@@ -386,8 +381,8 @@ rule DESeq2:
 			              column="SYMBOL", keytype="ENSEMBL", multiVals="first")
 			), file="{output.rld_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="DESeq2", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 		
 		
 ##-------------------- contrasts ----------------------------------------------------------------------------
@@ -400,16 +395,15 @@ rule contrast:
 		rds = pph.file_path("contrast", "rds"),
 		csv = pph.file_path("contrast", "csv")
 	log:
-		r_script = pph.file_path("contrast", "R",            log=True),
-		r_output = pph.file_path("contrast", "r_output.log", log=True),
-		yaml     = pph.file_path("contrast", "yaml",         log=True)
+		out           = pph.file_path("contrast", "output.log",  log=True),
+		contrast_yaml = pph.file_path("contrast", "contrast.yaml", log=True)
 	params:
 		ma_plot    = pph.file_path("contrast", "ma.pdf"),
 		count_plot = pph.file_path("contrast", "counts.pdf"),
 		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		contrast = pph.get_contrast(wildcards.contrast)
-		with open(log.yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
 		# variants of contrast definition
 		contrast_column, contrast_ref = "group", ""
@@ -480,8 +474,8 @@ rule contrast:
 		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
 		
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="contrast", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 
 ##-------------------- functional annotation ----------------------------------------------------------------
@@ -495,15 +489,14 @@ rule goseq:
 		go   = pph.file_path(step = "goseq", extension = "go.rds"),
 		kegg = pph.file_path(step = "goseq", extension = "kegg.rds")
 	log:
-		r_script = pph.file_path(step = "goseq", extension = "R",            log=True),
-		r_output = pph.file_path(step = "goseq", extension = "r_output.log", log=True),
-		yaml     = pph.file_path(step = "goseq", extension = "yaml",         log=True)
+		out           = pph.file_path(step = "goseq", extension = "output.log",    log=True),
+		contrast_yaml = pph.file_path(step = "goseq", extension = "contrast.yaml", log=True)
 	params:
 		annot_pkg = config["organism"]["R"]["annotations"],
 		fit_pwf   = pph.file_path(step = "goseq", extension = "pwf_fit.pdf")
 	run:
 		contrast = pph.get_contrast(wildcards.contrast)
-		with open(log.yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
 		fdr_threshold = contrast["GO"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
@@ -553,8 +546,8 @@ rule goseq:
 		saveRDS(GO, file="{output.go}"); saveRDS(KEGG, file="{output.kegg}")
 		""")
 		
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
+		script_file = pph.log(log.out, snakemake_format(script), step="goseq", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 		
 ##-------------------- QC steps -----------------------------------------------------------------------------
