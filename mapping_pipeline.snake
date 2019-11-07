@@ -6,12 +6,15 @@
 #TODO: save scripts for mapping pipeline
 
 
-import os, sys
+import os, sys, yaml, textwrap, pandas as pd
+from collections import OrderedDict
 from time import asctime, localtime, time
-from warnings import warn
 from pathlib import Path
-from snakemake.utils import report
+from snakemake.utils import report, format as snakemake_format
+from snakemake.logging import logger
 from tools.pipeline_tools import MappingPipelinePathHandler
+
+yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
 
 # source files
 SNAKEDIR  = Path(workflow.current_basedir)
@@ -27,7 +30,7 @@ if config["organism_defaults"]:
 	configfile: "mapping_config.yaml"
 
 # create path handler
-pph = MappingPipelinePathHandler(config)
+pph = MappingPipelinePathHandler(workflow)
 
 # link indices
 pph.link_index(step="star_index",   sample="allSample", flowcell="allFlowcell", lane="allLane")
@@ -49,6 +52,14 @@ onstart:
 	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", sample="allSample", flowcell="allFlowcell", lane="allLane")
 	os.makedirs(os.path.dirname(info_file), exist_ok=True)
 	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+	# save merged config
+	config_file = pph.file_path(step="pipeline_report", extension="yaml", sample="allSample", flowcell="allFlowcell", lane="allLane")
+	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
+	# warnings
+	mapping_choices, qc_choices = (config["pipeline_param"][key] for key in ["mapping_results", "QC_results"])
+	for qc_step in ["dupradar", "infer_experiment", "qc"]:
+		if qc_step in qc_choices and "star-gene_counts" not in mapping_choices:
+			logger.warning("{}: cannot run, because 'star-gene_counts' was not selected as mapping output".format(qc_step))
 
 ##-------------------- starting point ----------------------------------------------------------------------
 
@@ -58,7 +69,7 @@ def get_inputs_all():
 	# mapping results
 	mapping_choices = config["pipeline_param"]["mapping_results"]
 	if "star-gene_counts" in mapping_choices:
-		inputs += pph.expand_path("star", "bam", flowcell="allFlowcell", lane="allLane")
+		inputs += pph.expand_path("star",           "bam",            flowcell="allFlowcell", lane="allLane")
 		inputs += pph.expand_path("feature_counts", "feature_counts", flowcell="allFlowcell", lane="allLane")
 	if "salmon-transcript_counts" in mapping_choices:
 		inputs += pph.expand_path("salmon", "sf", flowcell="allFlowcell", lane="allLane")
@@ -66,24 +77,12 @@ def get_inputs_all():
 	# QC results
 	qc_choices = config["pipeline_param"]["QC_results"]
 	if "fastqc" in qc_choices:
-		inputs += pph.expand_path("fastqc", "zip", name_ext = "paired_end_extensions")
+		inputs += pph.expand_path("fastqc",        "zip", name_ext = "paired_end_extensions")
 		inputs += [pph.file_path("fastqc_summary", "tsv", sample="allSample", flowcell="allFlowcell", lane="allLane")]
-	if "dupradar" in qc_choices:
-		if "star-gene_counts" in mapping_choices:
-			inputs += pph.expand_path("dupradar", "done", flowcell="allFlowcell", lane="allLane")
-		else:
-			warn("cannot run dupradar, because 'star-gene_counts' was not selected as mapping output")
-	if "infer_experiment" in qc_choices:
-		if "star-gene_counts" in mapping_choices:
-			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="allFlowcell", lane="allLane")
-		else:
-			warn("cannot run infer_experiment, because 'star-gene_counts' was not selected as mapping output")
-	if "qc" in qc_choices:
-		if "star-gene_counts" in mapping_choices:
-			inputs += pph.expand_path("qc", "done", flowcell="allFlowcell", lane="allLane")
-		else:
-			warn("cannot run qc, because 'star-gene_counts' was not selected as mapping output")
-	
+	if "star-gene_counts" in mapping_choices:
+		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="allFlowcell", lane="allLane")
+		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="allFlowcell", lane="allLane")
+		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="allFlowcell", lane="allLane")
 	return inputs
 
 
@@ -145,45 +144,58 @@ rule all:
 ##-------------------- fastqc -------------------------------------------------------------------------------
 
 rule fastqc:
+	""" run fastqc for quality control of reads """
 	input: 
 		pph.get_fastq_pairs
 	output:
 		fzip = pph.file_path(step="fastqc", extension="zip",  name="{name}"),
 		html = pph.file_path(step="fastqc", extension="html", name="{name}")
 	log:
-		pph.file_path(step="fastqc", extension="log", name="{name}", log=True)
+		out  = pph.file_path(step="fastqc", extension="output.log", name="{name}", log=True)
 	params:
 		outdir = pph.out_dir_name(step="fastqc")
 	threads:
 		lambda wildcards: len(pph.get_fastq_pairs(wildcards))
 	run:
 		reads = " ".join(input)
-		shell(r"""
-		set -eux
-		fastqc --version &> {log}
-		rm -fr {params.outdir}/*; rm -fr $(dirname {log})/*
-		fastqc -o {params.outdir} -t {threads} {reads} &>> {log}
 		
-		# rename fastqc default output:
+		script = textwrap.dedent(r"""
+		#----- prepare		
+		set -eux
+		fastqc --version
+		rm -fr {params.outdir}/*
+
+		#----- run fastqc
+		fastqc -o {params.outdir} -t {threads} {reads}
+		
+		#----- rename fastqc output
 		find {params.outdir} -type f -name '*.zip' > {params.outdir}/.fastqc_name.txt #used by collect_fastqc
 		mv $(cat {params.outdir}/.fastqc_name.txt) {output.fzip}
 		find {params.outdir} -type f -name '*.html' -exec mv '{{}}' {output.html} \;
 		""")
 		
+		script_file = pph.log(log.out, snakemake_format(script), step="fastqc", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+		
 rule collect_fastqc:
+	""" summarize fastqc results of individual reads """
 	input:
 		pph.expand_path(step="fastqc", extension="zip", name_ext="paired_end_extensions")
 	output:
 		pph.file_path(step="fastqc_summary", extension="tsv")
 	log:
-		pph.file_path(step="fastqc_summary", extension="log", log=True)
+		out = pph.file_path(step="fastqc_summary", extension="output.log", log=True)
 	run:
+		lines = [r"set -eux"]
 		for file in input:
 			file_path = "/".join(file.split("/")[:-1])
-			shell(r"""
-			set -eux
-			unzip -c {file} $(basename $(cat {file_path}/.fastqc_name.txt) .zip)/summary.txt | tail -n+3 | grep -v '^$' >> {output} 2> {log}
-			""")
+			lines.append(snakemake_format(
+			r"unzip -c {file} $(basename $(cat {file_path}/.fastqc_name.txt) .zip)/summary.txt | tail -n+3 | grep -v '^$' >> {output}"
+			))
+		script = "\n".join(lines)
+
+		script_file = pph.log(log.out, script, step="fastqc_summary", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- star ---------------------------------------------------------------------------------
 

@@ -10,11 +10,10 @@ import os, re, yaml, textwrap, pandas as pd
 from collections import OrderedDict
 from time import asctime, localtime, time
 from pathlib import Path
-from snakemake.utils import report, R, format as snakemake_format
+from snakemake.utils import report, format as snakemake_format
 from tools.pipeline_tools import DEPipelinePathHandler, ReportTool
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
-
 
 SNAKEDIR  = Path(workflow.current_basedir)
 SNAKEFILE = workflow.snakefile

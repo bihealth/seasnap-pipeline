@@ -273,7 +273,7 @@ class PipelinePathHandler:
 		# git and snakefile info to out_log
 		git_dir     = self.snakemake_workflow.basedir
 		out_log_abs = str(Path(out_log).resolve())
-		os.system('echo "--------------- git info ---------------" >> {}'.format(out_log))
+		os.system('echo "--------------- git info ---------------" > {}'.format(out_log))
 		os.system('cd {}; echo "name:" $(git rev-parse --show-toplevel) >> {}'.format(git_dir, out_log_abs))
 		os.system('cd {}; echo "branch:" $(git symbolic-ref HEAD) >> {}'.format(git_dir, out_log_abs))
 		os.system('cd {}; echo "hash:" $(git rev-parse HEAD) >> {}'.format(git_dir, out_log_abs))
@@ -297,17 +297,17 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 	required_wildcards_out_log = ["step", "extension", "sample", "name"]
 	required_wildcards_in      = ["sample", "name"]
 	
-	def __init__(self, config):
-		super().__init__(config)
+	def __init__(self, workflow, **kwargs):
+		super().__init__(workflow, **kwargs)
 		
-		self.samples    = config["sample_info"]
+		self.samples    = self.snakemake_workflow.config["sample_info"]
 		self.sample_ids = list(self.samples.keys())
 		
 		# wildcard value-combinations parsed from input directory
 		self.wildcard_combs  = self._get_wildcard_combinations_per_sample(self.wildcard_values)
 		
 		# paths to static files
-		self.data_paths = config["organism"]["files"]
+		self.data_paths = self.snakemake_workflow.config["organism"]
 		
 		# test if all sample IDs can be found in input path
 		if not set(self.sample_ids).issubset(set(self.wildcard_values["sample"])):
@@ -319,8 +319,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
 	
-	def _test_config_input(self):
-		super()._test_config_input()
+	def _test_config_input(self, test_allowed_wildcards):
+		super()._test_config_input(test_allowed_wildcards)
 		
 		# test whether wildcards used consistently across patterns
 		if not set(self.out_path_wildcards) == set(self.log_path_wildcards) == set(self.in_path_wildcards) | set(self.required_wildcards_out_log) - set(self.required_wildcards_in):
@@ -373,6 +373,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		pattern_list = []
 		seen = set()
 		for comb in self.wildcard_combs[wildcards.sample]:
+			#TODO: case of ignored wildcards? meant for e.g. allFlowcell
 			kwargs_filled = {key: getattr(comb, key) if "{" in val or val not in self.wildcard_values[key] else val for key,val in kwargs_out.items()}
 			kwargs_id_tup = tuple(kwargs_filled[key] for key in sorted(kwargs_filled))
 			if kwargs_id_tup not in seen:
@@ -383,7 +384,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					pattern = pattern.format(sample=wildcards.sample, name_ext="{name_ext}") + self.samples[wildcards.sample]["read_extension"]
 					pattern = pattern.format(name_ext = ext_lst[mate] if len(ext_lst)>mate else "")
 				else:
-					pattern = self.in_path_pattern.format(sample=wildcards.sample, name="*", **kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
+					pattern = self.in_path_pattern.format(sample=wildcards.sample, name=getattr(wildcards, "name", "*"), 
+										**kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
 				pattern_list.append(pattern)
 		return [path for pat in pattern_list for path in iglob(pat)]
 		
@@ -464,7 +466,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		if step in self.data_paths:
 			index = self.data_paths[step]
 		else:
-			raise ValueError("Error linking index: no index for {} provided in config!".format(step))
+			raise ValueError("Error linking index: no keyword provided in config to set index for {}!".format(step))
 		if index:
 			ind = Path(index)
 			loc.parent.mkdir(exist_ok=True, parents=True)
@@ -488,8 +490,8 @@ class DEPipelinePathHandler(PipelinePathHandler):
 	required_wildcards_out_log = ["step", "extension", "contrast"]
 	required_wildcards_in      = ["step", "extension", "sample", "name"]
 	
-	def __init__(self, workflow):
-		super().__init__(workflow)
+	def __init__(self, workflow, **kwargs):
+		super().__init__(workflow, **kwargs)
 		
 		self.contrasts         = self.snakemake_workflow.config["contrasts"]["contrast_list"]
 		self.contrast_defaults = self.snakemake_workflow.config["contrasts"]["defaults"]
