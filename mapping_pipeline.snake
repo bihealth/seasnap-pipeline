@@ -5,7 +5,6 @@
 #TODO: dupradar in snakefile
 #TODO: save scripts for mapping pipeline
 
-
 import os, sys, yaml, textwrap, pandas as pd
 from collections import OrderedDict
 from time import asctime, localtime, time
@@ -15,6 +14,8 @@ from snakemake.logging import logger
 from tools.pipeline_tools import MappingPipelinePathHandler
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
+
+shell.prefix("set -e  pipefail;")
 
 # source files
 SNAKEDIR  = Path(workflow.current_basedir)
@@ -40,8 +41,6 @@ pph.link_index(step="salmon_index", sample="allSample", flowcell="allFlowcell", 
 wildcard_constraints: 
 	sample="[^./]+",
 	name  ="[^./]+"
-	
-shell.prefix("set -e  pipefail;")
 
 onstart:
 	# draw a dag
@@ -206,17 +205,24 @@ rule star_index:
 	output:
 		index = pph.out_dir_name(step = "star_index")+"/SA"
 	log:
-		pph.file_path(step="star_index", extension="log", log=True)
+		out = pph.file_path(step="star_index", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["star_index"]["cmd_opt"]
 	threads: 8
 	run:
-		shell(r"""
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		rm -fr $(dirname {output.index})/*; rm -fr $(dirname {log})/*
-		printf "\n-----------STAR index: " > {log}; STAR --version >> {log}
-		STAR --runMode genomeGenerate --genomeDir $(dirname {output}) --outFileNamePrefix $(dirname {log})/ --genomeFastaFiles {input.genome} --sjdbGTFfile {input.gtf} --runThreadN {threads} {params.options} &>> {log}
+		rm -fr $(dirname {output.index})/*
+		STAR --version
+		
+		#----- run STAR index
+		STAR --runMode genomeGenerate --genomeDir $(dirname {output}) --outFileNamePrefix $(dirname {log.out})/ --genomeFastaFiles {input.genome} \
+		      --sjdbGTFfile {input.gtf} --runThreadN {threads} {params.options}
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="star_index", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 rule star:
 	input:
@@ -224,11 +230,11 @@ rule star:
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, name_ext="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, name_ext="paired_end_extensions", mate=1) #identical if unstranded
 	output:
-		bam         = pph.file_path(step="star", extension="bam"),
+		bam         =      pph.file_path(step="star", extension="bam"),
 		usrt_bam    = temp(pph.file_path(step="star", extension="unsorted.bam")),
-		gene_counts = pph.file_path(step="star", extension="gene_counts.tab")
+		gene_counts =      pph.file_path(step="star", extension="gene_counts.tab")
 	log:
-		pph.file_path(step="star", extension="log", log=True)
+		out = pph.file_path(step="star", extension="output.log", log=True)
 	params:
 		outdir = pph.out_dir_name(step="star"),
 		options = config["rule_options"]["star"]["cmd_opt"],
@@ -251,36 +257,39 @@ rule star:
 			trim_cmd = "--readFilesCommand zcat"
 		else:
 			raise ValueError("STAR input: file extension {} not supported.".format(file_ext))
-		# run
-		shell(r"""
-		set -eux
-		rm -fr {params.outdir}/*; rm -fr $(dirname {log})/*
-		printf "\n-----------STAR: " > {log}; STAR --version >> {log}
 		
-		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} &>> {log}
-		mv {params.outdir}/Log.* $(dirname {log})
-		echo "more log files in $(dirname {log})" >> {log}
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		rm -fr {params.outdir}/*
+		STAR --version
+		samtools --version
+		
+		#----- run STAR mapping
+		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd}
+		mv {params.outdir}/Log.* $(dirname {log.out})
+		echo "more log files in $(dirname {log.out})"
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
 		
-		# sort BAM
-		printf "\n-----------samtools sort: " >> {log}; samtools --version >> {log}
-		samtools sort -@ $(expr {threads} / 2) -m $(expr 10000 / {threads})M -T {params.outdir}/sort -o {output.bam} {params.outdir}/Aligned.out.bam 2>> {log}
+		#----- sort BAM
+		samtools sort -@ $(expr {threads} / 2) -m $(expr 10000 / {threads})M -T {params.outdir}/sort -o {output.bam} {params.outdir}/Aligned.out.bam
 		mv {params.outdir}/Aligned.out.bam {output.usrt_bam}
 		
-		# mark duplicates
-		printf "\n-----------picard MarkDuplicates:\n" >> {log}
-		picard MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir} &>> {log}
+		#----- mark duplicates
+		picard MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir}
 		mv {params.outdir}/{wildcards.sample}.mdup.bam {output.bam}
 
-		# generate BAM index (.bai)
-		printf "\n-----------samtools index, stats, flagstat, idxstats: " >> {log}; samtools --version >> {log}
-		samtools index {output.bam} &>> {log}
+		#----- generate BAM index (.bai)
+		samtools index {output.bam}
 
-		# compute statistics
-		samtools stats {output.bam} > $(dirname {log})/star.{wildcards.sample}.bamstats.txt 2>> {log}
-		samtools flagstat {output.bam} > $(dirname {log})/star.{wildcards.sample}.flagstat.log 2>> {log}
-		samtools idxstats {output.bam} > $(dirname {log})/star.{wildcards.sample}.idxstats.log 2>> {log}
+		#----- compute statistics
+		samtools stats {output.bam} > $(dirname {log.out})/star.{wildcards.sample}.bamstats.txt
+		samtools flagstat {output.bam} > $(dirname {log.out})/star.{wildcards.sample}.flagstat.log
+		samtools idxstats {output.bam} > $(dirname {log.out})/star.{wildcards.sample}.idxstats.log
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="star", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- salmon -------------------------------------------------------------------------------
 
@@ -291,17 +300,21 @@ rule generate_transcriptome:
 	output:
 		pph.file_path(step = "generate_transcriptome", extension="fa")
 	log:
-		pph.file_path(step = "generate_transcriptome", extension="log", log=True)
+		out = pph.file_path(step = "generate_transcriptome", extension="output.log", log=True)
 	threads: 8
 	run:
-		shell(r"""
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		rm -fr $(dirname {output})/*; rm -fr $(dirname {log})/*
-		printf "\n-----------rsem-prepare-reference: " > {log}
+		rm -fr $(dirname {output})/*
 		
-		rsem-prepare-reference --gtf {input.gtf} {input.genome} $(dirname {output})/$(basename {output} .fa) &>> {log}
+		#----- generate transcriptome
+		rsem-prepare-reference --gtf {input.gtf} {input.genome} $(dirname {output})/$(basename {output} .fa)
 		mv $(dirname {output})/$(basename {output} .fa).idx.fa {output}
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="generate_transcriptome", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 rule salmon_index:
 	input:
@@ -309,17 +322,22 @@ rule salmon_index:
 	output:
 		index = pph.out_dir_name(step = "salmon_index")+"/sa.bin"
 	log:
-		pph.file_path(step = "salmon_index", extension="log", log=True)
+		out = pph.file_path(step = "salmon_index", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["salmon_index"]["cmd_opt"]
 	run:
-		shell(r"""
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		rm -fr $(dirname {output.index})/*; rm -fr $(dirname {log})/*
-		printf "\n-----------salmon index: " > {log}; salmon --version >> {log}
+		rm -fr $(dirname {output.index})/*
+		salmon --version
 		
-		salmon index -t {input.transcriptome} -i $(dirname {output.index}) {params.options} &>> {log}
+		#----- Salmon index
+		salmon index -t {input.transcriptome} -i $(dirname {output.index}) {params.options}
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="salmon_index", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 rule salmon:
 	input:
@@ -329,7 +347,7 @@ rule salmon:
 	output:
 		sf = pph.file_path(step = "salmon", extension="sf")
 	log:
-		pph.file_path(step = "salmon", extension="log", log=True)
+		out = pph.file_path(step = "salmon", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["salmon"]["cmd_opt"],
 		trim = True if config["rule_options"]["salmon"]["trim"]=="yes" else False
@@ -348,17 +366,22 @@ rule salmon:
 				reads = "-r {rds}".format(rds=" ".join(input.reads1))
 			else:
 				reads = "-1 {rds1} -2 {rds2}".format(rds1=" ".join(input.reads1), rds2=" ".join(input.reads2))
-		# run
-		shell(r"""
-		set -eux
-		rm -fr $(dirname {output.sf})/*; rm -fr $(dirname {log})/*
-		printf "\n-----------salmon: " > {log}; salmon --version >> {log}
 		
-		salmon quant -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf}) &>> {log}
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		rm -fr $(dirname {output.sf})/*
+		salmon --version
+		
+		#----- Salmon mapping
+		salmon quant -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
-		mv $(dirname {output.sf})/aux_info $(dirname {output.sf})/logs $(dirname {output.sf})/libParams $(dirname {output.sf})/cmd_info.json $(dirname {log})/
-		echo "more log files in $(dirname {log})" >> {log}
+		mv $(dirname {output.sf})/aux_info $(dirname {output.sf})/logs $(dirname {output.sf})/libParams $(dirname {output.sf})/cmd_info.json $(dirname {log.out})/
+		echo "more log files in $(dirname {log.out})"
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="salmon", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- feature counts -----------------------------------------------------------------------
 
@@ -369,21 +392,31 @@ rule feature_counts:
 	output:
 		pph.file_path(step="feature_counts", extension="feature_counts")
 	log:
-		pph.file_path(step="feature_counts", extension="log", log=True)
+		out = pph.file_path(step="feature_counts", extension="output.log", log=True)
 	params:
 		nsrt_bam = pph.file_path(step="feature_counts", extension="name_sorted.bam")
 	threads: 2
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
 		paired   = "-p" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
-		shell(r"""
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		printf "\n-----------samtools sort: " > {log}; samtools --version >> {log}
-		samtools sort -n -@ $(expr {threads} \* 2) -m $(expr 2500 / {threads})M -T $(dirname {output})/sort -o {params.nsrt_bam} {input.bam} 2>> {log}
-		printf "\n-----------feature counts: " >> {log}
-		featureCounts -T {threads} -t exon -g gene_id -a {input.gtf} -s {protocol} {paired} -o {output} {params.nsrt_bam} &>> {log}
+		samtools --version
+		
+		#----- sort (name sort)
+		samtools sort -n -@ $(expr {threads} \* 2) -m $(expr 2500 / {threads})M -T $(dirname {output})/sort -o {params.nsrt_bam} {input.bam}
+		
+		#----- feature counts
+		featureCounts -T {threads} -t exon -g gene_id -a {input.gtf} -s {protocol} {paired} -o {output} {params.nsrt_bam}
+		
+		#----- clean up
 		rm {params.nsrt_bam}
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="feature_counts", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- dupradar -----------------------------------------------------------------------------
 
@@ -394,16 +427,22 @@ rule dupradar:
 	output:
 		touch(pph.file_path(step="dupradar", extension="done"))
 	log:
-		pph.file_path(step="dupradar", extension="log", log=True)
+		out = pph.file_path(step="dupradar", extension="output.log", log=True)
 	threads: 8
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
 		paired  = "TRUE" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "FALSE"
-		shell(r"""
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		printf "\n-----------dupradar: " > {log}
-		Rscript --vanilla {SCRIPTDIR}/dupradar.R {input.bam} {wildcards.sample} {input.gtf} {protocol} {paired} {threads} $(dirname {output}) &>> {log}
+		
+		#----- dupradar
+		Rscript --vanilla {SCRIPTDIR}/dupradar.R {input.bam} {wildcards.sample} {input.gtf} {protocol} {paired} {threads} $(dirname {output})
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="dupradar", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- infer experiment ---------------------------------------------------------------------
 
@@ -414,13 +453,18 @@ rule infer_experiment:
 	output:
 		pph.file_path(step="infer_experiment", extension="strand_stat.txt")
 	log:
-		pph.file_path(step="infer_experiment", extension="log", log=True)
+		out = pph.file_path(step="infer_experiment", extension="output.log", log=True)
 	run:
-		shell(r"""
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		printf "\n-----------infer_experiment: " > {log}
-		infer_experiment.py -r {input.bed} -i {input.bam} -q 255 > {output} &>> {log}
+		
+		#----- infer experiment
+		infer_experiment.py -r {input.bed} -i {input.bam} -q 255 > {output}
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="infer_experiment", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- qc -----------------------------------------------------------------------------------
 
@@ -434,15 +478,21 @@ rule qc:
 	output:
 		touch(pph.file_path(step="qc", extension="done"))
 	log:
-		pph.file_path(step="qc", extension="log", log=True)
+		out = pph.file_path(step="qc", extension="output.log", log=True)
 	run:
 		paired = '' if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else '-e'
-		shell(r"""
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
 		set -eux
-		printf "\n-----------qc: " > {log}
+		
+		#----- qc
 		if [ ! -f {input.genome}.fai ] ; then exit 1; fi
-        {SCRIPTDIR}/run_my_qc.sh {paired} -l $(dirname {input.bam})/../report/Log.final.out -f $(dirname {input.fastqc}) -b {input.bam} -g {input.gtf} -r {input.genome} -o $(dirname {output}) &>> {log}
-        if [ ! -f $(dirname {output})/RNA-SeQC/metrics.tsv ] ; then exit 1; fi
+		{SCRIPTDIR}/run_my_qc.sh {paired} -l $(dirname {input.bam})/../report/Log.final.out -f $(dirname {input.fastqc}) -b {input.bam} -g {input.gtf} -r {input.genome} -o $(dirname {output})
+		if [ ! -f $(dirname {output})/RNA-SeQC/metrics.tsv ] ; then exit 1; fi
 		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="qc", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 
