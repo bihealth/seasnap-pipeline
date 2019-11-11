@@ -281,7 +281,7 @@ class PipelinePathHandler:
 		os.system('echo "--------------- snakefile --------------" >> {}'.format(out_log))
 		os.system('echo "snakefile name: {}" >> {}'.format(self.snakemake_workflow.snakefile, out_log))
 		os.system('echo "snakefile md5 : {}" >> {}'.format(self._md5(self.snakemake_workflow.snakefile), out_log))
-		os.system('echo "----------------------------------------" >> {}'.format(out_log))
+		os.system('echo "----------------------------------------" >> {l}; echo >> {l}'.format(l=out_log))
 		
 		return script_file
 		

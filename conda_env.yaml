@@ -37,3 +37,4 @@ dependencies:
   - trimadap=r9
   - salmon
   - rseqc
+  - multiqc

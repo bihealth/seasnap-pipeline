@@ -82,6 +82,7 @@ def get_inputs_all():
 		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="allFlowcell", lane="allLane")
 		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="allFlowcell", lane="allLane")
 		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="allFlowcell", lane="allLane")
+	
 	return inputs
 
 
@@ -89,7 +90,8 @@ shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.
 
 rule all:
 	input:
-		get_inputs_all()
+		get_inputs_all(),
+		pph.file_path(step="multiqc", extension="qc_report.html", sample="allSample", flowcell="allFlowcell", lane="allLane")
 	output:
 		html = pph.file_path(step="pipeline_report", extension="report.html", sample="allSample", flowcell="allFlowcell", lane="allLane")
 	run:
@@ -271,7 +273,7 @@ rule star:
 		echo "more log files in $(dirname {log.out})"
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
 		
-		#----- sort BAM
+		#----- sort BAM (coordinate sort)
 		samtools sort -@ $(expr {threads} / 2) -m $(expr 10000 / {threads})M -T {params.outdir}/sort -o {output.bam} {params.outdir}/Aligned.out.bam
 		mv {params.outdir}/Aligned.out.bam {output.usrt_bam}
 		
@@ -405,7 +407,7 @@ rule feature_counts:
 		set -eux
 		samtools --version
 		
-		#----- sort (name sort)
+		#----- sort BAM (name sort)
 		samtools sort -n -@ $(expr {threads} \* 2) -m $(expr 2500 / {threads})M -T $(dirname {output})/sort -o {params.nsrt_bam} {input.bam}
 		
 		#----- feature counts
@@ -488,11 +490,49 @@ rule qc:
 		
 		#----- qc
 		if [ ! -f {input.genome}.fai ] ; then exit 1; fi
-		{SCRIPTDIR}/run_my_qc.sh {paired} -l $(dirname {input.bam})/../report/Log.final.out -f $(dirname {input.fastqc}) -b {input.bam} -g {input.gtf} -r {input.genome} -o $(dirname {output})
+		{SCRIPTDIR}/run_my_qc.sh {paired} -l $(dirname {input.bam})/../report/Log.final.out -f $(dirname {input.fastqc}) -b {input.bam} -g {input.gtf} -r {input.genome} -o $( echo $(dirname {output}) | sed 's:/*$::')
 		if [ ! -f $(dirname {output})/RNA-SeQC/metrics.tsv ] ; then exit 1; fi
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="qc", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- multiQC ------------------------------------------------------------------------------
+
+rule multiqc:
+	input:
+		get_inputs_all()
+	output:
+		pph.file_path(step="multiqc", extension="qc_report.html")
+	log:
+		out            = pph.file_path(step="multiqc", extension="output.log",        log=True),
+		multiqc_config = pph.file_path(step="multiqc", extension="multiqc_conf.yaml", log=True)
+	run:
+		# compile multiqc config
+		multiqc_dict = config["report"]["multiqc"]
+		multiqc_dict["extra_fn_clean_exts"] = [dict(type="regex_keep", pattern="|".join(pph.sample_ids))]
+		if multiqc_dict["custom_logo"]: multiqc_dict["custom_logo"] = str(SNAKEDIR / multiqc_dict["custom_logo"])
+		with open(log.multiqc_config, "w") as f: yaml.dump(multiqc_dict, f, default_flow_style=False)
+		
+		# set search directory
+		dirs = Path(str(output)).parents
+		results_base_dir = str(dirs[len(dirs)-2])
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		multiqc --version
+		
+		#----- multiqc
+		multiqc -fv --config {log.multiqc_config} --filename {output} {results_base_dir}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="multiqc", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+
 
 

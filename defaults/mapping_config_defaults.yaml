@@ -29,3 +29,14 @@ rule_options:
   salmon: 
     cmd_opt: "--validateMappings"
     trim: yes
+
+#---------------------------------------- parameters for the report
+report:
+  multiqc:
+    title: SeA-SnaP mapping pipeline QC report
+    subtitle: run at the BIH CUBI
+    intro_text: The reports summarises results of several analyses
+    custom_logo: pictures/SeA-SnaP_logo.png
+    sp:
+      fastqc/zip:
+        fn: 'fastqc.*.zip'
