@@ -1,7 +1,7 @@
 RNA SeA-SnaP   <img align="right" width="140" src="pictures/SeA-SnaP_logo.svg" />
 ============
 
-RNA SeA-SnaP is a (Se)quence (A)nalysis (Sna)kemake (P)ipeline tool and combines two tasks:
+RNA SeA-SnaP is a RNA-(Se)q (A)nalysis (Sna)kemake (P)ipeline tool and combines two tasks:
 
 - A sub-pipeline mapping fastq files to a reference genome/transcriptome using STAR or Salmon
 - A sub-pipeline for Differential Expression (DE) analysis
@@ -657,10 +657,12 @@ Config options
 | \|---`contrast_list:`       | List of contrast definitions (see following); *default: empty*                    |
 | ...\|---(list entry)        |                                                                                   |
 | ......\|---`title`          | name of contrast, e.g. "nonclassical vs classical"                                |
-| ......\|---`column`         | column in covariate file, e.g. "condition"                                        |
-| ......\|---`numerator`      | numerator of the contrast (a level of `column`), e.g. "nonclassical"              |
-| ......\|---`denominator`    | denominator of the contrast (a level of `column`), e.g. "classical"               |
-| ......\|---`r_contrast`     | Advanced: a string in R syntax passed to the `contrast` argument of DESeq2's results (or lfcShrink) function, instead of using `column`, `numerator` and `denominator`. (Also see [here](https://www.rdocumentation.org/packages/DESeq2/versions/1.12.3/topics/results)) |
+| ......\|---`ratio`          |                                                                                   |
+| .........\|---`column`      | column in covariate file, e.g. "condition"                                        |
+| .........\|---`numerator`   | numerator of the contrast (a level of `column`), e.g. "nonclassical"              |
+| .........\|---`denominator` | denominator of the contrast (a level of `column`), e.g. "classical"               |
+| ......\|---`coef`           | alt. to `ratio`; the coefficient of DESeq2 results, e.g. "condition_classical_vs_nonclassical" |
+| ......\|---`vector`         | alt. to `ratio`; a list with entries corresponding to columns in the design matrix, defining the linear combination, e.g. [1,1,0,-1,0] |
 | ......\|---`...`            | any key from `defaults` (overwrite them for this contrast)                          |
 | \|---`defaults:`            |                                                                                   |
 | ...\|---`max_p_adj`         | FDR cutoff 'alpha' for DESeq2's results function; *default: 0.1*                  |
