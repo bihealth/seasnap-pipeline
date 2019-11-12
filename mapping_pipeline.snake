@@ -4,9 +4,9 @@
 
 #TODO: dupradar in snakefile
 
-import os, sys, yaml, textwrap, pandas as pd
+import os, sys, yaml, re, textwrap, pandas as pd
 from collections import OrderedDict
-from time import asctime, localtime, time
+from time import asctime, localtime, time, strftime
 from pathlib import Path
 from snakemake.utils import report, format as snakemake_format
 from snakemake.logging import logger
@@ -140,6 +140,30 @@ rule all:
 			:literal:
 		
 		""", output.html, graph = rule_execution, table = summary)
+		
+rule export:
+	input:
+		get_inputs_all()
+	output:
+		touch(pph.file_path(step="export", extension="done"))
+	log:
+		out = pph.file_path(step="export", extension="output.log", log=True)
+	run:
+		export_spec = config["export"]
+		for pattern in export_spec["path_pattern"]:
+			pat = strftime(pattern).replace("{GENOME}", config["organism"]["genome_version"])
+			wildcards = re.findall("{([^}]+)}", pat)
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		
+		#----- multiqc
+		multiqc -fv --config {log.multiqc_config} --filename {output} {results_base_dir}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="export", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- fastqc -------------------------------------------------------------------------------
 
