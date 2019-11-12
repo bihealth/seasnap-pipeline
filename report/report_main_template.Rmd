@@ -35,7 +35,7 @@ file_tab <- data.frame(read.table("{{FILE_TABLE}}", sep="\t", header = TRUE))
 file_tab$filename <- as.character(file_tab$filename)
 source(paste0(r_common, "/basic_funcs.R"))
 source(paste0(r_common, "/basic_plots.R"))
-report_dir      <- file.path(working_dir, dirname(subset(file_tab, step=="report" & extension=="tsv" & contrast=="all")$filename))
+report_dir      <- file.path(working_dir, dirname("{{report-tsv}}"))
 PLOTS_BASE_DIR  <- file.path(report_dir, "plots")
 dir.create(PLOTS_BASE_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
 ```
