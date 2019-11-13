@@ -40,3 +40,17 @@ report:
     sp:
       fastqc/zip:
         fn: 'fastqc.*.zip'
+        
+#---------------------------------------- configuration for export
+export:
+  path_pattern:
+    - SODAR_export/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:out}/{step}/out/{step}.{sample}.{extension}
+    - SODAR_export/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:rep}/{step}/report/
+    - SODAR_export/{sample}/{GENOME}/%Y_%m_%d/{files:gene_expression_quantification}/{step}/out/{step}.{sample}.{extension}
+  ngs_mapping_out:
+    - {step: star, extension: bam}
+  ngs_mapping_rep:
+    - dir: {step: star, log: true}
+  gene_expression_quantification:
+    - {step: star, extension: gene_counts.tab}
+    - {step: salmon, extension: sf}

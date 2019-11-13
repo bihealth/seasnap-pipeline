@@ -2,6 +2,8 @@ organism:
   name: human
   genus: "Homo Sapiens"
   taxon: 9606
+
+  genome_version: GRCh38
   
   files:
     genome: /fast/projects/cubit/18.12/static_data/reference/GRCh38/p7.chr_scaff/GRCh38.p7.genome.chr_scaff.fa

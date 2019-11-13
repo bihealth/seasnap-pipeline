@@ -2,9 +2,10 @@
 ## version: 0.9.5
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
-import sys, os, re, hashlib, itertools, yaml, pandas as pd
+import sys, os, re, shutil, hashlib, itertools, yaml, pandas as pd
 from collections import namedtuple, Mapping, OrderedDict
 from copy import deepcopy
+from time import strftime
 from warnings import warn
 from pathlib import Path
 from glob import iglob, glob
@@ -284,6 +285,54 @@ class PipelinePathHandler:
 		os.system('echo "----------------------------------------" >> {l}; echo >> {l}'.format(l=out_log))
 		
 		return script_file
+
+	def export(self):
+		"""
+		export selected results into a separate folder structure (as configured in config file)
+		"""
+		export_spec = self.snakemake_workflow.config["export"]
+		for pattern in export_spec["path_pattern"]:
+			pat = strftime(pattern).replace("{GENOME}", self.snakemake_workflow.config["organism"]["genome_version"])
+			wildcards = self._get_wildcard_list(pat)
+			key_wcs   = [wc for wc in wildcards if wc[:6] == "files:"]
+			# no nested keys for now:
+			assert len(key_wcs)==1
+			key = key_wcs[0].split(":")[1:]
+			assert len(key)>0
+			pat = pat.replace("{{{}}}".format(key_wcs[0]), key[0])
+			for arg_dct in export_spec["_".join(key)]:
+				mode = "file"
+				if "dir" in arg_dct:
+					mode = "dir"
+					arg_dct = arg_dct["dir"]
+				extra_wcs = set(wildcards) - set(key_wcs) - (set(arg_dct) & set(wildcards))
+				# only either 'sample' (mapping) or 'contrast' (DE) for now:
+				assert len(extra_wcs)<=1
+				if extra_wcs:
+					extra_wc   = list(extra_wcs)[0]
+					wc_in_dct  = {k:v for k,v in arg_dct.items() if k in wildcards}
+					search_pat = self.out_path_pattern if not "log" in arg_dct else self.log_path_pattern
+					
+					if mode == "file":
+						source = self.expand_path(**arg_dct)
+					else:
+						source = self.file_path(**{**arg_dct, "extension": "{extension}"})
+						source = str(Path(source).parent / "**")
+						source = glob(source.replace("{{{}}}".format(extra_wc), "*"))
+						search_pat = str(Path(search_pat).parent)
+						
+					get_wc = self._get_wildcard_values_from_file_path
+					target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
+				else:
+					source = [self.file_path(**arg_dct)]
+					target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
+				assert len(source)==len(target)
+				for i in range(len(source)):
+					if mode == "dir": target[i] = str(Path(target[i]) / Path(source[i]).name)
+					print("copy {} to {}...".format(source[i], target[i]))
+					Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
+					shutil.copy2(source[i], target[i])
+					Path(target[i] + ".md5").write_text(self._md5(target[i]))
 		
 		
 ##################################################################################################################################
