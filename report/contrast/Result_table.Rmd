@@ -5,11 +5,21 @@ An interactive data table of the contrast results for {{ENTRY_NAME}}.
 ```{r table_{{ENTRY_ID}}}
 #----- import packages
 library(DT)
+library(magrittr)
 
 #----- load results
 res <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
+results_table <- as.data.frame(res); ids <- is.element(colnames(results_table), c("entrez", "symbol"))
+results_table <- results_table[,c(which(ids), which(!ids))]
 
-#----- MA plot
-datatable(as.data.frame(res), options = list(scrollX = TRUE))
+#----- interactive table
+datatable(results_table, extensions=c('Buttons','FixedColumns'), escape=F,
+          options = list(scrollX=TRUE, fixedColumns=list(leftColumns=3), dom='Bfrtip', buttons='csv')) %>%
+  formatRound('baseMean', 3) %>%
+  formatRound('log2FoldChange', 3) %>%
+  formatRound('lfcSE', 3) %>%
+  formatRound('stat', 3) %>%
+  formatRound('pvalue', 4) %>%
+  formatRound('padj', 4)
 ```
 
