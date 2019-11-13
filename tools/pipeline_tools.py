@@ -328,11 +328,9 @@ class PipelinePathHandler:
 					target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
 				assert len(source)==len(target)
 				for i in range(len(source)):
+					if mode == "dir": target[i] = str(Path(target[i]) / Path(source[i]).name)
 					print("copy {} to {}...".format(source[i], target[i]))
-					if mode == "file":
-						Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
-					else:
-						Path(target[i]).mkdir(exist_ok = True, parents = True)
+					Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
 					shutil.copy2(source[i], target[i])
 					Path(target[i] + ".md5").write_text(self._md5(target[i]))
 		
