@@ -889,6 +889,39 @@ class SampleInfoTool(PipelinePathHandler):
 				self.sample_info = yaml.safe_load(f)["sample_info"]
 			except yaml.YAMLError as exc:
 				print(exc)
+				
+	def parse_isatab(self, filename):
+		"""
+		parse sample info from ISA-tab table
+		"""
+		tab = pd.read_csv(filename, sep="\t", index_col=False)
+		tab.dropna(axis="columns", how="all", inplace=True)
+		with open("ISAtab_parse_conf.yaml", "r") as stream:
+			try:
+				parse_conf = yaml.safe_load(stream)
+			except yaml.YAMLError as exc:
+				print(exc)
+		
+		def find_column(key):
+			if not parse_conf[key]["columns"]: return None
+			for col in tab.columns:
+				for col_regex in parse_conf[key]["columns"]:
+					if re.match(col_regex, col): return col
+		def map_value(key, value):
+			value = value.lower()
+			for val_regex, val_repl in parse_conf[key]["value"].items():
+				if re.fullmatch(val_regex, value): 
+					return re.sub(val_regex, val_repl, value) if isinstance(val_repl, str) else val_repl
+		
+		sample_info = {}
+		for key in parse_conf:
+			column = find_column(key)
+			print(f"key: {key} column: {column}")
+			if column is not None: 
+				sample_info[key] = [map_value(key, val) for val in tab[column]]
+		print(sample_info)
+			
+		
 
 
 ##################################################################################################################################
