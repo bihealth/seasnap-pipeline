@@ -65,8 +65,8 @@ def get_inputs_all():
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	
 	#functional annotation
-	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds")),
-	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds"))
+	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) )),
+	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
 	
 	return inputs
 

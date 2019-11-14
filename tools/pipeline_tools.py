@@ -617,12 +617,13 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, contrast=contrast, **kwargs_out)
 	
-	def expand_path(self, step, extension, **kwargs):
+	def expand_path(self, step, extension, if_set=False, **kwargs):
 		"""
 		Generate multiple paths for intermediate and output files corresponding to different contrast IDs
 		
 		:param step:  Snakemake rule name (string) for which the paths are generated
 		:param extension: file extension for the generated file path
+		:param if_set: dict entry of a contrast used to filter for which to expand over; expand over all contrast if False
 		:param **kwargs: replacement strings for optional wildcards, e.g. batch, flowcell, lane (see description)
 		:returns: list of paths
 		"""
@@ -633,7 +634,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 				for choice_comb in itertools.product(*[self.input_choice[eic] for eic in expand_input_choices])]
 		
 		paths = []
-		for contr in self.contrast_ids:
+		for contr in (c_id for i, c_id in enumerate(self.contrast_ids) if any({k:v}==if_set for k,v in self.contrasts[i].items()) or not if_set):
 			if not expand_input_choices:
 				paths.append(self.file_path(step, extension, contrast=contr, **kwargs_out))
 			else:
