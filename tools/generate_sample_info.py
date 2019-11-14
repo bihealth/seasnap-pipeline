@@ -9,6 +9,8 @@ if __name__ == '__main__':
 
 	sit.parse_isatab(sys.argv[1])
 
+	print(sit.sample_info)
+
 	# update info
 	#sit.update_sample_info(library_default="unstranded") # <-- EDIT file after generation to replace default
 

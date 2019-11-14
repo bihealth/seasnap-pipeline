@@ -824,13 +824,22 @@ class SampleInfoTool(PipelinePathHandler):
 		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern,f).group(0), "") for f in input_files]}
 		
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
+		""" for importing lists from table entries """
 		for smpl_info in self.sample_info.values():
 			smpl_info[key] = [s.replace("'","").replace('"',"") for s in re.findall("[^\[\]\s,]+", smpl_info[key])]
+			
+	def _add_info_fields(self, add_dict):
+		""" add fields from add_dict to self.sample_info if they are not already present """
+		for sample, fields in add_dict.items():
+			if sample in self.sample_info:
+				s_info = self.sample_info[sample]
+				for f_key,f_val in fields.items():
+					if f_key not in s_info: s_info[f_key] = f_val
 			
 		
 	#---------------------------------------------------- access methods ----------------------------------------------------#	
 		
-	def update_sample_info(self, library_default="unstranded"):
+	def update_sample_info(self, library_default="unstranded", add=False):
 		""" 
 		fill mandatory info about sample by searching the input path specified in the config file.
 		
@@ -856,7 +865,12 @@ class SampleInfoTool(PipelinePathHandler):
 				if paired_end_ext not in paired_end_ext_lst:
 					paired_end_ext_lst.append(paired_end_ext)
 		
-		self.sample_info = sample_info
+		if add:
+			# add missing fields
+			self._add_info_fields(sample_info)
+		else:
+			# overwrite
+			self.sample_info = sample_info
 		
 	def write_table(self, filename, sep="\t"):
 		"""
@@ -896,7 +910,8 @@ class SampleInfoTool(PipelinePathHandler):
 		"""
 		tab = pd.read_csv(filename, sep="\t", index_col=False)
 		tab.dropna(axis="columns", how="all", inplace=True)
-		with open("ISAtab_parse_conf.yaml", "r") as stream:
+		parse_conf = Path(os.path.realpath(__file__)).parent / Path("ISAtab_parse_conf.yaml")
+		with open(str(parse_conf), "r") as stream:
 			try:
 				parse_conf = yaml.safe_load(stream)
 			except yaml.YAMLError as exc:
@@ -908,22 +923,25 @@ class SampleInfoTool(PipelinePathHandler):
 				for col_regex in parse_conf[key]["columns"]:
 					if re.match(col_regex, col): return col
 		def map_value(key, value):
-			value = value.lower()
+			if "as_is" in parse_conf[key] and parse_conf[key]["as_is"]:
+				return value
+			value = str(value).lower()
 			for val_regex, val_repl in parse_conf[key]["value"].items():
 				if re.fullmatch(val_regex, value): 
 					return re.sub(val_regex, val_repl, value) if isinstance(val_repl, str) else val_repl
 		
-		sample_info = {}
+		sample_info_cols = {}
 		for key in parse_conf:
 			column = find_column(key)
-			print(f"key: {key} column: {column}")
+			print(f"key: {key} | column: {column}")
 			if column is not None: 
-				sample_info[key] = [map_value(key, val) for val in tab[column]]
-		print(sample_info)
+				sample_info_cols[key] = [map_value(key, val) for val in tab[column]]
+		
+		self.sample_info = {sample_info_cols["id"][i]: 
+		                   	{key: val[i] for key,val in sample_info_cols.items() if key != "id"} 
+		                   for i in range(len(sample_info_cols["id"]))}
 			
 		
-
-
 ##################################################################################################################################
 #------------------------------------------------------ class for report --------------------------------------------------------#
 ##################################################################################################################################

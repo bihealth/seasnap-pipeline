@@ -64,13 +64,17 @@ def generate_sample_info(args):
 		sit.read_yaml(args.input_file)
 	elif args.get_from=="tsv":
 		sit.read_table(args.input_file, sep=args.sep)
+	elif args.get_from=="sodar":
+		sit.parse_isatab(args.input_file)
+		print(f"...ISA-tab parsed. Sample IDs are: {list(sit.sample_info)}")
+		#sit.update_sample_info(library_default=args.library_default, add=True)
 	
 	# write to file
 	if args.write_to=="yaml":
 		sit.write_yaml(args.output + ".yaml")
 	elif args.write_to=="tsv":
 		sit.write_table(args.output + ".tsv", sep=args.sep)
-	print("\nsample info {} auto-generated. EDIT BEFORE RUNNING PIPELINE!".format(args.output))
+	print("\nsample info {} auto-generated. EDIT BEFORE RUNNING PIPELINE!\n".format(args.output))
 
 def generate_covariate_file(args):
 	"""
@@ -200,19 +204,19 @@ parser_working_dir.set_defaults(func=setup_working_directory)
 
 #--- parser for generate_sample_info
 parser_sample_info = subparsers.add_parser('sample_info', help="generate sample info for mapping pipeline", description=
-"""Generate sample info (yaml) file from input for the mapping pipeline.""")
+"""Generate sample info (yaml) file for the mapping pipeline.""")
 parser_sample_info.add_argument('--library_default', '-l', default="unstranded", choices=["unstranded","forward","reverse"], help="default strandedness for all samples")
 parser_sample_info.add_argument('--config_files',    '-c', nargs='+', default=["mapping_config.yaml"], help="config files to be loaded")
 parser_sample_info.add_argument('--output',          '-o', default="sample_info", help="name of sample info file")
 parser_sample_info.add_argument('--input',           '-i', default="sample_info.tsv", dest="input_file", help="import from this file; only needed if --from is used")
 parser_sample_info.add_argument('--sep',             '-s', default="\t", help='separator for importing or exporting tables with --from tsv or --to tsv (default "\\t")')
-parser_sample_info.add_argument('--from',            '-f', default="parse_dir", dest="get_from", choices=["parse_dir","yaml","tsv"], help="import sample info file type")
+parser_sample_info.add_argument('--from',            '-f', default="parse_dir", dest="get_from", choices=["parse_dir","yaml","tsv","sodar"], help="import sample info file type")
 parser_sample_info.add_argument('--to',              '-t', default="yaml", dest="write_to", choices=["yaml","tsv"], help="export sample info file type")
 parser_sample_info.set_defaults(func=generate_sample_info)
 
 #--- parser for generate_covariate_file
 parser_covariate_file = subparsers.add_parser('covariate_file', help="generate a covariate file for DE pipeline", description=
-"""Generate a covariate file from input for the DE pipeline.
+"""Generate a covariate file for the DE pipeline.
 Five mandatory columns are automatically generated.
 Additional columns can be added with --col NAME LEVELS, 
 where NAME is the column name and LEVELS can be specified in two ways:

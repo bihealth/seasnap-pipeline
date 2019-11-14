@@ -16,11 +16,10 @@ paired:
 stranded:
   columns: null
   value: null
-  default: unstranded
   
 read_length:
   columns: null
-  value: null
+  as_is: true
   
 instrument:
   columns:
