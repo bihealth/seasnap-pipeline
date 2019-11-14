@@ -162,7 +162,7 @@ class PipelinePathHandler:
 			combinations.append(WildcardComb(**{key: wildcard_values[key][index] for key in wildcard_values}))
 		return combinations
 		
-	def _get_wildcard_values_from_input(self, input_pattern, unix_style=False):
+	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
 		input_files = iglob(re.sub("{[^}./]+}",   "*", input_pattern))
@@ -173,7 +173,7 @@ class PipelinePathHandler:
 			self._get_wildcard_values_from_file_path(inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 		return wildcard_values
 		
-	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=False):
+	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True):
 		""" get values matching wildcards from given file path"""
 		
 		def wildc_replace(matchobj):

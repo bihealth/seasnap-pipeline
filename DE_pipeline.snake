@@ -31,8 +31,7 @@ pph = DEPipelinePathHandler(workflow)
 
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 
-	sample="[^./]+",
-	name  ="[^./]+"
+	sample="[^./]+"
 
 
 R_SESSION_INFO = r"""

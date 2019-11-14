@@ -39,7 +39,7 @@ pph.link_index(step="salmon_index", sample="all_samples", flowcell="all_flowcell
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 
 	sample="[^./]+",
-	name  ="[^./]+"
+	mate  ="[^./_]+"
 
 onstart:
 	# draw a dag
