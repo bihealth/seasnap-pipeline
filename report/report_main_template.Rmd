@@ -24,17 +24,20 @@ library(yaml)
 working_dir <- "{{WORKING_DIRECTORY}}"
 
 knitr::opts_knit$set(root.dir = working_dir)
-knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/', echo=F, warning=T, message=F)
+knitr::opts_chunk$set(dev="CairoPNG", fig.width=12, fig.height=8, echo=F, warning=T, message=F)
+ggplot2::theme_set(ggplot2::theme_bw())
 
 # variables and functions accessible from all chunks
 setwd(working_dir)
-config   <- yaml.load_file("DE_config.yaml")
+config   <- yaml.load_file("{{pipeline_report-yaml}}")
 r_common <- "{{R_COMMON}}"
 file_tab <- data.frame(read.table("{{FILE_TABLE}}", sep="\t", header = TRUE))
 file_tab$filename <- as.character(file_tab$filename)
 source(paste0(r_common, "/basic_funcs.R"))
 source(paste0(r_common, "/basic_plots.R"))
-DDS <- readRDS("{{DESeq2-rds}}")
+report_dir      <- file.path(working_dir, dirname("{{report-tsv}}"))
+PLOTS_BASE_DIR  <- file.path(report_dir, "plots")
+dir.create(PLOTS_BASE_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
 ```
 
 #>--------------------------------------------INSERT--------------------------------------------<#

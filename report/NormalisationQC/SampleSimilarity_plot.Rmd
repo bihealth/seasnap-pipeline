@@ -1,0 +1,22 @@
+## Sample similarity
+
+The hierarchical clustering shown below was generated using all the full normalised dataset (`r nrow(DDS)` genes).
+The expression values are obtained by the "`r config$normalization$normalized_expression`" method, where the normalisation doesn't take into account the experimental design.
+The clustering is using euclidian distance for both the rows (genes) and columns (samples). In both cases, the distance between clusters is defined as the maximum of the distances between elements pairs from each cluster.
+
+```{r normalisationQCSimilarity}
+d <- dist(t(SummarizedExperiment::assay(RLD_BLIND)))
+dMatrix <- as.matrix(d)
+
+fn <- file.path(PLOTS_DIR, "Similarity.pdf")
+p <- ggplotify::as.ggplot(pheatmap::pheatmap(
+    dMatrix,
+    clustering_distance_rows=d, clustering_distance_cols=d,
+    label_rows=colnames(RLD_BLIND), label_cols=NULL,
+    col=colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(255),
+    silent=TRUE
+))
+multiplot(p, fn=fn)
+```
+
+[Download plot](`r fn`)

@@ -1,6 +1,0 @@
-# Sample similarity
-
-Similarity of samples as a heatmap.
-
-<img src="{{WORKING_DIRECTORY}}{{sample_similarity-png}}">
-
