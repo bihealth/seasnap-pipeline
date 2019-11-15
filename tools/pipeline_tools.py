@@ -902,17 +902,19 @@ class ReportTool(PipelinePathHandler):
 	insert_pattern        = "#>.*INSERT.*<#"
 	entry_name_wildcard   = "{{ENTRY_NAME}}", "{{ENTRY_ID}}"
 
-	def __init__(self, config, id_dicts={}):
-		if type(config) is dict:
-			config_dict = config
-		elif isinstance(config, str):
-			with open(config, "r") as stream:
-				try:
-					config_dict = yaml.safe_load(stream)
-				except yaml.YAMLError as exc:
-					print(exc)
-		else:
-			raise TypeError("Wrong type of argument config: must be dict or str.")
+	def __init__(self, pph, id_dicts={}):
+		#if type(config) is dict:
+		#	config_dict = config
+		#elif isinstance(config, str):
+		#	with open(config, "r") as stream:
+		#		try:
+		#			config_dict = yaml.safe_load(stream)
+		#		except yaml.YAMLError as exc:
+		#			print(exc)
+		#else:
+		#	raise TypeError("Wrong type of argument config: must be dict or str.")
+		self.path_handler = pph
+		config_dict       = self.path_handler.snakemake_workflow.config
 			
 		if config_dict["pipeline_param"]["report_snippets"]:
 			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
@@ -998,8 +1000,14 @@ class ReportTool(PipelinePathHandler):
 			if type(snippet) is str:
 				
 				snippet_file = path / snippet
-			
-				snippet_text.append( self._insert_entry_name(snippet_file.read_text(), entry) )
+				snippet_cont = self._insert_entry_name(snippet_file.read_text(), entry)
+				
+				requirements = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", snippet_cont)
+				snippet_cont = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_cont)
+				req_fields   = ["step","extension","contrast"]
+				
+				if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") )) )).exists() for req in requirements):
+					snippet_text.append(snippet_cont)
 					
 			elif isinstance(snippet, dict):
 				assert len(snippet)==1

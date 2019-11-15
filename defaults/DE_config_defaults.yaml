@@ -64,6 +64,7 @@ report:
       - Init_code.Rmd
       - MA_plot.Rmd
       - Result_table.Rmd
+      - Goseq_GO_table.Rmd
   report_snippets:
     - Covariate_table.Rmd
     - NormalisationQC:
