@@ -78,7 +78,7 @@ class PipelinePathHandler:
 		if test_allowed_wildcards:
 			# test if all wildcards allowed
 			if not all(x in self.allowed_wildcards for x in self.out_path_wildcards+self.log_path_wildcards+self.in_path_wildcards):
-				raise ValueError("Error in config file: unknown wildcards. allowed wildcards: {}".format(self.allowed_wildcards()))
+				raise ValueError("Error in config file: unknown wildcards. allowed wildcards: {}".format(self.allowed_wildcards))
 		
 		# test for required wildcards in all patterns
 		if not all(x in self.out_path_wildcards and x in self.log_path_wildcards for x in self.required_wildcards_out_log):
@@ -162,7 +162,7 @@ class PipelinePathHandler:
 			combinations.append(WildcardComb(**{key: wildcard_values[key][index] for key in wildcard_values}))
 		return combinations
 		
-	def _get_wildcard_values_from_input(self, input_pattern, unix_style=False):
+	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
 		input_files = iglob(re.sub("{[^}./]+}",   "*", input_pattern))
@@ -173,7 +173,7 @@ class PipelinePathHandler:
 			self._get_wildcard_values_from_file_path(inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 		return wildcard_values
 		
-	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=False):
+	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True):
 		""" get values matching wildcards from given file path"""
 		
 		def wildc_replace(matchobj):
@@ -182,8 +182,8 @@ class PipelinePathHandler:
 		match_pattern   =       re.sub("\\\\{([^}./]+)\\\\}", wildc_replace, re.escape(input_pattern))
 		wildcards       =   re.findall("{([^}./]+)}",                                  input_pattern)
 		if unix_style:
-			match_pattern = re.sub("\\\\*\\\\*", "[^{}]*",   match_pattern)
-			match_pattern = re.sub("\\\\*",      "[^{}./]*", match_pattern)
+			match_pattern = re.sub(r"\\\*\\\*", "[^{}]*",   match_pattern)
+			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*",      "[^{}./]*", match_pattern)
 			
 		wildcard_values = wildc_val if wildc_val else {w:[] for w in wildcards}
 		
@@ -342,9 +342,9 @@ class PipelinePathHandler:
 class MappingPipelinePathHandler(PipelinePathHandler):
 	""" path handler for mapping pipeline """
 
-	allowed_wildcards          = ["step", "extension", "sample", "name", "batch", "flowcell", "lane"]
-	required_wildcards_out_log = ["step", "extension", "sample", "name"]
-	required_wildcards_in      = ["sample", "name"]
+	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane"]
+	required_wildcards_out_log = ["step", "extension", "sample"]
+	required_wildcards_in      = ["sample"]
 	
 	def __init__(self, workflow, **kwargs):
 		super().__init__(workflow, **kwargs)
@@ -377,8 +377,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			"do not contain the same wildcards. out: {}, log: {}, in: {}".format(set(self.out_path_wildcards), set(self.log_path_wildcards), set(self.in_path_wildcards)))
 			
 		# test if all wildcards used in outdir path pattern
-		if not set(self.out_path_wildcards) == set(self.outdir_path_wildcards) | set(["name", "extension"]):
-			raise ValueError("Error in config file: all wildcards of out and log dir should be used in folder names (exception: {{name}} and {{extension}}), otherwise "
+		if not set(self.out_path_wildcards) == set(self.outdir_path_wildcards) | set(["extension"]):
+			raise ValueError("Error in config file: all wildcards of out and log dir should be used in folder names (exception: {{extension}}), otherwise "
 			"different rules might compute output in the same folder, which can lead to mixed or deleted intermediate files. " 
 			"in folder name: {}, all: {}".format(set(self.outdir_path_wildcards), set(self.out_path_wildcards)))
 	
@@ -395,7 +395,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		return per_sample_comb
 		
 	def _write_log(self, **kwargs):
-		filename = self.file_path(step="MappingPipelinePathHandler", extension="log", log=True, batch="allBatches", flowcell="allFlowcells", lane="allLanes", **kwargs)
+		filename = self.file_path(step="MappingPipelinePathHandler", extension="log", log=True, batch="all_batches", flowcell="all_flowcells", lane="all_lanes", **kwargs)
 		os.makedirs(os.path.dirname(filename), exist_ok=True)
 		with open(filename, "w") as f:
 			f.write("pattern input:\n   in path pattern: {}\n   out path pattern: {}\n   log path pattern: {}\n\n"
@@ -409,13 +409,13 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			
 	#-------------------------------------------- methods used in snakemake file --------------------------------------------#
 	
-	def get_fastq_pairs(self, wildcards, mate=0, name_ext=""):
+	def get_fastq_pairs(self, wildcards, mate=0, mate_key=""):
 		"""
 		Generate paths to one or more .fastq input files for a given name extension (e.g. paired end extension).
 		
 		:param wildcards: rule wildcards
-		:param mate: index of extension type to return (based on name_ext)
-		:param name_ext: key to config dict where different extensions to a sample ID are defined (e.g. paired end extensions)
+		:param mate: index of extension type to return (based on mate_key)
+		:param mate_key: key to config dict where different extensions to a sample ID are defined (e.g. paired end extensions)
 		:returns: a list with paths to specified input files, [] if extension at given index (mate) does not exist
 		"""
 		kwargs_out = {key: getattr(wildcards, key, val) for key, val in self.opt_wildcard_placeholders.items()}
@@ -423,60 +423,55 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		seen = set()
 		for comb in self.wildcard_combs[wildcards.sample]:
 			#TODO: case of ignored wildcards? meant for e.g. allFlowcell
-			kwargs_filled = {key: getattr(comb, key) if "{" in val or val not in self.wildcard_values[key] else val for key,val in kwargs_out.items()}
+			kwargs_filled = {key: getattr(comb, key) if ("{" in val or val not in self.wildcard_values[key]) and key != "mate" else val for key,val in kwargs_out.items()}
 			kwargs_id_tup = tuple(kwargs_filled[key] for key in sorted(kwargs_filled))
 			if kwargs_id_tup not in seen:
 				seen.add(kwargs_id_tup)
-				if name_ext:
-					ext_lst = self.samples[wildcards.sample][name_ext]
-					pattern = self.in_path_pattern.format(sample="{sample}", name="{sample}{name_ext}", **kwargs_filled)
-					pattern = pattern.format(sample=wildcards.sample, name_ext="{name_ext}") + self.samples[wildcards.sample]["read_extension"]
-					pattern = pattern.format(name_ext = ext_lst[mate] if len(ext_lst)>mate else "")
+				if mate_key:
+					mate_lst = self.samples[wildcards.sample][mate_key]
+					if len(mate_lst)>mate: kwargs_filled["mate"] = mate_lst[mate]
+					pattern  = self.in_path_pattern.format(sample = wildcards.sample, **kwargs_filled)
+					pattern += self.samples[wildcards.sample]["read_extension"]
 				else:
-					pattern = self.in_path_pattern.format(sample=wildcards.sample, name=getattr(wildcards, "name", "*"), 
-										**kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
+					if "mate" not in kwargs_filled: kwargs_filled["mate"] = "*"
+					pattern = self.in_path_pattern.format(sample=wildcards.sample, **kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
 				pattern_list.append(pattern)
 		return [path for pat in pattern_list for path in iglob(pat)]
 		
-	def file_path(self, step, extension, sample="{sample}", name="", log=False, **kwargs):
+	def file_path(self, step, extension, sample="{sample}", log=False, **kwargs):
 		"""
 		Generate single path for intermediate and output or log files.
 		
 		:param step:  Snakemake rule for which the paths are generated
 		:param extension: file extension for the generated file path
 		:param sample: sample ID to be included in the file path
-		:param name: name of the file; will be set to name=sample if name==""
 		:param log: generate path to logfile if log==True otherwise generate path to output/intermediate file
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
-		if not name: name = sample
 		path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
-		return path_pattern.format(step=step, extension=extension, sample=sample, name=name, **kwargs_out)
+		return path_pattern.format(step=step, extension=extension, sample=sample, **kwargs_out)
 		
-	def out_dir_name(self, step, sample="{sample}", name="", **kwargs):
+	def out_dir_name(self, step, sample="{sample}", **kwargs):
 		"""
 		Generate single path to intermediate and output file directory.
 		
 		:param step:  Snakemake rule for which the paths are generated
 		:param sample: sample ID to be included in the file path
 		"""
-		if not name: name = sample
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildc_placeh_outdir.items()}
-		if "name" in self.outdir_path_wildcards: kwargs_out["name"]=name
 		return self.out_dir_pattern.format(step=step, sample=sample, **kwargs_out)
 		
-	def expand_path(self, step, extension="", name_ext="", **kwargs):
+	def expand_path(self, step, extension="", **kwargs):
 		"""
 		Generate multiple paths for intermediate and output files corresponding to different sample IDs (and e.g. paired end extensions).
 
 		Always generates paths over all sample IDs and their combinations with keyword arguments (kwargs) that were not
-		defined like, e.g. flowcell="allFlowcells", where "allFlowcells" is an arbitrary string that will be filled in the generated paths
+		defined like, e.g. flowcell="all_flowcells", where "all_flowcells" is an arbitrary string that will be filled in the generated paths
 		instead of the real flowcell IDs. Only keyword arguments that correspond to wildcards in the config path pattern (with the same name) are used.
 		
 		:param step:  Snakemake rule name (string) for which the paths are generated
 		:param extension: file extension for the generated file path; '' to generate paths to directories
-		:param name_ext: key to config dict where different extensions to a sample ID are defined (e.g. paired end extensions)
 		:param **kwargs: replacement strings for optional wildcards, e.g. batch, flowcell, lane (see description)
 		:returns: list of paths
 		"""
@@ -490,16 +485,13 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 				if kwargs_id_tup not in seen:
 					seen.add(kwargs_id_tup)
 					if extension:
-						out_path_pattern = self.file_path(step, extension, sample=sample, name=sample+"{name_ext}", **kwargs_filled)
-						name_exts = self.samples[sample][name_ext] if name_ext else [""]
-						for ext in name_exts:
-							paths.append(out_path_pattern.format(name_ext=ext))
+						out_path_pattern = self.file_path(step, extension, sample=sample, **kwargs_filled)
 					else:
 						out_path_pattern = self.out_dir_name(step, sample=sample, **kwargs_filled)
-						paths.append(out_path_pattern)
+					paths.append(out_path_pattern)
 		return paths
 	
-	def link_index(self, step, sample="{sample}", name="", **kwargs):
+	def link_index(self, step, sample="{sample}", **kwargs):
 		"""
 		Generate symbolic link to index folder (if provided in config).
 		
@@ -508,10 +500,9 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		
 		:param step:  Snakemake rule for which the paths are generated
 		:param sample: sample ID to be included in the file path
-		:param name: name of the file; will be set to name=sample if name==""
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
-		loc = Path(self.out_dir_name(step, sample, name, **kwargs))
+		loc = Path(self.out_dir_name(step, sample, **kwargs))
 		if step in self.data_paths:
 			index = self.data_paths[step]
 		else:
@@ -535,9 +526,9 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 class DEPipelinePathHandler(PipelinePathHandler):
 	""" path handler for differential expression pipeline """
 
-	allowed_wildcards          = ["step", "extension", "sample", "name", "batch", "flowcell", "lane", "contrast", "mapping"]
+	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "contrast", "mapping"]
 	required_wildcards_out_log = ["step", "extension", "contrast"]
-	required_wildcards_in      = ["step", "extension", "sample", "name"]
+	required_wildcards_in      = ["step", "extension", "sample"]
 	
 	def __init__(self, workflow, **kwargs):
 		super().__init__(workflow, **kwargs)
@@ -719,7 +710,7 @@ class CovariateFileTool(PipelinePathHandler):
 		:returns: a list with paths to specified input files
 		"""
 		wildcard_combs = self._get_wildcard_combinations(self.wildcard_values, step, extension)
-		wildcard_placeholders = {"sample":"{sample}", "name":"{name}", **self.opt_wildcard_placeholders}
+		wildcard_placeholders = {"sample":"{sample}", **self.opt_wildcard_placeholders}
 		kwargs_out = {key: getattr(wildcards, key, val) for key, val in wildcard_placeholders.items()}
 		pattern_list = []
 		seen = set()
@@ -810,13 +801,16 @@ class SampleInfoTool(PipelinePathHandler):
 		
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
 		
-	def _get_wildcard_values_from_read_input(self, unix_style=False):
+	def _get_wildcard_values_from_read_input(self, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
 		input_files   = glob(re.sub("{[^}./]+}",         "*",                   self.in_path_pattern))
 		wildcards     =  re.findall("{([^}./]+)}",                              self.in_path_pattern)
 		match_pattern =      re.sub("\\\\{[^}./]+\\\\}", "([^}./]+)", re.escape(self.in_path_pattern))
-			
+		if unix_style:
+			match_pattern = re.sub(r"\\\*\\\*",            "[^{}]*",   match_pattern)
+			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*", "[^{}./]*", match_pattern)
+		
 		wildcard_values = {w:[] for w in wildcards}
 		for inp in input_files:
 			self._get_wildcard_values_from_file_path(inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style)
@@ -825,13 +819,22 @@ class SampleInfoTool(PipelinePathHandler):
 		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern,f).group(0), "") for f in input_files]}
 		
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
+		""" for importing lists from table entries """
 		for smpl_info in self.sample_info.values():
 			smpl_info[key] = [s.replace("'","").replace('"',"") for s in re.findall("[^\[\]\s,]+", smpl_info[key])]
 			
+	def _add_info_fields(self, add_dict):
+		""" add fields from add_dict to self.sample_info if they are not already present """
+		for sample, fields in add_dict.items():
+			if sample in self.sample_info:
+				s_info = self.sample_info[sample]
+				for f_key,f_val in fields.items():
+					if f_key not in s_info: s_info[f_key] = f_val
+			
 		
-	#---------------------------------------------------- access methods ----------------------------------------------------#	
+	#---------------------------------------------------- access methods ----------------------------------------------------#
 		
-	def update_sample_info(self, library_default="unstranded"):
+	def update_sample_info(self, library_default="unstranded", add=False):
 		""" 
 		fill mandatory info about sample by searching the input path specified in the config file.
 		
@@ -848,16 +851,20 @@ class SampleInfoTool(PipelinePathHandler):
 		for comb in wildcard_combs:
 			if comb.sample not in sample_info:
 				sample_info[comb.sample] = {"stranded":library_default, "read_extension":comb.read_extension}
-				sample_info[comb.sample]["paired_end_extensions"] = [comb.name.replace(comb.sample, "")]
-			elif comb.name is not comb.sample:
-				paired_end_ext     = comb.name.replace(comb.sample, "")
+				sample_info[comb.sample]["paired_end_extensions"] = [getattr(comb, "mate", "")]
+			elif hasattr(comb, "mate"):
+				paired_end_ext     = getattr(comb, "mate", "")
 				paired_end_ext_lst = sample_info[comb.sample]["paired_end_extensions"]
 				if paired_end_ext_lst == [""]:
 					raise ValueError("Error compiling sample information: sample {} has names with and without paired end extensions".format(comb.sample))
 				if paired_end_ext not in paired_end_ext_lst:
 					paired_end_ext_lst.append(paired_end_ext)
-		
-		self.sample_info = sample_info
+		if add:
+			# add missing fields
+			self._add_info_fields(sample_info)
+		else:
+			# overwrite
+			self.sample_info = sample_info
 		
 	def write_table(self, filename, sep="\t"):
 		"""
@@ -890,8 +897,44 @@ class SampleInfoTool(PipelinePathHandler):
 				self.sample_info = yaml.safe_load(f)["sample_info"]
 			except yaml.YAMLError as exc:
 				print(exc)
-
-
+				
+	def parse_isatab(self, filename):
+		"""
+		parse sample info from ISA-tab table
+		"""
+		tab = pd.read_csv(filename, sep="\t", index_col=False)
+		tab.dropna(axis="columns", how="all", inplace=True)
+		parse_conf = Path(os.path.realpath(__file__)).parent / Path("ISAtab_parse_conf.yaml")
+		with open(str(parse_conf), "r") as stream:
+			try:
+				parse_conf = yaml.safe_load(stream)
+			except yaml.YAMLError as exc:
+				print(exc)
+		
+		def find_column(key):
+			if not parse_conf[key]["columns"]: return None
+			for col in tab.columns:
+				for col_regex in parse_conf[key]["columns"]:
+					if re.match(col_regex, col): return col
+		def map_value(key, value):
+			if "as_is" in parse_conf[key] and parse_conf[key]["as_is"]: return value
+			value = str(value).lower()
+			for val_regex, val_repl in parse_conf[key]["value"].items():
+				if re.fullmatch(val_regex, value): 
+					return re.sub(val_regex, val_repl, value) if isinstance(val_repl, str) else val_repl
+		
+		sample_info_cols = {}
+		for key in parse_conf:
+			column = find_column(key)
+			print(f"key: {key} | column: {column}")
+			if column is not None: 
+				sample_info_cols[key] = [map_value(key, val) for val in tab[column]]
+		
+		self.sample_info = {sample_info_cols["id"][i]: 
+		                   	{key: val[i] for key,val in sample_info_cols.items() if key != "id"} 
+		                   for i in range(len(sample_info_cols["id"]))}
+			
+		
 ##################################################################################################################################
 #------------------------------------------------------ class for report --------------------------------------------------------#
 ##################################################################################################################################
