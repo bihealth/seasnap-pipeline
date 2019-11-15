@@ -831,7 +831,7 @@ class SampleInfoTool(PipelinePathHandler):
 					if f_key not in s_info: s_info[f_key] = f_val
 			
 		
-	#---------------------------------------------------- access methods ----------------------------------------------------#	
+	#---------------------------------------------------- access methods ----------------------------------------------------#
 		
 	def update_sample_info(self, library_default="unstranded", add=False):
 		""" 
@@ -858,7 +858,6 @@ class SampleInfoTool(PipelinePathHandler):
 					raise ValueError("Error compiling sample information: sample {} has names with and without paired end extensions".format(comb.sample))
 				if paired_end_ext not in paired_end_ext_lst:
 					paired_end_ext_lst.append(paired_end_ext)
-		
 		if add:
 			# add missing fields
 			self._add_info_fields(sample_info)
@@ -917,8 +916,7 @@ class SampleInfoTool(PipelinePathHandler):
 				for col_regex in parse_conf[key]["columns"]:
 					if re.match(col_regex, col): return col
 		def map_value(key, value):
-			if "as_is" in parse_conf[key] and parse_conf[key]["as_is"]:
-				return value
+			if "as_is" in parse_conf[key] and parse_conf[key]["as_is"]: return value
 			value = str(value).lower()
 			for val_regex, val_repl in parse_conf[key]["value"].items():
 				if re.fullmatch(val_regex, value): 
