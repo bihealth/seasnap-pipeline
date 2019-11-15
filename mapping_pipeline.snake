@@ -39,7 +39,7 @@ pph.link_index(step="salmon_index", sample="all_samples", flowcell="all_flowcell
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 
 	sample="[^./]+",
-	mate  ="[^./_]+"
+	mate  ="[^./]+"
 
 onstart:
 	# draw a dag
@@ -81,7 +81,7 @@ def get_inputs_all():
 		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
 		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
 		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-	
+
 	return inputs
 
 
@@ -154,10 +154,10 @@ rule fastqc:
 	input: 
 		pph.get_fastq_pairs
 	output:
-		fzip = pph.file_path(step="fastqc", extension="zip",  name="{name}"),
-		html = pph.file_path(step="fastqc", extension="html", name="{name}")
+		fzip = pph.file_path(step="fastqc", extension="zip"),
+		html = pph.file_path(step="fastqc", extension="html")
 	log:
-		out  = pph.file_path(step="fastqc", extension="output.log", name="{name}", log=True)
+		out  = pph.file_path(step="fastqc", extension="output.log", log=True)
 	params:
 		outdir = pph.out_dir_name(step="fastqc")
 	threads:
@@ -274,7 +274,7 @@ rule star:
 		
 		#----- run STAR mapping
 		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd}
-		mv {params.outdir}/Log.* $(dirname {log.out})
+		rm -f $(dirname {log.out})/Log.*; mv {params.outdir}/Log.* $(dirname {log.out})
 		echo "more log files in $(dirname {log.out})"
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
 		
@@ -362,7 +362,6 @@ rule salmon:
 	run:
 		# prepare read input and trimming
 		unstranded = input.reads1 == input.reads2
-		print(input.reads1)
 		if params.trim:
 			if unstranded:
 				reads = "-r <(for var in {rds}; do trimadap-mt $var -p {thr}; done)".format(thr=threads//2, rds=" ".join(input.reads1))
@@ -383,6 +382,7 @@ rule salmon:
 		#----- Salmon mapping
 		salmon quant -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
+		rm -fr $(dirname {log.out})/aux_info $(dirname {log.out})/logs $(dirname {log.out})/libParams $(dirname {log.out})/cmd_info.json
 		mv $(dirname {output.sf})/aux_info $(dirname {output.sf})/logs $(dirname {output.sf})/libParams $(dirname {output.sf})/cmd_info.json $(dirname {log.out})/
 		echo "more log files in $(dirname {log.out})"
 		""")

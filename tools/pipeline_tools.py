@@ -78,7 +78,7 @@ class PipelinePathHandler:
 		if test_allowed_wildcards:
 			# test if all wildcards allowed
 			if not all(x in self.allowed_wildcards for x in self.out_path_wildcards+self.log_path_wildcards+self.in_path_wildcards):
-				raise ValueError("Error in config file: unknown wildcards. allowed wildcards: {}".format(self.allowed_wildcards()))
+				raise ValueError("Error in config file: unknown wildcards. allowed wildcards: {}".format(self.allowed_wildcards))
 		
 		# test for required wildcards in all patterns
 		if not all(x in self.out_path_wildcards and x in self.log_path_wildcards for x in self.required_wildcards_out_log):
@@ -182,8 +182,8 @@ class PipelinePathHandler:
 		match_pattern   =       re.sub("\\\\{([^}./]+)\\\\}", wildc_replace, re.escape(input_pattern))
 		wildcards       =   re.findall("{([^}./]+)}",                                  input_pattern)
 		if unix_style:
-			match_pattern = re.sub("\\\\*\\\\*", "[^{}]*",   match_pattern)
-			match_pattern = re.sub("\\\\*",      "[^{}./]*", match_pattern)
+			match_pattern = re.sub(r"\\\*\\\*", "[^{}]*",   match_pattern)
+			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*",      "[^{}./]*", match_pattern)
 			
 		wildcard_values = wildc_val if wildc_val else {w:[] for w in wildcards}
 		
@@ -429,12 +429,12 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 				seen.add(kwargs_id_tup)
 				if mate_key:
 					mate_lst = self.samples[wildcards.sample][mate_key]
+					if len(mate_lst)>mate: kwargs_filled["mate"] = mate_lst[mate]
 					pattern  = self.in_path_pattern.format(sample = wildcards.sample, **kwargs_filled)
 					pattern += self.samples[wildcards.sample]["read_extension"]
-					pattern  = pattern.format(mate = mate_lst[mate] if len(mate_lst)>mate else "")
 				else:
-					pattern = self.in_path_pattern.format(sample=wildcards.sample, mate=getattr(wildcards, "mate", "*"), 
-										**kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
+					if "mate" not in kwargs_filled: kwargs_filled["mate"] = "*"
+					pattern = self.in_path_pattern.format(sample=wildcards.sample, **kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
 				pattern_list.append(pattern)
 		return [path for pat in pattern_list for path in iglob(pat)]
 		
@@ -800,13 +800,16 @@ class SampleInfoTool(PipelinePathHandler):
 		
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
 		
-	def _get_wildcard_values_from_read_input(self, unix_style=False):
+	def _get_wildcard_values_from_read_input(self, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
 		input_files   = glob(re.sub("{[^}./]+}",         "*",                   self.in_path_pattern))
 		wildcards     =  re.findall("{([^}./]+)}",                              self.in_path_pattern)
 		match_pattern =      re.sub("\\\\{[^}./]+\\\\}", "([^}./]+)", re.escape(self.in_path_pattern))
-			
+		if unix_style:
+			match_pattern = re.sub(r"\\\*\\\*",            "[^{}]*",   match_pattern)
+			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*", "[^{}./]*", match_pattern)
+		
 		wildcard_values = {w:[] for w in wildcards}
 		for inp in input_files:
 			self._get_wildcard_values_from_file_path(inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style)
