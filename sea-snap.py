@@ -16,7 +16,7 @@ CONFIGS    = dict(DE      = "DE_config.yaml",
 
 CLUSTER_CONFIG = "cluster_config.json"
 
-CLUSTER_START  = "qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P medium -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh"
+CLUSTER_START  = "qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh"
 
 
 ############################## HELPER FUNCTIONS

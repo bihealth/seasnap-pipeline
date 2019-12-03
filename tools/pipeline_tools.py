@@ -491,7 +491,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					paths.append(out_path_pattern)
 		return paths
 	
-	def link_index(self, step, sample="{sample}", **kwargs):
+	def link_index(self, step, sample="{sample}", entry=None, **kwargs):
 		"""
 		Generate symbolic link to index folder (if provided in config).
 		
@@ -500,10 +500,13 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		
 		:param step:  Snakemake rule for which the paths are generated
 		:param sample: sample ID to be included in the file path
+		:param entry: set the path to be linked explicitly
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		loc = Path(self.out_dir_name(step, sample, **kwargs))
-		if step in self.data_paths:
+		if entry:
+			index = entry
+		elif step in self.data_paths:
 			index = self.data_paths[step]
 		else:
 			raise ValueError("Error linking index: no keyword provided in config to set index for {}!".format(step))
