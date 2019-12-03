@@ -8,8 +8,8 @@
     
     "__default__":
     {
-        "output": "sge_log/{rule}.{wildcards}.{jobid}.out",
-        "errors": "sge_log/{rule}.{wildcards}.{jobid}.err",
+        "output": "sge_log/{rule}.{jobid}.out",
+        "errors": "sge_log/{rule}.{jobid}.err",
         
         "h_vmem": "2g",
         "h_rt": "4:00:00",

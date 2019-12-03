@@ -784,6 +784,8 @@ class SampleInfoTool(PipelinePathHandler):
 	required_wildcards_out_log = MappingPipelinePathHandler.required_wildcards_out_log
 	required_wildcards_in      = MappingPipelinePathHandler.required_wildcards_in
 	
+	allowed_read_extensions    = [".fastq", ".fastq.gz"]
+	
 	def __init__(self, config_yaml, *add_yaml):
 		with open(config_yaml, "r") as stream:
 			try:
@@ -818,7 +820,7 @@ class SampleInfoTool(PipelinePathHandler):
 		for inp in input_files:
 			self._get_wildcard_values_from_file_path(inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 			
-		print("\nread files:\n{}".format("\n".join(input_files)))
+		print("\ninput files:\n{}".format("\n".join(input_files)))
 		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern,f).group(0), "") for f in input_files]}
 		
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
@@ -847,8 +849,8 @@ class SampleInfoTool(PipelinePathHandler):
 		:param library_default:  options: ["unstranded", "forward", "reverse"]
 		"""
 		wildcard_values = self._get_wildcard_values_from_read_input()
-		wildcard_combs  = self._get_wildcard_combinations(wildcard_values)
-		print("\nextract combinations:\n{}".format("\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
+		wildcard_combs  = [comb for comb in self._get_wildcard_combinations(wildcard_values) if comb.read_extension in self.allowed_read_extensions]
+		print("\nextracted combinations:\n{}".format("\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
 		
 		sample_info = {}
 		for comb in wildcard_combs:

@@ -2,7 +2,6 @@
 ## version: 0.9.9
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
-#TODO: ignore files in sample sheet generation
 #TODO: Salmon with decoys, link them as well?
 
 #TODO: update old qc script
