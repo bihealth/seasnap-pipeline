@@ -178,8 +178,9 @@ class PipelinePathHandler:
 	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
-		input_files = iglob(re.sub("{[^}./]+}",   "*", input_pattern))
-		wildcards   =   re.findall("{([^}./]+)}",      input_pattern)
+		glob_pattern =       re.sub("{[^}./]+}",   "*", input_pattern)
+		wildcards    =   re.findall("{([^}./]+)}",      input_pattern)
+		input_files  = iglob(glob_pattern + ("*" if glob_pattern[-1]!="*" else ""), recursive=True)
 			
 		wildcard_values = {w:[] for w in wildcards}
 		for inp in input_files:
@@ -826,9 +827,10 @@ class SampleInfoTool(PipelinePathHandler):
 	def _get_wildcard_values_from_read_input(self, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
-		input_files   = glob(re.sub("{[^}./]+}",         "*",                   self.in_path_pattern))
+		glob_pattern  =      re.sub("{[^}./]+}",         "*",                   self.in_path_pattern)
 		wildcards     =  re.findall("{([^}./]+)}",                              self.in_path_pattern)
 		match_pattern =      re.sub("\\\\{[^}./]+\\\\}", "([^}./]+)", re.escape(self.in_path_pattern))
+		input_files   = glob(glob_pattern + ("*" if glob_pattern[-1]!="*" else ""), recursive=True)
 		if unix_style:
 			match_pattern = re.sub(r"\\\*\\\*",            "[^{}]*",   match_pattern)
 			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*", "[^{}./]*", match_pattern)
