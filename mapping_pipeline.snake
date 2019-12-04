@@ -332,7 +332,7 @@ rule salmon_index:
 		transcriptome = pph.out_dir_name(step = "generate_transcriptome")+"/transcriptome.fa",
 		genome        = config["organism"]["files"]["genome"]
 	output:
-		index = pph.out_dir_name(step = "salmon_index")+"/sa.bin"
+		index = pph.out_dir_name(step = "salmon_index")+"/pos.bin"
 	log:
 		out = pph.file_path(step = "salmon_index", extension="output.log", log=True)
 	params:
@@ -364,7 +364,7 @@ rule salmon_index:
 
 rule salmon:
 	input:
-		index = pph.out_dir_name(step = "salmon_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")+"/sa.bin",
+		index = pph.out_dir_name(step = "salmon_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")+"/pos.bin",
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unstranded
 	output:
