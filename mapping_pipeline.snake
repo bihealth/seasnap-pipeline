@@ -309,7 +309,7 @@ rule generate_transcriptome:
 		genome = config["organism"]["files"]["genome"],
 		gtf    = config["organism"]["files"]["gtf"]
 	output:
-		pph.file_path(step = "generate_transcriptome", extension="fa")
+		pph.out_dir_name(step = "generate_transcriptome")+"/transcriptome.fa"
 	log:
 		out = pph.file_path(step = "generate_transcriptome", extension="output.log", log=True)
 	threads: 8
@@ -329,7 +329,8 @@ rule generate_transcriptome:
 
 rule salmon_index:
 	input:
-		transcriptome = pph.file_path(step = "generate_transcriptome", extension="fa")
+		transcriptome = pph.out_dir_name(step = "generate_transcriptome")+"/transcriptome.fa",
+		genome        = config["organism"]["files"]["genome"]
 	output:
 		index = pph.out_dir_name(step = "salmon_index")+"/sa.bin"
 	log:
@@ -341,10 +342,21 @@ rule salmon_index:
 		#----- prepare
 		set -eux
 		rm -fr $(dirname {output.index})/*
+		logdir=$(dirname {log.out})
 		salmon --version
+
+		#----- extract names of genome targets
+		grep "^>" <(gunzip -cf {input.genome}) | cut -d " " -f 1 > $logdir/decoys.txt
+		sed -i.bak -e 's/>//g' $logdir/decoys.txt
+		
+		#----- make gentrome
+		gzip -cdf {input.transcriptome} {input.genome} | gzip > $logdir/gentrome.fa.gz
 		
 		#----- Salmon index
-		salmon index -t {input.transcriptome} -i $(dirname {output.index}) {params.options}
+		salmon index -t $logdir/gentrome.fa.gz -d $logdir/decoys.txt -i $(dirname {output.index}) {params.options}
+		
+		#----- cleanup
+		rm -f $logdir/gentrome.fa.gz
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="salmon_index", extension="sh", **wildcards)

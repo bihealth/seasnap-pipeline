@@ -48,6 +48,8 @@ class PipelinePathHandler:
 		self.log_path_pattern = self.snakemake_workflow.config["pipeline_param"]["log_path_pattern"]
 		self.in_path_pattern  = self.snakemake_workflow.config["pipeline_param"]["in_path_pattern"]
 		
+		self.wildcard_constraints = self._prepare_inpathpattern()
+		
 		self.out_dir_pattern = "/".join(self.out_path_pattern.split("/")[:-1])
 		
 		self.out_path_wildcards    = self._get_wildcard_list(self.out_path_pattern)
@@ -161,6 +163,17 @@ class PipelinePathHandler:
 		for index in range(wildcard_comb_num):
 			combinations.append(WildcardComb(**{key: wildcard_values[key][index] for key in wildcard_values}))
 		return combinations
+
+	def _prepare_inpathpattern(self):
+		""" read and remove wildcard constraints from in_path_pattern """
+		wildcards = re.findall("{([^{}]+)}", self.in_path_pattern)
+		wildcard_constraints = {}
+		for wildcard in wildcards:
+			comp = wildcard.split(",")
+			if len(comp)>1:
+				wildcard_constraints[comp[0]] = comp[1]
+				self.in_path_pattern = self.in_path_pattern.replace(wildcard, comp[0])
+		return wildcard_constraints
 		
 	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
@@ -684,6 +697,8 @@ class CovariateFileTool(PipelinePathHandler):
 					
 		self.in_path_pattern = config_dict["pipeline_param"]["in_path_pattern"]
 		
+		self.wildcard_constraints = self._prepare_inpathpattern()
+		
 		self.wildcard_values = self._get_wildcard_values_from_input(self.in_path_pattern)
 
 		self.opt_wildcard_placeholders = {w: "{{{}}}".format(w) for w in set(self.wildcard_values)-set(self.required_wildcards_in)}
@@ -800,6 +815,8 @@ class SampleInfoTool(PipelinePathHandler):
 					print(exc)
 					
 		self.in_path_pattern  = config_dict["pipeline_param"]["in_path_pattern"]
+		
+		self.wildcard_constraints = self._prepare_inpathpattern()
 		
 		self.sample_info = {}
 		
