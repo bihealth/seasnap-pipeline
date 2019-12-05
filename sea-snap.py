@@ -67,7 +67,7 @@ def generate_sample_info(args):
 	elif args.get_from=="sodar":
 		sit.parse_isatab(args.input_file)
 		print(f"...ISA-tab parsed. Sample IDs are: {list(sit.sample_info)}")
-		#sit.update_sample_info(library_default=args.library_default, add=True)
+		sit.update_sample_info(library_default=args.library_default, add=True)
 	
 	# write to file
 	if args.write_to=="yaml":
