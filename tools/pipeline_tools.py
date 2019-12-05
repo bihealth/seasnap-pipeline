@@ -187,14 +187,21 @@ class PipelinePathHandler:
 			self._get_wildcard_values_from_file_path(inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 		return wildcard_values
 		
-	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True):
-		""" get values matching wildcards from given file path"""
+	def _wildc_replace(self, matchobj):
+		""" method used with re.sub to generate match pattern from path pattern """
+		wildc_name = matchobj.group(1)
+		if wildc_name in self.wildcard_constraints:
+			return "({})".format(self.wildcard_constraints[wildc_name].replace("//","/"))
+		elif wildc_name == "extension":
+			return "([^}/]+)"
+		else:
+			return "([^}./]+)"
 		
-		def wildc_replace(matchobj):
-			return "([^}/]+)" if matchobj.group(1) == "extension" else "([^}./]+)"
+	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True):
+		""" get values matching wildcards from given file path """
 				
-		match_pattern   =       re.sub("\\\\{([^}./]+)\\\\}", wildc_replace, re.escape(input_pattern))
-		wildcards       =   re.findall("{([^}./]+)}",                                  input_pattern)
+		match_pattern   =       re.sub("\\\\{([^}./]+)\\\\}", self._wildc_replace, re.escape(input_pattern))
+		wildcards       =   re.findall("{([^}./]+)}",                                        input_pattern)
 		if unix_style:
 			match_pattern = re.sub(r"\\\*\\\*", "[^{}]*",   match_pattern)
 			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*",      "[^{}./]*", match_pattern)
@@ -827,9 +834,9 @@ class SampleInfoTool(PipelinePathHandler):
 	def _get_wildcard_values_from_read_input(self, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
 		
-		glob_pattern  =      re.sub("{[^}./]+}",         "*",                   self.in_path_pattern)
-		wildcards     =  re.findall("{([^}./]+)}",                              self.in_path_pattern)
-		match_pattern =      re.sub("\\\\{[^}./]+\\\\}", "([^}./]+)", re.escape(self.in_path_pattern))
+		glob_pattern  =      re.sub("{[^}./]+}",           "*",                           self.in_path_pattern)
+		wildcards     =  re.findall("{([^}./]+)}",                                        self.in_path_pattern)
+		match_pattern =      re.sub("\\\\{([^}./]+)\\\\}", self._wildc_replace, re.escape(self.in_path_pattern))
 		input_files   = glob(glob_pattern + ("*" if glob_pattern[-1]!="*" else ""), recursive=True)
 		if unix_style:
 			match_pattern = re.sub(r"\\\*\\\*",            "[^{}]*",   match_pattern)
@@ -840,6 +847,7 @@ class SampleInfoTool(PipelinePathHandler):
 			self._get_wildcard_values_from_file_path(inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 			
 		print("\ninput files:\n{}".format("\n".join(input_files)))
+		print(f"\nmatch pattern:\n{match_pattern}")
 		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern,f).group(0), "") for f in input_files]}
 		
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
