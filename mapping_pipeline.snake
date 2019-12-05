@@ -36,9 +36,9 @@ if config["organism_defaults"]:
 pph = MappingPipelinePathHandler(workflow)
 
 # link indices
-pph.link_index(step="star_index",             sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-pph.link_index(step="salmon_index",           sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-pph.link_index(step="generate_transcriptome", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", entry=config["organism"]["files"]["transcriptome"])
+pph.link_index(step="star_index",             sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+pph.link_index(step="salmon_index",           sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+pph.link_index(step="generate_transcriptome", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries", entry=config["organism"]["files"]["transcriptome"])
 
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 
@@ -47,15 +47,15 @@ wildcard_constraints:
 
 onstart:
 	# draw a dag
-	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
 	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
 	# info about the pipeline run
-	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	os.makedirs(os.path.dirname(info_file), exist_ok=True)
 	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
 	# save merged config
-	config_file = pph.file_path(step="pipeline_report", extension="yaml", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+	config_file = pph.file_path(step="pipeline_report", extension="yaml", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
 	# warnings
 	mapping_choices, qc_choices = (config["pipeline_param"][key] for key in ["mapping_results", "QC_results"])
@@ -71,40 +71,40 @@ def get_inputs_all():
 	# mapping results
 	mapping_choices = config["pipeline_param"]["mapping_results"]
 	if "star-gene_counts" in mapping_choices:
-		inputs += pph.expand_path("star",           "bam",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-		inputs += pph.expand_path("feature_counts", "feature_counts", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+		inputs += pph.expand_path("star",           "bam",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		inputs += pph.expand_path("feature_counts", "feature_counts", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	if "salmon-transcript_counts" in mapping_choices:
-		inputs += pph.expand_path("salmon", "sf", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+		inputs += pph.expand_path("salmon", "sf", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		
 	# QC results
 	qc_choices = config["pipeline_param"]["QC_results"]
 	if "fastqc" in qc_choices:
 		inputs += pph.expand_path("fastqc",        "zip")
-		inputs += [pph.file_path("fastqc_summary", "tsv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")]
+		inputs += [pph.file_path("fastqc_summary", "tsv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")]
 	if "star-gene_counts" in mapping_choices:
-		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 
 	return inputs
 
 
-shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")))
+shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")))
 
 rule all:
 	input:
 		get_inputs_all(),
-		pph.file_path(step="multiqc", extension="qc_report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+		pph.file_path(step="multiqc", extension="qc_report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	output:
-		html = pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+		html = pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	run:
 		mappers = "".join(["- {}\n".format(mapper) for mapper in config["pipeline_param"]["mapping_results"]])
 		quality_control = "".join(["- {}\n".format(qc) for qc in config["pipeline_param"]["QC_results"]])
 		loctime = asctime(localtime(time()))
-		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-		summary        = pph.file_path("pipeline_report", "summary.csv",        sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-		version_info   = pph.file_path("pipeline_report", "version_info.txt",   sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
-		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")
+		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		summary        = pph.file_path("pipeline_report", "summary.csv",        sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt",   sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		dag = rule_execution.split("/")[-1]
 		shell("conda list > {}".format(version_info))
 		shell("conda info > {}".format(conda_info))
@@ -237,7 +237,7 @@ rule star_index:
 
 rule star:
 	input:
-		index = pph.out_dir_name(step = "star_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")+"/SA",
+		index = pph.out_dir_name(step = "star_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")+"/SA",
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unstranded
 	output:
@@ -268,6 +268,18 @@ rule star:
 			trim_cmd = "--readFilesCommand zcat"
 		else:
 			raise ValueError("STAR input: file extension {} not supported.".format(file_ext))
+		# set read groups
+		read_group_lines = []
+		for readfile in input.reads1:
+			read_group_line = ' "ID:{wildcards.sample}" "SM:{wildcards.sample}"'
+			input_wildcards = pph.wildcard_values(readfile)
+			if "library" in input_wildcards: read_group_line += ' "LB:{}"'.format(input_wildcards["library"])
+			if "instrument" in config["sample_info"][wildcards.sample]: read_group_line += ' "PL:{}"'.format(config["sample_info"][wildcards.sample]["instrument"])
+			fc="flowcell" in input_wildcards
+			ln="lane" in input_wildcards
+			if fc or ln: read_group_line += ' "PU:{}.{}"'.format(input_wildcards["flowcell"] if fc else "", input_wildcards["lane"] if ln else "")
+			read_group_lines.append(read_group_line)
+		read_groups = "--outSAMattrRGline" + " , ".join(read_group_lines)
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -277,7 +289,8 @@ rule star:
 		samtools --version
 		
 		#----- run STAR mapping
-		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd}
+		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} \
+		     --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} {read_groups}
 		rm -f $(dirname {log.out})/Log.*; mv {params.outdir}/Log.* $(dirname {log.out})
 		echo "more log files in $(dirname {log.out})"
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
@@ -364,7 +377,7 @@ rule salmon_index:
 
 rule salmon:
 	input:
-		index = pph.out_dir_name(step = "salmon_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates")+"/pos.bin",
+		index = pph.out_dir_name(step = "salmon_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")+"/pos.bin",
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unstranded
 	output:
@@ -396,7 +409,7 @@ rule salmon:
 		salmon --version
 		
 		#----- Salmon mapping
-		salmon quant -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
+		salmon quant --validateMappings -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
 		rm -fr $(dirname {log.out})/aux_info $(dirname {log.out})/logs $(dirname {log.out})/libParams $(dirname {log.out})/cmd_info.json
 		mv $(dirname {output.sf})/aux_info $(dirname {output.sf})/logs $(dirname {output.sf})/libParams $(dirname {output.sf})/cmd_info.json $(dirname {log.out})/

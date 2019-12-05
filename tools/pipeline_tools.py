@@ -265,6 +265,19 @@ class PipelinePathHandler:
 		"""
 		return lambda wildcards: self._choose_input(wildcards, choice_name, options)
 		
+	def wildcard_values(self, filepath, in_path_pattern=True):
+		"""
+		Parse a file path and return a dict of wildcard names to values.
+		
+		:param filepath: a file path (string)
+		:param in_path_pattern: use in_path_pattern to extract wildcards, if False use out_path_pattern
+		:returns: a dict of wildcard names to values
+		"""
+		if in_path_pattern:
+			return self._get_wildcard_values_from_file_path(filepath, self.in_path_pattern)
+		else:
+			return self._get_wildcard_values_from_file_path(filepath, self.out_path_pattern)
+		
 	def log(self, out_log, script, step, extension, **kwargs):
 		"""
 		create various log files and return a path to the script file for execution
@@ -339,7 +352,7 @@ class PipelinePathHandler:
 					else:
 						source = self.file_path(**{**arg_dct, "extension": "{extension}"})
 						source = str(Path(source).parent / "**")
-						source = glob(source.replace("{{{}}}".format(extra_wc), "*"))
+						source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
 						search_pat = str(Path(search_pat).parent)
 						
 					get_wc = self._get_wildcard_values_from_file_path
@@ -363,7 +376,7 @@ class PipelinePathHandler:
 class MappingPipelinePathHandler(PipelinePathHandler):
 	""" path handler for mapping pipeline """
 
-	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane"]
+	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "library"]
 	required_wildcards_out_log = ["step", "extension", "sample"]
 	required_wildcards_in      = ["sample"]
 	
@@ -416,7 +429,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		return per_sample_comb
 		
 	def _write_log(self, **kwargs):
-		filename = self.file_path(step="MappingPipelinePathHandler", extension="log", log=True, batch="all_batches", flowcell="all_flowcells", lane="all_lanes", **kwargs)
+		filename = self.file_path(step="MappingPipelinePathHandler", extension="log", log=True, batch="all_batches", 
+		                          flowcell="all_flowcells", lane="all_lanes", library="all_libraries", **kwargs)
 		os.makedirs(os.path.dirname(filename), exist_ok=True)
 		with open(filename, "w") as f:
 			f.write("pattern input:\n   in path pattern: {}\n   out path pattern: {}\n   log path pattern: {}\n\n"
@@ -457,7 +471,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					if "mate" not in kwargs_filled: kwargs_filled["mate"] = "*"
 					pattern = self.in_path_pattern.format(sample=wildcards.sample, **kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
 				pattern_list.append(pattern)
-		return [path for pat in pattern_list for path in iglob(pat)]
+		return [path for pat in pattern_list for path in iglob(pat, recursive=True)]
 		
 	def file_path(self, step, extension, sample="{sample}", log=False, **kwargs):
 		"""
@@ -550,7 +564,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 class DEPipelinePathHandler(PipelinePathHandler):
 	""" path handler for differential expression pipeline """
 
-	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "contrast", "mapping"]
+	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "contrast", "mapping", "library"]
 	required_wildcards_out_log = ["step", "extension", "contrast"]
 	required_wildcards_in      = ["step", "extension", "sample"]
 	
@@ -746,7 +760,7 @@ class CovariateFileTool(PipelinePathHandler):
 			if kwargs_id_tup not in seen:
 				seen.add(kwargs_id_tup)
 				pattern_list.append(self.in_path_pattern.format(step=step, extension=extension, **kwargs_filled))
-		return [path for pat in pattern_list for path in iglob(pat)]
+		return [path for pat in pattern_list for path in iglob(pat, recursive=True)]
 		
 		
 	#---------------------------------------------------- access methods ----------------------------------------------------#
