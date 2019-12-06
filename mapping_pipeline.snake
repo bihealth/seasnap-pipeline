@@ -267,8 +267,6 @@ rule star:
 		#----- run STAR mapping
 		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} \
 		     --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} {read_groups}
-		rm -f $(dirname {log.out})/Log.*; mv {params.outdir}/Log.* $(dirname {log.out})
-		echo "more log files in $(dirname {log.out})"
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
 		
 		#----- sort BAM (coordinate sort)
@@ -387,9 +385,6 @@ rule salmon:
 		#----- Salmon mapping
 		salmon quant --validateMappings -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
-		rm -fr $(dirname {log.out})/aux_info $(dirname {log.out})/logs $(dirname {log.out})/libParams $(dirname {log.out})/cmd_info.json
-		mv $(dirname {output.sf})/aux_info $(dirname {output.sf})/logs $(dirname {output.sf})/libParams $(dirname {output.sf})/cmd_info.json $(dirname {log.out})/
-		echo "more log files in $(dirname {log.out})"
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="salmon", extension="sh", **wildcards)
