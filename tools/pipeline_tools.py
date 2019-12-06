@@ -905,6 +905,7 @@ class SampleInfoTool(PipelinePathHandler):
 					raise ValueError("Error compiling sample information: sample {} has names with and without paired end extensions".format(comb.sample))
 				if paired_end_ext not in paired_end_ext_lst:
 					paired_end_ext_lst.append(paired_end_ext)
+					paired_end_ext_lst.sort()
 		if add:
 			# add missing fields
 			self._add_info_fields(sample_info)
