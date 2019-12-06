@@ -526,7 +526,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					paths.append(out_path_pattern)
 		return paths
 	
-	def link_index(self, step, sample="{sample}", entry=None, **kwargs):
+	def link_index(self, step, sample="{sample}", entry="nopath", **kwargs):
 		"""
 		Generate symbolic link to index folder (if provided in config).
 		
@@ -539,7 +539,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		loc = Path(self.out_dir_name(step, sample, **kwargs))
-		if entry:
+		if entry != "nopath":
 			index = entry
 		elif step in self.data_paths:
 			index = self.data_paths[step]
