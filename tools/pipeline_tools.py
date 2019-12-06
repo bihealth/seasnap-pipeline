@@ -326,32 +326,35 @@ class PipelinePathHandler:
 		"""
 		export_spec = self.snakemake_workflow.config["export"]
 		for pattern in export_spec["path_pattern"]:
+			#--- go through path patterns (that specify which location to copy to)
 			pat = strftime(pattern).replace("{GENOME}", self.snakemake_workflow.config["organism"]["genome_version"])
 			wildcards = self._get_wildcard_list(pat)
 			key_wcs   = [wc for wc in wildcards if wc[:6] == "files:"]
-			# no nested keys for now:
-			assert len(key_wcs)==1
+			assert len(key_wcs)==1 # no nested keys for now
 			key = key_wcs[0].split(":")[1:]
 			assert len(key)>0
 			pat = pat.replace("{{{}}}".format(key_wcs[0]), key[0])
-			for arg_dct in export_spec["_".join(key)]:
-				mode = "file"
-				if "dir" in arg_dct:
-					mode = "dir"
-					arg_dct = arg_dct["dir"]
+			#--- read specification for fetching files
+			for opt_dct in export_spec["_".join(key)]:
+				#--- read options
+				if "files" in opt_dct: mode = "files"
+				elif "dir" in opt_dct: mode = "dir"
+				else: raise ValueError("Error in export: no mode (files or dir) specfied in config!")
+				compress = opt_dct["compress"] if "compress" in opt_dct else None
+				arg_dct = opt_dct[mode]
+				#--- extract files
 				extra_wcs = set(wildcards) - set(key_wcs) - (set(arg_dct) & set(wildcards))
-				# only either 'sample' (mapping) or 'contrast' (DE) for now:
-				assert len(extra_wcs)<=1
+				assert len(extra_wcs)<=1 # only either 'sample' (mapping) or 'contrast' (DE) for now
 				if extra_wcs:
 					extra_wc   = list(extra_wcs)[0]
 					wc_in_dct  = {k:v for k,v in arg_dct.items() if k in wildcards}
 					search_pat = self.out_path_pattern if not "log" in arg_dct else self.log_path_pattern
 					
-					if mode == "file":
+					if mode == "files":
 						source = self.expand_path(**arg_dct)
 					else:
 						source = self.file_path(**{**arg_dct, "extension": "{extension}"})
-						source = str(Path(source).parent / "**")
+						source = str(Path(source).parent / ("" if compress else "**"))
 						source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
 						search_pat = str(Path(search_pat).parent)
 						
@@ -360,12 +363,21 @@ class PipelinePathHandler:
 				else:
 					source = [self.file_path(**arg_dct)]
 					target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
+				#--- copy files
 				assert len(source)==len(target)
 				for i in range(len(source)):
-					if mode == "dir": target[i] = str(Path(target[i]) / Path(source[i]).name)
-					print("copy {} to {}...".format(source[i], target[i]))
+					if mode == "dir" and not compress: target[i] = str(Path(target[i]) / Path(source[i]).name)
 					Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
-					shutil.copy2(source[i], target[i])
+					src, trg = Path(source[i]).resolve(), Path(target[i]).resolve()
+					if not compress:
+						print("copy {} to {}...".format(source[i], target[i]))
+						shutil.copy2(source[i], target[i])
+					elif compress == "zip":
+						print("zip {} into {}...".format(source[i], target[i]))
+						os.system(f"cd {str(src.parent)}; zip -r {str(trg)} {str(src.name)}")
+					elif compress == "tar":
+						print("tar {} into {}...".format(source[i], target[i]))
+						os.system(f"cd {str(src.parent)}; tar -czf {str(trg)} {str(src.name)}")
 					Path(target[i] + ".md5").write_text(self._md5(target[i]))
 		
 		
