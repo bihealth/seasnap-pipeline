@@ -2,8 +2,6 @@
 ## version: 0.9.9
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
-#TODO: Salmon with decoys, link them as well?
-
 #TODO: update old qc script
 #TODO: dupradar into snakefile
 
@@ -79,8 +77,7 @@ def get_inputs_all():
 	# QC results
 	qc_choices = config["pipeline_param"]["QC_results"]
 	if "fastqc" in qc_choices:
-		inputs += pph.expand_path("fastqc",        "zip")
-		inputs += [pph.file_path("fastqc_summary", "tsv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")]
+		inputs += pph.expand_path("fastqc", "zip_names.txt")
 	if "star-gene_counts" in mapping_choices:
 		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
@@ -158,8 +155,8 @@ rule fastqc:
 	input: 
 		pph.get_fastq_pairs
 	output:
-		fzip = pph.file_path(step="fastqc", extension="zip"),
-		html = pph.file_path(step="fastqc", extension="html")
+		fzip = pph.file_path(step="fastqc", extension="zip_names.txt"),
+		html = pph.file_path(step="fastqc", extension="html_names.txt")
 	log:
 		out  = pph.file_path(step="fastqc", extension="output.log", log=True)
 	params:
@@ -178,33 +175,12 @@ rule fastqc:
 		#----- run fastqc
 		fastqc -o {params.outdir} -t {threads} {reads}
 		
-		#----- rename fastqc output
-		find {params.outdir} -type f -name '*.zip' > {params.outdir}/.fastqc_name.txt #used by collect_fastqc
-		mv $(cat {params.outdir}/.fastqc_name.txt) {output.fzip}
-		find {params.outdir} -type f -name '*.html' -exec mv '{{}}' {output.html} \;
+		#----- save fastqc output names
+		find {params.outdir} -type f -name '*.zip' > {output.fzip}
+		find {params.outdir} -type f -name '*.html' > {output.html}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="fastqc", extension="sh", **wildcards)
-		shell("bash '{script_file}' &>> '{log.out}'")
-		
-rule collect_fastqc:
-	""" summarize fastqc results of individual reads """
-	input:
-		pph.expand_path(step="fastqc", extension="zip")
-	output:
-		pph.file_path(step="fastqc_summary", extension="tsv")
-	log:
-		out = pph.file_path(step="fastqc_summary", extension="output.log", log=True)
-	run:
-		lines = [r"set -eux"]
-		for file in input:
-			file_path = "/".join(file.split("/")[:-1])
-			lines.append(snakemake_format(
-			r"unzip -c {file} $(basename $(cat {file_path}/.fastqc_name.txt) .zip)/summary.txt | tail -n+3 | grep -v '^$' >> {output}"
-			))
-		script = "\n".join(lines)
-
-		script_file = pph.log(log.out, script, step="fastqc_summary", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- star ---------------------------------------------------------------------------------

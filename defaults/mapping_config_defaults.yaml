@@ -39,7 +39,7 @@ report:
     custom_logo: pictures/SeA-SnaP_logo.png
     sp:
       fastqc/zip:
-        fn: 'fastqc.*.zip'
+        fn: '*_fastqc.zip'
         
 #---------------------------------------- configuration for export
 export:
