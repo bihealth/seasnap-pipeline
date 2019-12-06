@@ -265,7 +265,7 @@ class PipelinePathHandler:
 		"""
 		return lambda wildcards: self._choose_input(wildcards, choice_name, options)
 		
-	def wildcard_values(self, filepath, in_path_pattern=True):
+	def wildcard_values_from(self, filepath, in_path_pattern=True):
 		"""
 		Parse a file path and return a dict of wildcard names to values.
 		

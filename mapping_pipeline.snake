@@ -271,8 +271,8 @@ rule star:
 		# set read groups
 		read_group_lines = []
 		for readfile in input.reads1:
-			read_group_line = ' "ID:{wildcards.sample}" "SM:{wildcards.sample}"'
-			input_wildcards = pph.wildcard_values(readfile)
+			read_group_line = ' "ID:{sample}" "SM:{sample}"'.format(sample=wildcards.sample)
+			input_wildcards = pph.wildcard_values_from(readfile)
 			if "library" in input_wildcards: read_group_line += ' "LB:{}"'.format(input_wildcards["library"])
 			if "instrument" in config["sample_info"][wildcards.sample]: read_group_line += ' "PL:{}"'.format(config["sample_info"][wildcards.sample]["instrument"])
 			fc="flowcell" in input_wildcards
