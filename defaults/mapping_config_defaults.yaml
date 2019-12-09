@@ -29,6 +29,8 @@ rule_options:
   salmon: 
     cmd_opt: ""
     trim: yes
+  rna_seqc:
+    cmd_opt: ""
 
 #---------------------------------------- parameters for the report
 report:

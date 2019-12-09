@@ -57,7 +57,7 @@ onstart:
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
 	# warnings
 	mapping_choices, qc_choices = (config["pipeline_param"][key] for key in ["mapping_results", "QC_results"])
-	for qc_step in ["dupradar", "infer_experiment", "qc"]:
+	for qc_step in ["dupradar", "infer_experiment", "rna_seqc", "qualimap", "qc"]:
 		if qc_step in qc_choices and "star-gene_counts" not in mapping_choices:
 			logger.warning("{}: cannot run, because 'star-gene_counts' was not selected as mapping output".format(qc_step))
 
@@ -79,7 +79,11 @@ def get_inputs_all():
 	if "fastqc" in qc_choices:
 		inputs += pph.expand_path("fastqc", "zip_names.txt")
 	if "star-gene_counts" in mapping_choices:
-		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar",         "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "rna_seqc"         in qc_choices: inputs += pph.expand_path("rna_seqc", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "qualimap"         in qc_choices: 
+			inputs += pph.expand_path("qualimap_rnaseq",  "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+			inputs += pph.expand_path("qualimap_bamqc",   "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 
@@ -472,8 +476,108 @@ rule infer_experiment:
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="infer_experiment", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
+		
+##-------------------- qualimap -----------------------------------------------------------------------------
+
+rule qualimap_rnaseq:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		touch(pph.file_path(step="qualimap_rnaseq", extension="done"))
+	log:
+		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
+	resources:
+		mem_mb = 4000
+	run:
+		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
+		paired   = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		
+		#----- rna-seqc
+		qualimap --java-mem-size={resources.mem_mb}M rnaseq -bam {input.bam} -gtf {input.gtf} -outdir $(dirname {output}) -p {protocol} {paired}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="qualimap_rnaseq", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+		
+rule qualimap_bamqc:
+	input:
+		bam = pph.file_path(step="star", extension="bam")
+	output:
+		touch(pph.file_path(step="qualimap_bamqc", extension="done"))
+	log:
+		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
+	resources:
+		mem_mb = 4000
+	run:
+		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		
+		#----- rna-seqc
+		qualimap --java-mem-size={resources.mem_mb}M bamqc -bam {input.bam} -outdir $(dirname {output}) -c -ip -p {protocol}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="qualimap_bamqc", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- rna-seqc -----------------------------------------------------------------------------
+
+rule collapse_annotation:
+	""" run a script from https://github.com/broadinstitute/gtex-pipeline to prepare GTF for RNA-SeQC """
+	input:
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		pph.file_path(step="collapse_annotation", extension="genes.gtf")
+	log:
+		out = pph.file_path(step="collapse_annotation", extension="output.log", log=True)
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		
+		#----- collapse annotation
+		{SCRIPTDIR}/collapse_annotation.py {input.gtf} {output}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="collapse_annotation", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+rule rna_seqc:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+		gtf = pph.file_path(step="collapse_annotation", extension="genes.gtf", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	output:
+		touch(pph.file_path(step="rna_seqc", extension="done"))
+	log:
+		out = pph.file_path(step="rna_seqc", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["rna_seqc"]["cmd_opt"]
+	run:
+		protocol = {"unstranded":"", "forward":"--stranded=FR", "reverse":"--stranded=RF"}[config["sample_info"][wildcards.sample]["stranded"]]
+		paired   = "" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "--unpaired"
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		rnaseqc --version
+		
+		#----- rna-seqc
+		rnaseqc {input.gtf} {input.bam} --coverage $(dirname {output}) {paired} {protocol} {params.options}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="rna_seqc", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- qc -----------------------------------------------------------------------------------
+
+# deprecated
 
 #TODO: keep script? rename, several steps, hard coded star report file path
 rule qc:
