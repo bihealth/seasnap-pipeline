@@ -1,4 +1,4 @@
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
 
 ---
 
@@ -20,7 +20,7 @@ After creating a working directory with the file `DE_config.yaml` you have to ed
 SeA-SnaP parses an internal config file with default values from the git repository first and the files you edit in your working directory will overwrite the default values.
 In this way the config can be kept simple and you do not need to specify all values.
 
-Many configuration options are available described in a [`separate section`](../config_options.html).
+Many configuration options are available described in a [`separate section`](../config_options.md).
 (Hint: it might also be helpful to look into the default configuration file in the [git repository](../defaults/DE_config_defaults.yaml)).
 
 Here, we describe the minimal settings required:
@@ -44,9 +44,9 @@ Folder structures for input and output files in SeA-SnaP are specified by *path 
 mapping/{step}/{sample}/out/{step}.{mate}.{extension}
 ```
 
-See [`path patterns`](path_patterns.html) for a detailed description.
+See [`path patterns`](path_patterns.md) for a detailed description.
 
-[Here](path_patterns.html) are also examples how to configure the `contrast list` and customize the Rmd report.
+[Here](path_patterns.md) are also examples how to configure the `contrast list` and customize the Rmd report.
 
 ---
 
@@ -89,7 +89,7 @@ To run the mapping pipeline locally you can use:
 ```
 
 This is a wrapper for Snakemake.
-You can add any [`snakemake options`](https://snakemake.readthedocs.io/en/stable/executable.html#all-options) after `l` and they will be passed to snakemake.
+You can add any [`snakemake options`](https://snakemake.readthedocs.io/en/stable/executable.md#all-options) after `l` and they will be passed to snakemake.
 
 E.g. run
 
@@ -114,7 +114,7 @@ Also note the file `cluster_config.json`, which was added to the working directo
 It will be used if SeA-SnaP runs with the cluster option.
 In the file, resources for the different pipeline steps are defined.
 
-In addition, the file contains an object `__set_run_command__` where default [`snakemake options`](https://snakemake.readthedocs.io/en/stable/executable.html#CLUSTER) are defined for running the pipeline on the cluster.
+In addition, the file contains an object `__set_run_command__` where default [`snakemake options`](https://snakemake.readthedocs.io/en/stable/executable.md#CLUSTER) are defined for running the pipeline on the cluster.
 You can adapt these to your needs.
 E.g. per default `--drmaa` is used to submit jobs to other nodes.
 
@@ -126,8 +126,8 @@ tail -f pipeline_log.out
 
 to follow the progress (press `ctrl-c` to exit).
 
-A list of all options for the `./sea-snap` command is given in section [`SeA-SnaP options`](../README.html#sea-snap-options).
+A list of all options for the `./sea-snap` command is given in section [`SeA-SnaP options`](../README.md#sea-snap-options).
 
 ---
 
-[Back](../README.html#running-the-pipeline) to main doc.
+[Back](../README.md#running-the-pipeline) to main doc.

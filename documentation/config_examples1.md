@@ -1,4 +1,4 @@
-[Back](../run_DE.html) to run DE.
+[Back](../run_DE.md) to run DE.
 
 ---
 
@@ -93,4 +93,4 @@ Here, for the contrast "B vs C" the default snippet list is overwritten and only
 
 ---
 
-[Back](../run_DE.html) to run DE.
+[Back](../run_DE.md) to run DE.

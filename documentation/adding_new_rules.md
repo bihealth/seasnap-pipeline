@@ -1,4 +1,4 @@
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
 
 ---
 
@@ -105,4 +105,4 @@ Finally, here are some conventions to keep the rule structure uniform:
 
 ---
 
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.

@@ -1,4 +1,4 @@
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
 
 ---
 
@@ -105,17 +105,17 @@ Config options
 |**`QC:`**                    | **(set which QC steps to run)**                                                   |
 | \|---`count_heatmap:`       |                                                                                   |
 | ...\|---`plot`              | plot a heatmap of counts? "yes" or "no"                                           |
-| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization)) |
+| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.md#data-transformations-and-visualization)) |
 | ...\|---`annotation_col`    | List with names of covariate file columns to use for annotation                   |
 | \|---`sample_similarity:`   |                                                                                   |
 | ...\|---`plot`              | plot a heatmap of sample similarity? "yes" or "no"                                |
-| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization)) |
+| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.md#data-transformations-and-visualization)) |
 | ...\|---`annotation_col`    | List with names of covariate file columns to use for annotation                   |
 | \|---`samples_pca:`         |                                                                                   |
 | ...\|---`plot`              | plot a PCA of samples? "yes" or "no"                                              |
-| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization)) |
+| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.md#data-transformations-and-visualization)) |
 | ...\|---`annotation_col`    | List with names of covariate file columns to use for annotation                   |
 
 ---
 
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.

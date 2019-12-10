@@ -16,12 +16,12 @@ Outline
     - [Installation](#installation)
     - [Running the pipeline](#running-the-pipeline)
 - [Development](#development)
-    - [Adding Rmd snippets](documentation/adding_rmd_snippets.html)
-    - [Adding new pipeline rules](documentation/adding_new_rules.html)
-- [Config options](documentation/config_options.html)
+    - [Adding Rmd snippets](documentation/adding_rmd_snippets.md)
+    - [Adding new pipeline rules](documentation/adding_new_rules.md)
+- [Config options](documentation/config_options.md)
 - [SeA-SnaP options](#sea-snap-options)
-- [Config examples](documentation/config_examples1.html)
-- [Prepare input](documentation/prepare_input.html)
+- [Config examples](documentation/config_examples1.md)
+- [Prepare input](documentation/prepare_input.md)
 - [Hints](#hints)
 
 Concept
@@ -76,7 +76,7 @@ path/to/git/sea-snap.py working_dir
 ```
 
 This will create a directory at the location from where you are running the command called `results_<year>_<month>_<day>/` and add config files for both pipelines, but you can customize this behaviour via the command line options (type `sea-snap.py working_dir -h` for help).
-Directory names you provide can include formatting instructions for pythons [`time`](https://docs.python.org/3/library/time.html#time.strftime) package.
+Directory names you provide can include formatting instructions for pythons [`time`](https://docs.python.org/3/library/time.md#time.strftime) package.
 
 `cd <dir_name>` to the newly created working directory.
 SeA-SnaP also creates a symbolic link to the sea-snap.py script, so that you can from now on use `./sea-snap` to run helpers or pipelines from the working directory.
@@ -86,8 +86,8 @@ You should always run pipelines and helpers from there.
 
 The next steps depend on, whether you want to run:
 
-- [**`The mapping pipeline`**](documentation/run_mapping.html)
-- [**`The DE pipeline`**](documentation/run_DE.html)
+- [**`The mapping pipeline`**](documentation/run_mapping.md)
+- [**`The DE pipeline`**](documentation/run_DE.md)
 
 ---
 
@@ -116,8 +116,8 @@ The pipelines can be easily extended.
 
 See the separate sections for:
 
-- [**`Adding new .Rmd snippets`**](documentation/adding_rmd_snippets.html)
-- [**`Adding new rules`**](documentation/adding_new_rules.html)
+- [**`Adding new .Rmd snippets`**](documentation/adding_rmd_snippets.md)
+- [**`Adding new rules`**](documentation/adding_new_rules.md)
 
 ---
 

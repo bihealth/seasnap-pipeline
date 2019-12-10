@@ -1,4 +1,4 @@
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
 
 ---
 
@@ -40,8 +40,8 @@ Both are required to save the output of different pipeline steps in unique locat
 
 All other wildcards should be used (if they are used) in all path patterns, because if the contained information is not used in different outputs there is currently no point in parsing it, and if it is not parsed, it is not available for the output.
 
-For setting the `in_path_pattern` see also the section [`prepare input`](prepare_input.html)
+For setting the `in_path_pattern` see also the section [`prepare input`](prepare_input.md)
 
 ---
 
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.

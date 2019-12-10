@@ -1,4 +1,4 @@
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
 
 ---
 
@@ -43,7 +43,7 @@ Therefore, if you write a new Rmd snippet and want to make it available for the 
 
 Sub-folders will usually correspond to sub-sections in the report.
 
-There is also an example for configuring the report [here](config_examples1.html).
+There is also an example for configuring the report [here](config_examples1.md).
 
 ---
 
@@ -105,4 +105,4 @@ If some files are not found, you may change the setting of the working directory
 
 ---
 
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.

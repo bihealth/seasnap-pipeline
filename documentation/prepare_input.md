@@ -1,4 +1,4 @@
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
 
 ---
 
@@ -66,4 +66,4 @@ Run:
 
 ---
 
-[Back](../README.html) to main doc.
+[Back](../README.md) to main doc.
