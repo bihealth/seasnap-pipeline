@@ -38,7 +38,7 @@ report:
     title: SeA-SnaP mapping pipeline QC report
     subtitle: run at the BIH CUBI
     intro_text: The reports summarises results of several analyses
-    custom_logo: pictures/SeA-SnaP_logo.png
+    custom_logo: documentation/pictures/SeA-SnaP_logo.png
     sp:
       fastqc/zip:
         fn: '*_fastqc.zip'

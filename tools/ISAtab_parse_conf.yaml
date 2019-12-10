@@ -1,5 +1,6 @@
 id:
   columns:
+    - "Sample Name"
     - "Characteristics\\[Secondary ID\\]"
   value:
     ".*": "\\g<0>"

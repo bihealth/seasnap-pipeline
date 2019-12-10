@@ -9,9 +9,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="13.63155cm"
+   width="15.845921cm"
    height="9.1019421cm"
-   viewBox="0 0 136.3155 91.019421"
+   viewBox="0 0 158.45921 91.019421"
    version="1.1"
    id="svg8"
    inkscape:version="0.92.3 (2405546, 2018-03-11)"
@@ -561,8 +561,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="2.02"
-     inkscape:cx="197.21537"
-     inkscape:cy="206.20674"
+     inkscape:cx="313.34752"
+     inkscape:cy="166.60279"
      inkscape:document-units="cm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -601,7 +601,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -1101,122 +1101,104 @@
          x="42.298187"
          y="237.7394"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
-         id="tspan3093">        r_output = ph.file_path(<tspan
+         id="tspan3144">        out = ph.file_path(<tspan
    style="fill:#37c8ab"
-   id="tspan1214">&lt;name&gt;</tspan>,...,log=<tspan
+   id="tspan1214">&lt;name&gt;</tspan>,<tspan
+   style="fill:#5aa02c"
+   id="tspan1220">&quot;output.log&quot;</tspan>,log=<tspan
    style="font-size:2.82222223px;fill:#c83737"
    id="tspan3138">True</tspan>),</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
          y="241.26717"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
-         id="tspan3144">        r_script = ph.file_path(<tspan
-   style="fill:#37c8ab"
-   id="tspan1216">&lt;name&gt;</tspan>,...,log=<tspan
-   style="font-size:2.82222223px;fill:#c83737"
-   id="tspan3146">True</tspan>)</tspan><tspan
-         sodipodi:role="line"
-         x="42.298187"
-         y="244.79494"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
          id="tspan3095">    <tspan
    style="font-size:2.82222223px;fill:#ff6600"
    id="tspan3107">run</tspan>:</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="248.32272"
+         y="244.79494"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
          id="tspan3148">        param1 = config[<tspan
    style="fill:#5aa02c"
    id="tspan3154">&quot;...&quot;</tspan>]</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="251.85049"
+         y="248.32272"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
          id="tspan3158">        script = textwrap.dedent(<tspan
    style="fill:#5aa02c"
    id="tspan3180">r&quot;&quot;&quot;</tspan></tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="255.37828"
+         y="251.85049"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3166">        library(lib)</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="258.90607"
+         y="255.37828"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3162">        {R_SESSION_INFO}</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="262.43384"
+         y="258.90607"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3168">        if(TRUE){{</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="265.96161"
+         y="262.43384"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3174">            x &lt;- c(&quot;{input.A}&quot;,&quot;{input.B}&quot;)</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="269.48938"
+         y="265.96161"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3176">            y &lt;- &quot;{input.C}&quot;</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="273.01718"
+         y="269.48938"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3164">            result &lt;- libfunction({param1},x,y)</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="276.54495"
+         y="273.01718"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3170">        }}</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="280.07272"
+         y="276.54495"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;fill:#5aa02c;stroke-width:0.26458332"
          id="tspan3172">        saveFunc(&quot;{output.A}&quot;, result, sep=&quot;\t&quot;)</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
-         y="283.60049"
+         y="280.07272"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
          id="tspan3160"><tspan
    style="fill:#5aa02c"
    id="tspan3182">        &quot;&quot;&quot;</tspan>)</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
+         y="283.60049"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
+         id="tspan3186">        script_file = pph.log(log.out, snakemake_format(script),</tspan><tspan
+         sodipodi:role="line"
+         x="42.298187"
          y="287.12827"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
-         id="tspan3184">        <tspan
-   style="fill:#ff6600"
-   id="tspan3188">with</tspan> <tspan
-   style="fill:#ff6600"
-   id="tspan3190">open</tspan>(log.r_script, <tspan
+         id="tspan1230">           step=<tspan
+   style="fill:#37c8ab"
+   id="tspan1240">&lt;name&gt;</tspan>, extension=<tspan
    style="fill:#5aa02c"
-   id="tspan3194">&quot;w&quot;</tspan>) <tspan
-   style="fill:#808080"
-   id="tspan3192">as</tspan> f:</tspan><tspan
+   id="tspan1238">&quot;R&quot;</tspan>, ..., **wildcards)</tspan><tspan
          sodipodi:role="line"
          x="42.298187"
          y="290.65607"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
-         id="tspan3186">            f.write(snakemake_format(script))</tspan><tspan
-         sodipodi:role="line"
-         x="42.298187"
-         y="294.18384"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
-         id="tspan3196">        <tspan
+         id="tspan3202">        <tspan
    style="fill:#ff6600"
    id="tspan3200">shell</tspan>(<tspan
    style="fill:#5aa02c"
-   id="tspan3198">&quot;Rscript --vanilla '{log.r_script}' &quot;</tspan></tspan><tspan
-         sodipodi:role="line"
-         x="42.298187"
-         y="297.71161"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222223px;font-family:monospace;-inkscape-font-specification:monospace;stroke-width:0.26458332"
-         id="tspan3202"><tspan
-   style="fill:#5aa02c"
-   id="tspan3204">              &quot;&amp;&gt; '{log.r_output}'&quot;</tspan>)</tspan></text>
+   id="tspan3198">&quot;Rscript --vanilla '{script_file}' &amp;&gt;&gt; '{log.out}'&quot;</tspan>)</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.25999999;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
        d="M 41.174074,297.84803 V 207.88695"
@@ -1239,22 +1221,12 @@
        x="62.105103"
        y="228.17093"
        ry="0" />
-    <rect
+    <path
        style="fill:none;fill-opacity:1;stroke:#d40000;stroke-width:0.25999999;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
+       d="m 65.416329,235.24394 h 21.219057 v 3.40553 H 65.416329 Z"
        id="rect4156-0"
-       width="21.219057"
-       height="3.4055281"
-       x="73.882996"
-       y="235.24394"
-       ry="0" />
-    <rect
-       style="fill:none;fill-opacity:1;stroke:#d40000;stroke-width:0.25999999;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
-       id="rect4156-1"
-       width="21.219057"
-       height="3.4055281"
-       x="73.882996"
-       y="238.90947"
-       ry="0" />
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccc" />
     <rect
        style="fill:none;fill-opacity:1;stroke:#88aa00;stroke-width:0.25999999;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
        id="rect4156-4"

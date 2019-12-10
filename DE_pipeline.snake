@@ -8,7 +8,7 @@
 #TODO: update documentation: report generation, rule development, templates, pictures, run pipeline
 #TODO: add snippet list to README
 
-#TODO: auto-check config values (branch patrick_dev)
+#TODO: auto-check config values (branch patrick_dev), validation: https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation
 
 
 import os, re, yaml, textwrap, pandas as pd
