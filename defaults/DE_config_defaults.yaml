@@ -3,7 +3,7 @@ pipeline_param:
   # adjust pattern of stored files
   out_path_pattern: DE/{contrast}/{step}/out/{step}.{contrast}.{extension}
   log_path_pattern: DE/{contrast}/{step}/report/{step}.{contrast}.{extension}
-  in_path_pattern: mapping/{step}/{sample}/out/{step}.{name}.{extension}
+  in_path_pattern: mapping/{step}/{sample}.{mate}/out/{step}.{sample}.{mate}.{extension}
   
   # base dir of report snippet library ("" for the default in git repo)
   report_snippets: ""

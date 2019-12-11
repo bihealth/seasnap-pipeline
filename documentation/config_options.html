@@ -273,15 +273,15 @@ summary {
 </tr>
 <tr class="odd">
 <td>|—<code>out_path_pattern</code></td>
-<td>path pattern for output files. Wildcards can be used inside braces <code>{...}</code>.<br>Available wildcards: <code>{step}</code>, <code>{extension}</code> and<br><em>—mapping</em>: <code>{sample}</code>, <code>{name}</code>, <code>{batch}</code>, <code>{flowcell}</code>, <code>{lane}</code><br><em>—DE</em>: <code>{contrast}</code>, <code>{mapping}</code><br><em>default mapping: <code>mapping/{step}/{sample}/out/{step}.{name}.{extension}</code></em><br><em>default DE: <code>DE/{contrast}/{step}/out/{step}.{contrast}.{extension}</code></em></td>
+<td>path pattern for output files. Wildcards can be used inside braces <code>{...}</code>.<br>Available wildcards: <code>{step}</code>, <code>{extension}</code> and<br><em>—mapping</em>: <code>{sample}</code>, <code>{mate}</code>, <code>{batch}</code>, <code>{flowcell}</code>, <code>{lane}</code>, <code>{library}</code><br><em>—DE</em>: <code>{contrast}</code>, <code>{mapping}</code><br><em>default mapping: <code>mapping/{step}/{sample}.{mate}/out/{step}.{sample}.{mate}.{extension}</code></em><br><em>default DE: <code>DE/{contrast}/{step}/out/{step}.{contrast}.{extension}</code></em></td>
 </tr>
 <tr class="even">
 <td>|—<code>log_path_pattern</code></td>
-<td>path pattern for log files. Wildcards can be used inside braces <code>{...}</code>.<br>Available wildcards: <code>{step}</code>, <code>{extension}</code> and<br><em>—mapping</em>: <code>{sample}</code>, <code>{name}</code>, <code>{batch}</code>, <code>{flowcell}</code>, <code>{lane}</code><br><em>—DE</em>: <code>{contrast}</code>, <code>{mapping}</code><br><em>default mapping: <code>mapping/{step}/{sample}/report/{step}.{name}.{extension}</code></em><br><em>default DE: <code>DE/{contrast}/{step}/report/{step}.{contrast}.{extension}</code></em></td>
+<td>path pattern for log files. Wildcards can be used inside braces <code>{...}</code>.<br>Available wildcards: <code>{step}</code>, <code>{extension}</code> and<br><em>—mapping</em>: <code>{sample}</code>, <code>{mate}</code>, <code>{batch}</code>, <code>{flowcell}</code>, <code>{lane}</code>, <code>{library}</code><br><em>—DE</em>: <code>{contrast}</code>, <code>{mapping}</code><br><em>default mapping: <code>mapping/{step}/{sample}.{mate}/report/{step}.{sample}.{mate}.{extension}</code></em><br><em>default DE: <code>DE/{contrast}/{step}/report/{step}.{contrast}.{extension}</code></em></td>
 </tr>
 <tr class="odd">
 <td>|—<code>in_path_pattern</code></td>
-<td>path pattern for input files. Wildcards can be used inside braces <code>{...}</code>.<br>Available wildcards mapping: <code>{sample}</code>, <code>{name}</code>, <code>{batch}</code>, <code>{flowcell}</code>, <code>{lane}</code><br>Available wildcards DE: same as <code>out_path_pattern</code> for mapping<br><em>default mapping: <code>../input/{sample}/{name}</code></em><br><em>default DE: <code>mapping/{step}/{sample}/out/{step}.{name}.{extension}</code></em></td>
+<td>path pattern for input files. Wildcards can be used inside braces <code>{...}</code>.<br>Available wildcards mapping: <code>{sample}</code>, <code>{mate}</code>, <code>{batch}</code>, <code>{flowcell}</code>, <code>{lane}</code>, <code>{library}</code><br>Available wildcards DE: same as <code>out_path_pattern</code> for mapping<br><em>default mapping: <code>../input/{sample}/{sample}.{mate}</code></em><br><em>default DE: <code>mapping/{step}/{sample}.{mate}/out/{step}.{sample}.{mate}.{extension}</code></em></td>
 </tr>
 <tr class="even">
 <td>|—<code>report_snippets</code></td>
