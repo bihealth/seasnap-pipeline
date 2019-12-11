@@ -64,6 +64,35 @@ Run:
 
 *after* editing the path pattern in the config file.
 
+**Note: The solution of parsing information from ISA-tab files is more or less temporary, since an API for SODAR is about to come at some point. 
+Nevertheless, until then the sea-snap helper can be used to extract information from the file.**
+
+Unfortunately, sometimes there are errors in the file, so please make sure to double-check the extracted ionformation.
+
+Further, the recognition of different ISA-tab column names and extraction of values is rudimentary at the moment, but can be extended in a separate configuration file that is located under [`tools/ISAtab_parse_conf.yaml`](../tools/ISAtab_parse_conf.yaml).
+It contains entries of this form:
+
+```
+<field>:
+  columns:
+    - <regex>
+    - <regex>
+    - <regex>
+  value:
+    <regex>: <replacement string>
+    <regex>: <replacement string>
+```
+
+For a field name (which will be added to `sample_info.yaml`) two keys are defined:
+
+- `columns` contains regular expressions to recognize the name of the column that contains information for the respective field. Regular expressions in the list will be tried out consecutively until a match was found.
+- `value` contains pairs of regular expressions and replacement strings, that will be used with pythons [`re.sub`](https://docs.python.org/3/library/re.html#re.sub) function. The substitution will be applied to all values in that column and thus allows trimming and formatting. Note: values will be converted to lower case before applying the substitution.
+
+Thus, if you download an ISA-tab file, have a look at it and check whether the right regular expressions are included in the config.
+Feel free to extend the config file and push it back to gitlab. In this way the configuration may grow and improve.
+
+For an explanation how to export to SODAR see [`SODAR export`](export.md).
+
 ---
 
 [Back](../README.md) to main doc.

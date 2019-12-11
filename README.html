@@ -199,13 +199,13 @@ summary {
 </ul></li>
 <li><a href="#development">Development</a>
 <ul>
-<li><a href="documentation/adding_rmd_snippets.html">Adding Rmd snippets</a></li>
-<li><a href="documentation/adding_new_rules.html">Adding new pipeline rules</a></li>
+<li><a href="documentation/adding_rmd_snippets.md">Adding Rmd snippets</a></li>
+<li><a href="documentation/adding_new_rules.md">Adding new pipeline rules</a></li>
 </ul></li>
-<li><a href="documentation/config_options.html">Config options</a></li>
+<li><a href="documentation/config_options.md">Config options</a></li>
 <li><a href="#sea-snap-options">SeA-SnaP options</a></li>
-<li><a href="documentation/config_examples1.html">Config examples</a></li>
-<li><a href="documentation/prepare_input.html">Prepare input</a></li>
+<li><a href="documentation/config_examples1.md">Config examples</a></li>
+<li><a href="documentation/prepare_input.md">Prepare input</a></li>
 <li><a href="#hints">Hints</a></li>
 </ul>
 </div>
@@ -235,14 +235,16 @@ summary {
 <p><strong>set up a working directory</strong></p>
 <p>Set up a working directory to store the results produced by the pipeline. (For CUBI projects create a project directory in the cluster under <code>/fast/groups/cubi/projects/</code>). To create a directory and copy required files for the configuration of your pipeline run:</p>
 <pre><code>path/to/git/sea-snap.py working_dir</code></pre>
-<p>This will create a directory at the location from where you are running the command called <code>results_&lt;year&gt;_&lt;month&gt;_&lt;day&gt;/</code> and add config files for both pipelines, but you can customize this behaviour via the command line options (type <code>sea-snap.py working_dir -h</code> for help). Directory names you provide can include formatting instructions for pythons <a href="https://docs.python.org/3/library/time.html#time.strftime"><code>time</code></a> package.</p>
+<p>This will create a directory at the location from where you are running the command called <code>results_&lt;year&gt;_&lt;month&gt;_&lt;day&gt;/</code> and add config files for both pipelines, but you can customize this behaviour via the command line options (type <code>sea-snap.py working_dir -h</code> for help). Directory names you provide can include formatting instructions for pythons <a href="https://docs.python.org/3/library/time.md#time.strftime"><code>time</code></a> package.</p>
 <p><code>cd &lt;dir_name&gt;</code> to the newly created working directory. SeA-SnaP also creates a symbolic link to the sea-snap.py script, so that you can from now on use <code>./sea-snap</code> to run helpers or pipelines from the working directory. You should always run pipelines and helpers from there.</p>
 <hr />
+<p><strong>run the pipeline</strong></p>
 <p>The next steps depend on, whether you want to run:</p>
 <ul>
-<li><a href="documentation/run_mapping.html"><strong><code>The mapping pipeline</code></strong></a></li>
-<li><a href="documentation/run_DE.html"><strong><code>The DE pipeline</code></strong></a></li>
+<li><a href="documentation/run_mapping.md"><strong><code>The mapping pipeline</code></strong></a></li>
+<li><a href="documentation/run_DE.md"><strong><code>The DE pipeline</code></strong></a></li>
 </ul>
+<p>The results of an analysis can also be <a href="documentation/export.md"><code>exported</code></a> to a new folder structure, e.g. to upload them to SODAR.</p>
 <hr />
 </div>
 </div>
@@ -259,8 +261,8 @@ Finally, there are some helper functions, that can be accessed via the <code>./s
 <p>The pipelines can be easily extended.</p>
 <p>See the separate sections for:</p>
 <ul>
-<li><a href="documentation/adding_rmd_snippets.html"><strong><code>Adding new .Rmd snippets</code></strong></a></li>
-<li><a href="documentation/adding_new_rules.html"><strong><code>Adding new rules</code></strong></a></li>
+<li><a href="documentation/adding_rmd_snippets.md"><strong><code>Adding new .Rmd snippets</code></strong></a></li>
+<li><a href="documentation/adding_new_rules.md"><strong><code>Adding new rules</code></strong></a></li>
 </ul>
 <hr />
 </div>

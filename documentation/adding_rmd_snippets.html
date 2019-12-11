@@ -180,7 +180,7 @@ summary {
 </div>
 
 
-<p><a href="../README.html">Back</a> to main doc.</p>
+<p><a href="../README.md">Back</a> to main doc.</p>
 <hr />
 <div id="adding-rmd-snippets" class="section level2">
 <h2>Adding Rmd snippets</h2>
@@ -201,7 +201,7 @@ The algorithm that generates the report reads the file called <code>report/repor
 <p>Should any of the .Rmd snippets corresponding to a <em>contrast name</em>, be specified as a dictionary and not as a string, the algorithm would try to continue recursively assembling lists of sub-sub sections of the report from sub-sub folders in <code>report/contrast/etc/</code>.</p>
 <p>Therefore, if you write a new Rmd snippet and want to make it available for the report generation, make sure to place it in the corresponding sub-folder. (<code>report/</code> for first level snippets, <code>report/contrast/</code> for snippets analyzing contrasts, etc.).</p>
 <p>Sub-folders will usually correspond to sub-sections in the report.</p>
-<p>There is also an example for configuring the report <a href="config_examples1.html">here</a>.</p>
+<p>There is also an example for configuring the report <a href="config_examples1.md">here</a>.</p>
 <hr />
 </div>
 <div id="accessing-pipeline-results-in-snippets" class="section level3">
@@ -225,7 +225,16 @@ The algorithm that generates the report reads the file called <code>report/repor
 <p><strong>5) other</strong></p>
 <p>Also the wildcards <code>{{WORKING_DIRECTORY}}</code> and <code>{{R_COMMON}}</code> are replaced by paths to the respective folders in the complete document. Note, that the working directory of the Rmd report will be set to the working directory of the pipeline. Thus, moving the report file is less likely to break paths to the results files. If some files are not found, you may change the setting of the working directory in <code>report_main_template.Rmd</code> or RStudio, e.g. if you copied the report to your local computer and want to knit it accessing files via sshfs.</p>
 <hr />
-<p><a href="../README.html">Back</a> to main doc.</p>
+</div>
+<div id="conditional-inclusion-of-.rmd-snippets" class="section level3">
+<h3>conditional inclusion of .Rmd snippets</h3>
+<p>GO and KEGG enrichment analysis may be performed only for a subset of contrasts. Corresponding .Rmd snippets should then be included in the report only if the corresponding results are present.</p>
+<p>To this end, there is a</p>
+<pre><code>#REQUIRE &lt;filename&gt;</code></pre>
+<p>keyword, that can be added at the beginning of an .Rmd snippet (several of such lines are possible, with one filename each). The snippet is then only included in the report, if the specified files are present.</p>
+<p>The filename may be defined for example as <code>{{goseq-go.rds-{{ENTRY_ID}}}}</code>, as described above.</p>
+<hr />
+<p><a href="../README.md">Back</a> to main doc.</p>
 </div>
 </div>
 

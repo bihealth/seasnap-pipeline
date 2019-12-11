@@ -84,10 +84,14 @@ You should always run pipelines and helpers from there.
 
 ---
 
+**run the pipeline**
+
 The next steps depend on, whether you want to run:
 
 - [**`The mapping pipeline`**](documentation/run_mapping.md)
 - [**`The DE pipeline`**](documentation/run_DE.md)
+
+The results of an analysis can also be [`exported`](documentation/export.md) to a new folder structure, e.g. to upload them to SODAR.
 
 ---
 

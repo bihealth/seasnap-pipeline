@@ -180,7 +180,7 @@ summary {
 </div>
 
 
-<p><a href="../README.html">Back</a> to main doc.</p>
+<p><a href="../README.md">Back</a> to main doc.</p>
 <hr />
 <div id="config-options" class="section level2">
 <h2>Config options</h2>
@@ -482,137 +482,85 @@ summary {
 <td>alt. to <code>ratio</code>; a list with entries corresponding to columns in the design matrix, defining the linear combination, e.g. [1,1,0,-1,0]</td>
 </tr>
 <tr class="even">
+<td>……|—<code>goseq</code></td>
+<td>whether to run GO and KEGG enrichment analysis with <code>goseq</code>; “true” or “false”</td>
+</tr>
+<tr class="odd">
 <td>……|—<code>...</code></td>
 <td>any key from <code>defaults</code> (overwrite them for this contrast)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>|—<code>defaults:</code></td>
 <td></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>…|—<code>max_p_adj</code></td>
 <td>FDR cutoff ‘alpha’ for DESeq2’s results function; <em>default: 0.1</em></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>…|—<code>ranking_by</code></td>
 <td>rank results by (column in results table): <code>log2FoldChange</code> for log2 fold change (the effect size estimate), <code>pvalue</code> for the p-value, <code>padj</code> for the multiple testing corrected p-value</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>…|—<code>ranking_order</code></td>
 <td>R expression for ordering (with <code>ranking_by</code>) with ‘x’ as input, e.g. “-abs(x)”</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>…|—<code>results_parameters:</code></td>
 <td></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>……|—<code>lfcThreshold</code></td>
 <td>test for log fold change higher than <x>; <em>default: 0</em></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>……|—<code>altHypothesis</code></td>
 <td>alternative hypothesis of the test<br>Options: <code>greater</code>, <code>less</code>, <code>greaterAbs</code>, <code>lessAbs</code> (see <a href="https://www.rdocumentation.org/packages/DESeq2/versions/1.12.3/topics/results">results</a>)<br><em>default: greaterAbs</em></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>……|—<code>independentFiltering</code></td>
 <td>perform independent filtering; “yes” or “no”</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>…|—<code>lfcShrink_parameters:</code></td>
 <td></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>……|—<code>type</code></td>
 <td>algorithm to use for log fold change shrinkage; Options: <code>none</code>, <code>apeglm</code>, <code>ashr</code>, <code>normal</code><br><em>default: “none”</em></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>…|—<code>GO:</code></td>
 <td></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>……|—<code>fdr_threshold</code></td>
 <td>FDR threshold to determine which results to use for functional annotation; <em>default: 0.1</em></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td></td>
 <td></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><strong><code>report:</code></strong></td>
 <td><strong>(define which snippets to include in the report)</strong></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>|—<code>report_snippets</code></td>
 <td>List of report snippets (Rmd files) in the <code>report/</code> directory. Snippets will be appended in the order defined in this list (see section <a href="#adding-rmd-snippets">Adding Rmd Snippets</a>)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>|—<code>defaults:</code></td>
 <td></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>…|—<code>contrast</code></td>
 <td>default list of report snippets (Rmd files) added to each contrast in the report</td>
-</tr>
-<tr class="even">
-<td></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><strong><code>QC:</code></strong></td>
-<td><strong>(set which QC steps to run)</strong></td>
-</tr>
-<tr class="even">
-<td>|—<code>count_heatmap:</code></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td>…|—<code>plot</code></td>
-<td>plot a heatmap of counts? “yes” or “no”</td>
-</tr>
-<tr class="even">
-<td>…|—<code>transform_type</code></td>
-<td>transform count data; Options: <code>normTransform</code>, <code>vst</code>, <code>rlog</code> (see <a href="http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization">here</a>)</td>
-</tr>
-<tr class="odd">
-<td>…|—<code>annotation_col</code></td>
-<td>List with names of covariate file columns to use for annotation</td>
-</tr>
-<tr class="even">
-<td>|—<code>sample_similarity:</code></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td>…|—<code>plot</code></td>
-<td>plot a heatmap of sample similarity? “yes” or “no”</td>
-</tr>
-<tr class="even">
-<td>…|—<code>transform_type</code></td>
-<td>transform count data; Options: <code>normTransform</code>, <code>vst</code>, <code>rlog</code> (see <a href="http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization">here</a>)</td>
-</tr>
-<tr class="odd">
-<td>…|—<code>annotation_col</code></td>
-<td>List with names of covariate file columns to use for annotation</td>
-</tr>
-<tr class="even">
-<td>|—<code>samples_pca:</code></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td>…|—<code>plot</code></td>
-<td>plot a PCA of samples? “yes” or “no”</td>
-</tr>
-<tr class="even">
-<td>…|—<code>transform_type</code></td>
-<td>transform count data; Options: <code>normTransform</code>, <code>vst</code>, <code>rlog</code> (see <a href="http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-transformations-and-visualization">here</a>)</td>
-</tr>
-<tr class="odd">
-<td>…|—<code>annotation_col</code></td>
-<td>List with names of covariate file columns to use for annotation</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<p><a href="../README.html">Back</a> to main doc.</p>
+<p><a href="../README.md">Back</a> to main doc.</p>
 </div>
 </div>
 

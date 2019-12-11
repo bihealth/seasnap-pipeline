@@ -180,7 +180,7 @@ summary {
 </div>
 
 
-<p><a href="../README.html">Back</a> to main doc.</p>
+<p><a href="../README.md">Back</a> to main doc.</p>
 <hr />
 <div id="run-differential-expression-analysis" class="section level2">
 <h2>Run differential expression analysis</h2>
@@ -193,7 +193,7 @@ summary {
 <h3>1) edit the config file</h3>
 <p>After creating a working directory with the file <code>DE_config.yaml</code> you have to edit that file to set your configuration.</p>
 <p>SeA-SnaP parses an internal config file with default values from the git repository first and the files you edit in your working directory will overwrite the default values. In this way the config can be kept simple and you do not need to specify all values.</p>
-<p>Many configuration options are available described in a <a href="../config_options.html"><code>separate section</code></a>. (Hint: it might also be helpful to look into the default configuration file in the <a href="../defaults/DE_config_defaults.yaml">git repository</a>).</p>
+<p>Many configuration options are available described in a <a href="../config_options.md"><code>separate section</code></a>. (Hint: it might also be helpful to look into the default configuration file in the <a href="../defaults/DE_config_defaults.yaml">git repository</a>).</p>
 <p>Here, we describe the minimal settings required:</p>
 <p><strong>required settings</strong></p>
 <p>In the config file which was copied to your working directory values that need to be filled are marked with <code>### FILL IN ###</code>. For other sections of the config file <code>__options__</code> gives hints to which further adjustments can be made. But you can also completely delete these other sections, if not required.</p>
@@ -206,8 +206,8 @@ summary {
 </ul>
 <p>Folder structures for input and output files in SeA-SnaP are specified by <em>path patterns with wildcards</em>, e.g.:</p>
 <pre><code>mapping/{step}/{sample}/out/{step}.{mate}.{extension}</code></pre>
-<p>See <a href="path_patterns.html"><code>path patterns</code></a> for a detailed description.</p>
-<p><a href="path_patterns.html">Here</a> are also examples how to configure the <code>contrast list</code> and customize the Rmd report.</p>
+<p>See <a href="path_patterns.md"><code>path patterns</code></a> for a detailed description.</p>
+<p><a href="config_examples1.md">Here</a> are also examples how to configure the <code>contrast list</code> and customize the Rmd report.</p>
 <hr />
 </div>
 <div id="create-a-covariate-file" class="section level3">
@@ -246,7 +246,7 @@ summary {
 <h3>3) execute the pipeline</h3>
 <p>To run the mapping pipeline locally you can use:</p>
 <pre><code>./sea-snap DE l</code></pre>
-<p>This is a wrapper for Snakemake. You can add any <a href="https://snakemake.readthedocs.io/en/stable/executable.html#all-options"><code>snakemake options</code></a> after <code>l</code> and they will be passed to snakemake.</p>
+<p>This is a wrapper for Snakemake. You can add any <a href="https://snakemake.readthedocs.io/en/stable/executable.md#all-options"><code>snakemake options</code></a> after <code>l</code> and they will be passed to snakemake.</p>
 <p>E.g. run</p>
 <pre><code>./sea-snap DE l -nr</code></pre>
 <p>for a dry run to see which steps will be executed and why. Other helpful options might be <code>-R</code>, <code>-U</code> and <code>-O</code> to run only specific parts of the pipeline.</p>
@@ -255,13 +255,13 @@ summary {
 <pre><code>./sea-snap DE c</code></pre>
 <p>instead of <code>l</code>.</p>
 <p>Also note the file <code>cluster_config.json</code>, which was added to the working directory together with <code>mapping_config.yaml</code> and <code>DE_config.yaml</code>. It will be used if SeA-SnaP runs with the cluster option. In the file, resources for the different pipeline steps are defined.</p>
-<p>In addition, the file contains an object <code>__set_run_command__</code> where default <a href="https://snakemake.readthedocs.io/en/stable/executable.html#CLUSTER"><code>snakemake options</code></a> are defined for running the pipeline on the cluster. You can adapt these to your needs. E.g. per default <code>--drmaa</code> is used to submit jobs to other nodes.</p>
+<p>In addition, the file contains an object <code>__set_run_command__</code> where default <a href="https://snakemake.readthedocs.io/en/stable/executable.md#CLUSTER"><code>snakemake options</code></a> are defined for running the pipeline on the cluster. You can adapt these to your needs. E.g. per default <code>--drmaa</code> is used to submit jobs to other nodes.</p>
 <p>When a job was submitted to the cluster you can run</p>
 <pre><code>tail -f pipeline_log.out</code></pre>
 <p>to follow the progress (press <code>ctrl-c</code> to exit).</p>
-<p>A list of all options for the <code>./sea-snap</code> command is given in section <a href="../README.html#sea-snap-options"><code>SeA-SnaP options</code></a>.</p>
+<p>A list of all options for the <code>./sea-snap</code> command is given in section <a href="../README.md#sea-snap-options"><code>SeA-SnaP options</code></a>.</p>
 <hr />
-<p><a href="../README.html#running-the-pipeline">Back</a> to main doc.</p>
+<p><a href="../README.md#running-the-pipeline">Back</a> to main doc.</p>
 </div>
 </div>
 

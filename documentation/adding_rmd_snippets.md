@@ -105,4 +105,22 @@ If some files are not found, you may change the setting of the working directory
 
 ---
 
+### conditional inclusion of .Rmd snippets
+
+GO and KEGG enrichment analysis may be performed only for a subset of contrasts.
+Corresponding .Rmd snippets should then be included in the report only if the corresponding results are present.
+
+To this end, there is a
+
+```
+#REQUIRE <filename>
+```
+
+keyword, that can be added at the beginning of an .Rmd snippet (several of such lines are possible, with one filename each).
+The snippet is then only included in the report, if the specified files are present.
+
+The filename may be defined for example as `{{goseq-go.rds-{{ENTRY_ID}}}}`, as described above.
+
+---
+
 [Back](../README.md) to main doc.

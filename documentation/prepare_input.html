@@ -180,7 +180,7 @@ summary {
 </div>
 
 
-<p><a href="../README.html">Back</a> to main doc.</p>
+<p><a href="../README.md">Back</a> to main doc.</p>
 <hr />
 <div id="prepare-input" class="section level2">
 <h2>Prepare input</h2>
@@ -214,8 +214,26 @@ summary {
 <p>the <code>sample_info</code> wrapper has an option to parse both the folder structure and the ISA-tab file and merge the results into a sample_info file. Run:</p>
 <pre><code>./sea-snap sample_info --from sodar --input path/to/isa-tab</code></pre>
 <p><em>after</em> editing the path pattern in the config file.</p>
+<p><strong>Note: The solution of parsing information from ISA-tab files is more or less temporary, since an API for SODAR is about to come at some point. Nevertheless, until then the sea-snap helper can be used to extract information from the file.</strong></p>
+<p>Unfortunately, sometimes there are errors in the file, so please make sure to double-check the extracted ionformation.</p>
+<p>Further, the recognition of different ISA-tab column names and extraction of values is rudimentary at the moment, but can be extended in a separate configuration file that is located under <a href="../tools/ISAtab_parse_conf.yaml"><code>tools/ISAtab_parse_conf.yaml</code></a>. It contains entries of this form:</p>
+<pre><code>&lt;field&gt;:
+  columns:
+    - &lt;regex&gt;
+    - &lt;regex&gt;
+    - &lt;regex&gt;
+  value:
+    &lt;regex&gt;: &lt;replacement string&gt;
+    &lt;regex&gt;: &lt;replacement string&gt;</code></pre>
+<p>For a field name (which will be added to <code>sample_info.yaml</code>) two keys are defined:</p>
+<ul>
+<li><code>columns</code> contains regular expressions to recognize the name of the column that contains information for the respective field. Regular expressions in the list will be tried out consecutively until a match was found.</li>
+<li><code>value</code> contains pairs of regular expressions and replacement strings, that will be used with pythons <a href="https://docs.python.org/3/library/re.html#re.sub"><code>re.sub</code></a> function. The substitution will be applied to all values in that column and thus allows trimming and formatting. Note: values will be converted to lower case before applying the substitution.</li>
+</ul>
+<p>Thus, if you download an ISA-tab file, have a look at it and check whether the right regular expressions are included in the config. Feel free to extend the config file and push it back to gitlab. In this way the configuration may grow and improve.</p>
+<p>For an explanation how to export to SODAR see <a href="export.md"><code>SODAR export</code></a>.</p>
 <hr />
-<p><a href="../README.html">Back</a> to main doc.</p>
+<p><a href="../README.md">Back</a> to main doc.</p>
 </div>
 </div>
 

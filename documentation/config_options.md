@@ -83,38 +83,25 @@ Config options
 | .........\|---`denominator` | denominator of the contrast (a level of `column`), e.g. "classical"               |
 | ......\|---`coef`           | alt. to `ratio`; the coefficient of DESeq2 results, e.g. "condition_classical_vs_nonclassical" |
 | ......\|---`vector`         | alt. to `ratio`; a list with entries corresponding to columns in the design matrix, defining the linear combination, e.g. [1,1,0,-1,0] |
-| ......\|---`...`            | any key from `defaults` (overwrite them for this contrast)                          |
+| ......\|---`goseq`          | whether to run GO and KEGG enrichment analysis with `goseq`; "true" or "false"    |
+| ......\|---`...`            | any key from `defaults` (overwrite them for this contrast)                        |
 | \|---`defaults:`            |                                                                                   |
 | ...\|---`max_p_adj`         | FDR cutoff 'alpha' for DESeq2's results function; *default: 0.1*                  |
 | ...\|---`ranking_by`        | rank results by (column in results table): `log2FoldChange` for log2 fold change (the effect size estimate), `pvalue` for the p-value, `padj` for the multiple testing corrected p-value |
-| ...\|---`ranking_order`       | R expression for ordering (with `ranking_by`) with 'x' as input, e.g. "-abs(x)"   |
-| ...\|---`results_parameters:` |                                                                                   |
-| ......\|---`lfcThreshold`   | test for log fold change higher than <x>; *default: 0*                            |
+| ...\|---`ranking_order`       | R expression for ordering (with `ranking_by`) with 'x' as input, e.g. "-abs(x)"  |
+| ...\|---`results_parameters:` |                                                                                  |
+| ......\|---`lfcThreshold`   | test for log fold change higher than <x>; *default: 0*                             |
 | ......\|---`altHypothesis`  | alternative hypothesis of the test<br>Options: `greater`, `less`, `greaterAbs`, `lessAbs` (see [results](https://www.rdocumentation.org/packages/DESeq2/versions/1.12.3/topics/results))<br>*default: greaterAbs* |
-| ......\|---`independentFiltering` | perform independent filtering; "yes" or "no"                                  |
-| ...\|---`lfcShrink_parameters:` |                                                                                 |
+| ......\|---`independentFiltering` | perform independent filtering; "yes" or "no"                                 |
+| ...\|---`lfcShrink_parameters:` |                                                                                |
 | ......\|---`type`           | algorithm to use for log fold change shrinkage; Options: `none`, `apeglm`, `ashr`, `normal`<br>*default: "none"* |
-| ...\|---`GO:`               |                                                                                   |
+| ...\|---`GO:`               |                                                                                    |
 | ......\|---`fdr_threshold`  | FDR threshold to determine which results to use for functional annotation; *default: 0.1* |
-|                             |                                                                                   |
-|**`report:`**                | **(define which snippets to include in the report)**                              |
+|                             |                                                                                    |
+|**`report:`**                | **(define which snippets to include in the report)**                               |
 | \|---`report_snippets`      | List of report snippets (Rmd files) in the `report/` directory. Snippets will be appended in the order defined in this list (see section [Adding Rmd Snippets](#adding-rmd-snippets)) |
-| \|---`defaults:`            |                                                                                   |
-| ...\|---`contrast`          | default list of report snippets (Rmd files) added to each contrast in the report  |
-|                             |                                                                                   |
-|**`QC:`**                    | **(set which QC steps to run)**                                                   |
-| \|---`count_heatmap:`       |                                                                                   |
-| ...\|---`plot`              | plot a heatmap of counts? "yes" or "no"                                           |
-| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.md#data-transformations-and-visualization)) |
-| ...\|---`annotation_col`    | List with names of covariate file columns to use for annotation                   |
-| \|---`sample_similarity:`   |                                                                                   |
-| ...\|---`plot`              | plot a heatmap of sample similarity? "yes" or "no"                                |
-| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.md#data-transformations-and-visualization)) |
-| ...\|---`annotation_col`    | List with names of covariate file columns to use for annotation                   |
-| \|---`samples_pca:`         |                                                                                   |
-| ...\|---`plot`              | plot a PCA of samples? "yes" or "no"                                              |
-| ...\|---`transform_type`    | transform count data; Options: `normTransform`, `vst`, `rlog` (see [here](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.md#data-transformations-and-visualization)) |
-| ...\|---`annotation_col`    | List with names of covariate file columns to use for annotation                   |
+| \|---`defaults:`            |                                                                                    |
+| ...\|---`contrast`          | default list of report snippets (Rmd files) added to each contrast in the report   |
 
 ---
 

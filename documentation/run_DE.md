@@ -46,7 +46,7 @@ mapping/{step}/{sample}/out/{step}.{mate}.{extension}
 
 See [`path patterns`](path_patterns.md) for a detailed description.
 
-[Here](path_patterns.md) are also examples how to configure the `contrast list` and customize the Rmd report.
+[Here](config_examples1.md) are also examples how to configure the `contrast list` and customize the Rmd report.
 
 ---
 

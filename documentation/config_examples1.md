@@ -16,13 +16,15 @@ E.g.
 ```
 contrast_list:
   - title: "A vs C"
-    column: condition
-    numerator: A
-    denominator: C
+    ratio:
+      column: condition
+      numerator: A
+      denominator: C
   - title: "B vs C"
-    column: condition
-    numerator: B
-    denominator: C
+    ratio:
+      column: condition
+      numerator: B
+      denominator: C
     ranking_order: "-x"
     results_parameters:
       altHypothesis: less
@@ -32,6 +34,18 @@ defines two contrasts "A vs C" and "B vs C".
 "A", "B" and "C" are levels of a column "condition" in the covariate file.
 In the second contrast, also defaults for `ranking_order` and `results_parameters` are overwritten.
 The defaults are defined in the config file under `contrasts: defaults:`.
+
+**conditional functional annotation analysis**
+
+Analysis of e.g. GO and KEGG annotation enrichment can be optional for certain contrasts.
+For example by adding a key-value pair `goseq: true` to a contrast specification, **goseq** is run for that contrast for GO and KEGG enrichment analysis.
+
+At the level of the snakefile, the argument `if_set = dict(goseq=True)` of the `expand_path()` path handler function is used when collecting output files for the `all` rule.
+While expanding over the contrasts, only output files will be requested, if a `dict(goseq=True)` is in the definition of the respective contrast.
+This mechanism can also be used, when adding more analysis steps to the pipeline that are optional for contrasts.
+
+If results of some analysis steps are not computed for all contrasts, also the report must adapt by not including sections for those steps for a given contrast.
+See [`adding new snippets`](adding_rmd_snippets.md) on how to make snippet inclusion conditional.
 
 ### Configure report
 
