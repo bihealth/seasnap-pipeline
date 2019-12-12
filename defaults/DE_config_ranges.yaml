@@ -11,7 +11,7 @@ pipeline_param:
   # define choices for choose_input()
   input_choice:
     mapping:
-      __opt__: ["import_gene_counts|import_sf", ["import_gene_counts|import_sf"]]
+      __opt__: ["import_gene_counts|import_sf|import_featurecounts", ["import_gene_counts|import_sf|import_featurecounts"]]
 
 #---------------------------------------- organism annotation (needs to be set)
 organism_defaults:
@@ -56,28 +56,14 @@ contrasts:
       fdr_threshold: {"__num__": [0, 1]}
   contrast_list:
     - title: .+
-      column: \S+
-      numerator: \S+
-      denominator: \S+
-      __any_other__: "contrasts:defaults:"
-
-#---------------------------------------- QC parameters
-QC:
-  count_heatmap:
-    plot:
-      __opt__: [true, false]
-    transform_type: normTransform|vst|rlog
-    annotation_col: [\S+]
-  sample_similarity:
-    plot:
-      __opt__: [true, false]
-    transform_type: normTransform|vst|rlog
-    annotation_col: [\S+]
-  samples_pca:
-    plot:
-      __opt__: [true, false]
-    transform_type: normTransform|vst|rlog
-    annotation_col: [\S+]
+      __opt__:
+        - ratio:
+            column: \S+
+            numerator: \S+
+            denominator: \S+
+        - coef: \S+
+        - vector: [{"__num__": [-1, 1]}]
+      __any_other__: "contrasts:defaults"
 
 #---------------------------------------- report parameters
 report:
