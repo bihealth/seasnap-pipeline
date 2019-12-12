@@ -28,7 +28,9 @@ if config["organism_defaults"]:
 	configfile: "DE_config.yaml"
 
 # create path handler
-pph = DEPipelinePathHandler(config)
+conf_ranges = str(SNAKEDIR / "defaults" / "DE_config_ranges.yaml")
+test_config = conf_ranges if config["pipeline_param"]["test_config"] else None
+pph = DEPipelinePathHandler(config, test_config)
 
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 

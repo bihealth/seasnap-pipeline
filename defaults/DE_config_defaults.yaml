@@ -14,6 +14,8 @@ pipeline_param:
       - import_gene_counts
       - import_sf
 
+  test_config: true
+
 #---------------------------------------- organism annotation (needs to be set)
 organism_defaults: null
 

@@ -27,20 +27,9 @@ class PipelinePathHandler:
 	required_wildcards_in      = []
 	
 	def __init__(self, config, test_config=False, test_allowed_wildcards=True):
-		self.test_config = None
-		if test_config:
-			# load test_config for validity check of config values
-			if type(test_config) is dict:
-				self.test_config = test_config
-			elif isinstance(test_config, str):
-				with open(test_config, "r") as stream:
-					try:
-						self.test_config = yaml.safe_load(stream)
-					except yaml.YAMLError as exc:
-						print(exc)
-			else:
-				raise TypeError("Wrong type of argument test_config: must be dict or str.")
-	
+		self.test_config = self._load_test_config(test_config)
+		if self.test_config: self._test_config_general(config, self.test_config)
+		
 		self.out_path_pattern = config["pipeline_param"]["out_path_pattern"]
 		self.log_path_pattern = config["pipeline_param"]["log_path_pattern"]
 		self.in_path_pattern  = config["pipeline_param"]["in_path_pattern"]
@@ -69,6 +58,22 @@ class PipelinePathHandler:
 	
 	
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
+	
+	def _load_test_config(self, test_config):
+		""" load test_config for validity check of config values """
+		if test_config:
+			if type(test_config) is dict:
+				return test_config
+			elif isinstance(test_config, str):
+				with open(test_config, "r") as stream:
+					try:
+						return yaml.safe_load(stream)
+					except yaml.YAMLError as exc:
+						print(exc)
+			else:
+				raise TypeError("Wrong type of argument test_config: must be dict or str.")
+		else:
+			return None
 	
 	def _test_config_input(self, test_allowed_wildcards):
 		""" test whether wildcards in path patterns are valid """
@@ -103,52 +108,60 @@ class PipelinePathHandler:
 					if opt_key in base_dict:
 						self._test_config_general(base_dict, {opt_key: ref_dict[opt_key]})
 			# if missing
-			elif key not in base_dict:
-				raise KeyError("Error in config file: The required key {} was not defined!".format(key))
+			elif key not in base_dict and key not in ["__num__", "__opt__"]:
+				raise KeyError("Error in config file: The required key '{}' was not defined!".format(key))
 			
 			## value test
 			# if string
 			elif isinstance(val, str):
 				if isinstance(base_dict[key], str):
-					if not re.fullmatch(base_dict[key], val):
-						raise ValueError("Error in config file: value of {} does not match {}!".format(key, val))
+					if not re.fullmatch(val, base_dict[key]):
+						raise ValueError("Error in config file: value of '{}' ('{}') does not match '{}'!".format(key, base_dict[key], val))
 				else:
-					raise TypeError("Error in config file: value of {} should be a string! got: {}".format(key, val))
+					raise TypeError("Error in config file: value of '{}' should be a string! got: {}".format(key, base_dict[key]))
 			# if list
 			elif isinstance(val, list):
 				if isinstance(base_dict[key], list):
 					for item in base_dict[key]:
-						self._test_config_general({key: item}, check_dict)
+						self._test_config_general({key: item}, {key: val[0]})
 				else:
-					raise TypeError("Error in config file: value of {} should be a string! got: {}".format(key, val))
+					raise TypeError("Error in config file: value of '{}' should be a list! got: {}".format(key, base_dict[key]))
 			# if dict
 			elif isinstance(val, dict):
 			
-				# if number range
-				if len(val)==1 and list(val)[0] == "__num__":
-					if not isinstance(base_dict[key], (int, float)):
-						raise TypeError("Error in config file: value of {} must be a number!".format(key))
-					num_range = list(val.values())
-					assert len(num_range)==2
-					if num_range[0] and not base_dict[key] > num_range[0]: 
-						raise ValueError("Error in config file: value of {} must be >{}!".format(key, num_range[0]))
-					if num_range[1] and not base_dict[key] < num_range[1]: 
-						raise ValueError("Error in config file: value of {} must be <{}!".format(key, num_range[1]))	
-				# if option list
-				elif len(val)==1 and list(val)[0] == "__opt__":
-					options = list(val.values())[0]
-					error_num  = 0
-					for option in options:
-						try:
-							self._test_config_general(base_dict, option)
-						except (KeyError, ValueError, TypeError) as e:
-							if not re.match("Error in config file", str(e)):
-								raise
-							error_num += 1
-					if error_num == len(options):
-						raise ValueError("Error in config file: no valid option for {}! must be one of: {}".format(key, options))
-				else:
-					self._test_config_general(base_dict[key], val)
+					# if number range
+					if len(val)==1 and list(val)[0] == "__num__":
+						if not isinstance(base_dict[key], (int, float)):
+							raise TypeError("Error in config file: value of '{}' must be a number!".format(key))
+						num_range = list(val.values())[0]
+						assert len(num_range)==2
+						if num_range[0] and not base_dict[key] >= num_range[0]: 
+							raise ValueError("Error in config file: value of '{}' must be >{}!".format(key, num_range[0]))
+						if num_range[1] and not base_dict[key] <= num_range[1]: 
+							raise ValueError("Error in config file: value of '{}' must be <{}!".format(key, num_range[1]))
+					else:
+						for v_key, v_val in val.items():
+							# if option list (OR)
+							if v_key == "__opt__":
+								options, error_num = v_val, 0
+								for option in options:
+									try:
+										self._test_config_general(base_dict, {key: option})
+									except (KeyError, ValueError, TypeError) as err:
+										if not re.match("\"?Error in config file", str(err)):
+											raise
+										error_num += 1
+									except:
+										raise
+								if error_num == len(options):
+									raise ValueError("Error in config file: no valid option for '{}' ('{}')! "
+									                 "must be one of: {}".format(key, base_dict[key], options))
+							# otherwise (AND)
+							else:
+								if isinstance(base_dict[key], dict):
+									self._test_config_general(base_dict[key], {v_key: v_val})
+								else:
+									raise TypeError("Error in config file: value of '{}' must be a dict!".format(key))
 			
 		
 	def _set_input_choice(self, config):
@@ -277,8 +290,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 	required_wildcards_out_log = ["step", "extension", "sample", "name"]
 	required_wildcards_in      = ["sample", "name"]
 	
-	def __init__(self, config):
-		super().__init__(config)
+	def __init__(self, config, test_config=False):
+		super().__init__(config, test_config)
 		
 		self.samples    = config["sample_info"]
 		self.sample_ids = list(self.samples.keys())
@@ -468,8 +481,8 @@ class DEPipelinePathHandler(PipelinePathHandler):
 	required_wildcards_out_log = ["step", "extension", "contrast"]
 	required_wildcards_in      = ["step", "extension", "sample", "name"]
 	
-	def __init__(self, config):
-		super().__init__(config)
+	def __init__(self, config, test_config=False):
+		super().__init__(config, test_config)
 		
 		self.contrasts         = config["contrasts"]["contrast_list"]
 		self.contrast_defaults = config["contrasts"]["defaults"]
