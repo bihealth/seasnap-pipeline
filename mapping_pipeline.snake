@@ -30,7 +30,9 @@ if config["organism_defaults"]:
 	configfile: "mapping_config.yaml"
 
 # create path handler
-pph = MappingPipelinePathHandler(workflow)
+conf_ranges = str(SNAKEDIR / "defaults" / "mapping_config_ranges.yaml")
+test_config = conf_ranges if config["pipeline_param"]["test_config"] else None
+pph = MappingPipelinePathHandler(workflow, test_config)
 
 # link indices
 pph.link_index(step="star_index",             sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")

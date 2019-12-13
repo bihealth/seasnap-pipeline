@@ -15,7 +15,7 @@ pipeline_param:
 
 #---------------------------------------- organism annotation (needs to be set)
 organism_defaults:
-  __opt__: [null, \S+]
+  __opt__: [null, \S*]
 
 #---------------------------------------- information about experiment
 experiment:
@@ -38,6 +38,7 @@ filters:
 normalization:
   DESeq2_parameters:
     min_mu: {"__num__": [0, null]}
+  normalized_expression: vst|rld
 
 #---------------------------------------- description of contrasts
 contrasts:
@@ -68,17 +69,18 @@ contrasts:
 #---------------------------------------- report parameters
 report:
   defaults:
-    contrast: [\S+]
+    __any__: [\S+]
   report_snippets:
     - __opt__:
         - \S+
-        - contrast:
-            __opt__:
-              - .+
-              - __any__: [\S+]
-              -
-                - __opt__:
-                    - .+
-                    - __any__: [\S+]
+        - __any__:
+            - __opt__:
+                - \S+
+                - __any__:
+                    __opt__:
+                      - .+
+                      - __any__: [\S+]
+                      -
+                        - __opt__: [.+, {__any__: [\S+]}]
 
 

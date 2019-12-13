@@ -109,8 +109,11 @@ class PipelinePathHandler:
 						self._test_config_general(base_dict, {glob_key: val})
 			# if reference
 			elif key == "__any_other__":
-				ref_dict = self.test_config
-				for r_key in val.split(":"): ref_dict = ref_dict[r_key]
+				if isinstance(val, str):
+					ref_dict = self.test_config
+					for r_key in val.split(":"): ref_dict = ref_dict[r_key]
+				elif isinstance(val, dict):
+					ref_dict = val
 				for opt_key in ref_dict:
 					if opt_key in base_dict:
 						self._test_config_general(base_dict, {opt_key: ref_dict[opt_key]})
@@ -133,6 +136,14 @@ class PipelinePathHandler:
 						self._test_config_general({key: item}, {key: val[0]})
 				else:
 					raise TypeError("Error in config file: value of '{}' should be a list! got: {}".format(key, base_dict[key]))
+			# if None
+			elif val is None:
+				if base_dict[key] is not None:
+					raise TypeError("Error in config file: value of '{}' should be None! got: {}".format(key, base_dict[key]))
+			# if bool
+			elif isinstance(val, bool):
+				if not isinstance(base_dict[key], bool):
+					raise TypeError("Error in config file: value of '{}' should be bool! got: {}".format(key, base_dict[key]))
 			# if dict
 			elif isinstance(val, dict):
 			
@@ -143,10 +154,11 @@ class PipelinePathHandler:
 						num_range = list(val.values())[0]
 						assert len(num_range)==2
 						if num_range[0] and not base_dict[key] >= num_range[0]: 
-							raise ValueError("Error in config file: value of '{}' must be >{}!".format(key, num_range[0]))
+							raise ValueError("Error in config file: value of '{}' must be >={}!".format(key, num_range[0]))
 						if num_range[1] and not base_dict[key] <= num_range[1]: 
-							raise ValueError("Error in config file: value of '{}' must be <{}!".format(key, num_range[1]))
+							raise ValueError("Error in config file: value of '{}' must be <={}!".format(key, num_range[1]))
 					else:
+						others = {}
 						for v_key, v_val in val.items():
 							# if option list (OR)
 							if v_key == "__opt__":
@@ -163,12 +175,14 @@ class PipelinePathHandler:
 								if error_num == len(options):
 									raise ValueError("Error in config file: no valid option for '{}' ('{}')! "
 									                 "must be one of: {}".format(key, base_dict[key], options))
-							# otherwise (AND)
 							else:
-								if isinstance(base_dict[key], dict):
-									self._test_config_general(base_dict[key], {v_key: v_val})
-								else:
-									raise TypeError("Error in config file: value of '{}' must be a dict!".format(key))
+								others[v_key] = v_val
+						# others (AND)
+						if others:
+							if isinstance(base_dict[key], dict):
+								self._test_config_general(base_dict[key], others)
+							else:
+								raise TypeError("Error in config file: value of '{}' must be a dict!".format(key))
 			
 		
 	def _set_input_choice(self, config):

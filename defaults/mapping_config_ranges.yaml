@@ -1,0 +1,59 @@
+#---------------------------------------- general pipeline parameters
+pipeline_param:
+  out_path_pattern: \S+
+  log_path_pattern: \S+
+  in_path_pattern: \S+
+  
+  mapping_results:
+    - __opt__: [salmon-transcript_counts, star-gene_counts]
+  QC_results:
+    - __opt__: [fastqc, dupradar, infer_experiment, rna_seqc, qualimap]
+
+#---------------------------------------- organism annotation
+organism_defaults:
+  __opt__: [null, \S*]
+
+#---------------------------------------- parameters for rules
+rule_options:
+  star: 
+    cmd_opt: .*
+    trim: {__opt__: [true, false]}
+  star_index: 
+    cmd_opt: .*
+  salmon_index:
+    cmd_opt: .*
+  salmon: 
+    cmd_opt: .*
+    trim: {__opt__: [true, false]}
+  rna_seqc:
+    cmd_opt: .*
+
+#---------------------------------------- parameters for the report
+report:
+  multiqc:
+    title: .+
+    subtitle: .*
+    intro_text: .*
+    custom_logo: .*
+        
+#---------------------------------------- configuration for export
+export:
+  path_pattern: [\S+]
+  __any__:
+    - __opt__:
+        - files:
+            __any_other__:
+              step: \S+
+              extension: \S+
+              log: {__opt__: [true, false]}
+        - dir:
+            __any_other__:
+              step: \S+
+              log: {__opt__: [true, false]}
+      __any_other__:
+        compress:
+          __opt__: [zip, tar]
+
+
+
+

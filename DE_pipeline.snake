@@ -2,14 +2,8 @@
 ## version: 0.9.9
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
-
 #TODO: requested feature: different analyses (e.g. designs, sample sets) in one report -> options: modify config or merge reports
-
-#TODO: update documentation: report generation, rule development, templates, pictures, run pipeline
-#TODO: add snippet list to README
-
-#TODO: auto-check config values (branch patrick_dev), validation: https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation
-
+#TODO: auto-check config values, https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation
 
 import os, re, yaml, textwrap, pandas as pd
 from collections import OrderedDict

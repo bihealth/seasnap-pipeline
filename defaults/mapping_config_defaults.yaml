@@ -7,12 +7,16 @@ pipeline_param:
   
   # adjust which files to produce
   mapping_results:
-    - "salmon-transcript_counts"
-    - "star-gene_counts"
+    - salmon-transcript_counts
+    - star-gene_counts
   QC_results:
-    - "fastqc"
-    - "dupradar"
-    - "infer_experiment"
+    - fastqc
+    - dupradar
+    - infer_experiment
+    - qualimap
+    - infer_experiment
+    
+  test_config: true
 
 #---------------------------------------- organism annotation
 organism_defaults: null
