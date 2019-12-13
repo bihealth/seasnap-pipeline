@@ -80,13 +80,22 @@ def get_inputs_all():
 	if "fastqc" in qc_choices:
 		inputs += pph.expand_path("fastqc", "zip_names.txt")
 	if "star-gene_counts" in mapping_choices:
-		if "dupradar"         in qc_choices: inputs += pph.expand_path("dupradar", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		if "rna_seqc"         in qc_choices: inputs += pph.expand_path("rna_seqc", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		if "qualimap"         in qc_choices: 
+		if "dupradar"         in qc_choices: 
+			inputs += pph.expand_path("dupradar", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "rna_seqc"         in qc_choices: 
+			inputs += pph.expand_path("rna_seqc", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "preseq_lc_extrap" in qc_choices: 
+			inputs += pph.expand_path("preseq_lc_extrap", "future_yield.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "preseq_c_curve"   in qc_choices: 
+			inputs += pph.expand_path("preseq_c_curve", "complexity.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "qualimap_rnaseq"  in qc_choices: 
 			inputs += pph.expand_path("qualimap_rnaseq",  "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "qualimap_bamqc"   in qc_choices:
 			inputs += pph.expand_path("qualimap_bamqc",   "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		if "infer_experiment" in qc_choices: inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		if "qc"               in qc_choices: inputs += pph.expand_path("qc",               "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "infer_experiment" in qc_choices: 
+			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		if "qc"               in qc_choices: 
+			inputs += pph.expand_path("qc",               "done",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 
 	return inputs
 
@@ -476,6 +485,52 @@ rule infer_experiment:
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="infer_experiment", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+		
+##-------------------- preseq -------------------------------------------------------------------------------
+
+rule preseq_lc_extrap:
+	input:
+		bam = pph.file_path(step="star", extension="bam")
+	output:
+		pph.file_path(step="preseq_lc_extrap", extension="future_yield.txt")
+	log:
+		out = pph.file_path(step="preseq_lc_extrap", extension="output.log", log=True)
+	run:
+		paired   = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		preseq
+		
+		#----- infer experiment
+		preseq lc_extrap -v {paired} -B {input.bam} -o {output}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="preseq_lc_extrap", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+		
+rule preseq_c_curve:
+	input:
+		bam = pph.file_path(step="star", extension="bam")
+	output:
+		pph.file_path(step="preseq_c_curve", extension="complexity.txt")
+	log:
+		out = pph.file_path(step="preseq_c_curve", extension="output.log", log=True)
+	run:
+		paired   = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		preseq
+		
+		#----- infer experiment
+		preseq c_curve -v {paired} -B {input.bam} -o {output}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="preseq_c_curve", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 		
 ##-------------------- qualimap -----------------------------------------------------------------------------

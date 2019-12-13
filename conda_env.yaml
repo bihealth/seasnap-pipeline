@@ -33,6 +33,7 @@ dependencies:
   - rsem
   - rna-seqc
   - qualimap
+  - preseq
   - bedtools
   - subread
   - trimadap=r9

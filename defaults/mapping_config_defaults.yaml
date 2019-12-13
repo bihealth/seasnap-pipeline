@@ -13,8 +13,11 @@ pipeline_param:
     - fastqc
     - dupradar
     - infer_experiment
-    - qualimap
-    - infer_experiment
+    - qualimap_rnaseq
+    - qualimap_bamqc
+    - rna_seqc
+    - preseq_c_curve
+    - preseq_lc_extrap
     
   test_config: true
 
