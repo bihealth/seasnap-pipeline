@@ -705,7 +705,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 			warn("titles of contrasts defined in config are not unique! using last ID for each title")
 		return {contr["title"]: self.contrast_ids[i] for i,contr in enumerate(self.contrasts)}
 	
-	def file_path(self, step, extension, contrast="{contrast}", log=False, **kwargs):
+	def file_path(self, step, extension, contrast="{contrast}", log=False, path_pattern=None, **kwargs):
 		"""
 		Generate single path for intermediate and output or log files.
 		
@@ -713,6 +713,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		:param extension: file extension for the generated file path
 		:param contrast: contrast ID to be included in the file path
 		:param log: generate path to logfile if log==True otherwise generate path to output/intermediate file
+		:param path_pattern: explicitly set the path pattern (string)
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		path_pattern = self.log_path_pattern if log else self.out_path_pattern
@@ -1090,6 +1091,8 @@ class ReportTool(PipelinePathHandler):
 		
 		self.contrast_list = [contr["title"] for contr in config_dict["contrasts"]["contrast_list"]] if "contrasts" in config_dict else ""
 		
+		self.use_results = self._make_use_results_dict()
+		
 		# define substitutions for report generation
 		self.substitutions = {"__contrasts__": self.contrast_list}
 		
@@ -1097,6 +1100,18 @@ class ReportTool(PipelinePathHandler):
 	
 	
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
+	
+	def _make_use_results_dict(self):
+		merge_spec = config_dict["report"]["merge"]
+		if isinstance(merge_spec, str): merge_spec = [merge_spec]
+		if isinstance(merge_spec, list): merge_spec = {"__all__": [path for path in merge_spec]}
+		if isinstance(merge_spec, dict):
+			for k,v in merge_spec.items():
+				if isinstance(v, str): merge_spec[k] = [v]
+			merge_spec["__all__"].append(self.path_handler.out_path_pattern)
+		else:
+			merge_spec = {"__all__": [self.path_handler.out_path_pattern]}
+		return merge_spec
 		
 	def _split_template(self, template_text):
 		before, after = re.split(self.insert_pattern, template_text, maxsplit=1, flags=re.MULTILINE)
@@ -1121,6 +1136,18 @@ class ReportTool(PipelinePathHandler):
 		
 	def _rem_entry_heading_code(self, template_text):
 		return re.sub(self.entry_heading_pattern, "", template_text)
+		
+	def _insert_file_paths(self, text, path_pattern):
+		wildcards_orig = re.findall("{{([^{}]+)}}", text)
+		wildcards_prep = [rwo.replace(".","_") for rwo in wildcards_orig]
+		for rwo, rwp in zip(wildcards_orig, wildcards_prep):
+			text = text.replace(rwo, rwp)
+			parts = rwo.split("-")
+			if len(parts) == 2:
+				text = text.replace("{{"+rwp+"}}", self.path_handler.file_path(parts[0], parts[1], contrast = "all", path_pattern=path_pattern))
+			elif len(parts) == 3:
+				text = text.replace("{{"+rwp+"}}", self.path_handler.file_path(parts[0], parts[1], contrast = parts[2], path_pattern=path_pattern))
+		return text
 		
 	def _assemble_entries(self, entries, path, snippet_name, entry_heading_code):
 		""" assemble entry list (e.g. list of contrasts) """
@@ -1153,7 +1180,7 @@ class ReportTool(PipelinePathHandler):
 			
 		return "".join(entry_text)
 		
-	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("","")):
+	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("",""), results_path="__all__"):
 		""" assemble snippet list """
 		
 		snippet_text = []
@@ -1169,8 +1196,13 @@ class ReportTool(PipelinePathHandler):
 				snippet_cont = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_cont)
 				req_fields   = ["step","extension","contrast"]
 				
-				if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") )) )).exists() for req in requirements):
-					snippet_text.append(snippet_cont)
+				for i, res_pth in enumerate(self.use_results[results_path]):
+					if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=res_pth) )).exists() for req in requirements):
+						snippet_rep = snippet_cont.replace("file_tab", "file_tab_{}{}".format(results_path, i))
+						snippet_rep = snippet_rep.replace("config", "config_{}{}".format(results_path, i))
+						snippet_rep = self._insert_file_paths(snippet_rep, res_pth)
+						
+						snippet_text.append(snippet_rep)
 					
 			elif isinstance(snippet, dict):
 				assert len(snippet)==1
@@ -1180,6 +1212,9 @@ class ReportTool(PipelinePathHandler):
 				if snippet_key == "__list__":
 					# add list entries
 					snippet_text.append( self._assemble_entries(snippet_value, path, snippet_name, entry_heading_code) )
+				elif snippet_key in self.use_results:
+					add_txt = self._assemble_template(snippet_value,path,snippet_name,entry_heading_code,entry, results_path=snippet_key)
+					snippet_text.append(add_txt)
 				else:
 					# load template
 					sub_template_path  = path / snippet_key / (snippet_key + "_main_template.Rmd")
