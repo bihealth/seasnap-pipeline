@@ -69,17 +69,17 @@ def get_inputs_all():
 		
 	# mapping results
 	mapping_choices = config["pipeline_param"]["mapping_results"]
-	if "star-gene_counts" in mapping_choices:
+	if "star-gene_counts" in mapping_choices: 
 		inputs += pph.expand_path("star",           "bam",            flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		inputs += pph.expand_path("feature_counts", "feature_counts", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-	if "salmon-transcript_counts" in mapping_choices:
+	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		
 	# QC results
 	qc_choices = config["pipeline_param"]["QC_results"]
-	if "fastqc" in qc_choices:
+	if "fastqc" in qc_choices: 
 		inputs += pph.expand_path("fastqc", "zip_names.txt")
-	if "star-gene_counts" in mapping_choices:
+	if "star-gene_counts" in mapping_choices: 
 		if "dupradar"         in qc_choices: 
 			inputs += pph.expand_path("dupradar", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		if "rna_seqc"         in qc_choices: 
@@ -90,7 +90,7 @@ def get_inputs_all():
 			inputs += pph.expand_path("preseq_c_curve", "complexity.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		if "qualimap_rnaseq"  in qc_choices: 
 			inputs += pph.expand_path("qualimap_rnaseq",  "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		if "qualimap_bamqc"   in qc_choices:
+		if "qualimap_bamqc"   in qc_choices: 
 			inputs += pph.expand_path("qualimap_bamqc",   "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 		if "infer_experiment" in qc_choices: 
 			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
@@ -282,6 +282,8 @@ rule star:
 		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} \
 		     --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} {read_groups}
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
+		mv {params.outdir}/ReadsPerGene.out.tab {params.outdir}/{wildcards.sample}.ReadsPerGene.out.tab #for multiqc
+		mv {params.outdir}/Log.final.out {params.outdir}/{wildcards.sample}.Log.final.out #for multiqc
 		
 		#----- sort BAM (coordinate sort)
 		samtools sort -@ $(expr {threads} / 2) -m $(expr 10000 / {threads})M -T {params.outdir}/sort -o {output.bam} {params.outdir}/Aligned.out.bam
@@ -399,6 +401,8 @@ rule salmon:
 		#----- Salmon mapping
 		salmon quant --validateMappings -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
+		mv $(dirname {output.sf})/aux_info/meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
+		mv $(dirname {output.sf})/libParams/flenDist.txt $(dirname {output.sf})/libParams/{wildcards.sample}.flenDist.txt #for multiqc
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="salmon", extension="sh", **wildcards)
@@ -540,7 +544,8 @@ rule qualimap_rnaseq:
 		bam = pph.file_path(step="star", extension="bam"),
 		gtf = config["organism"]["files"]["gtf"]
 	output:
-		touch(pph.file_path(step="qualimap_rnaseq", extension="done"))
+		outdir = directory(pph.file_path(step="qualimap_rnaseq", extension="results")),
+		done   = touch(pph.file_path(step="qualimap_rnaseq", extension="done"))
 	log:
 		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
 	resources:
@@ -554,7 +559,8 @@ rule qualimap_rnaseq:
 		set -eux
 		
 		#----- rna-seqc
-		qualimap --java-mem-size={resources.mem_mb}M rnaseq -bam {input.bam} -gtf {input.gtf} -outdir $(dirname {output}) -p {protocol} {paired}
+		qualimap --java-mem-size={resources.mem_mb}M rnaseq -bam {input.bam} -gtf {input.gtf} -outdir {output.outdir} -p {protocol} {paired}
+		find {output.outdir} -name "*.txt" -exec sh -c 'mv "{{}}" $(dirname "{{}}")/{wildcards.sample}_$(basename "{{}}")' \;
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="qualimap_rnaseq", extension="sh", **wildcards)
@@ -564,7 +570,8 @@ rule qualimap_bamqc:
 	input:
 		bam = pph.file_path(step="star", extension="bam")
 	output:
-		touch(pph.file_path(step="qualimap_bamqc", extension="done"))
+		outdir = directory(pph.file_path(step="qualimap_bamqc", extension="results")),
+		done   = touch(pph.file_path(step="qualimap_bamqc", extension="done"))
 	log:
 		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
 	resources:
@@ -577,7 +584,8 @@ rule qualimap_bamqc:
 		set -eux
 		
 		#----- rna-seqc
-		qualimap --java-mem-size={resources.mem_mb}M bamqc -bam {input.bam} -outdir $(dirname {output}) -c -ip -p {protocol}
+		qualimap --java-mem-size={resources.mem_mb}M bamqc -bam {input.bam} -outdir {output.outdir} -c -ip -p {protocol}
+		find {output.outdir} -name "*.txt" -exec sh -c 'mv "{{}}" $(dirname "{{}}")/{wildcards.sample}_$(basename "{{}}")' \;
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="qualimap_bamqc", extension="sh", **wildcards)
