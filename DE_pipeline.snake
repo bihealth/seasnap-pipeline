@@ -566,39 +566,43 @@ rule report:
 	output:
 		pph.file_path("report", "Rmd", contrast = "all")
 	run:
-		file_table  = pph.file_path("report", "tsv", contrast = "all")
-		pph.log_generated_files(save_to = file_table)
-		
-		rt = ReportTool(pph, id_dicts={"contrast": pph.get_contrast_id_dict()})
+		rt = ReportTool(pph)
 		report_text = rt.generate_report()
+
+		for result_path in (path for paths in rt.use_results.values() for path in paths):
+			file_table  = pph.file_path("report", "tsv", contrast="all", path_pattern=result_path)
+			pph.log_generated_files(save_to = file_table)
 		
 		# switch single and double braces
-		report_text = report_text.replace("{","{{").replace("}","}}")
-		report_text = report_text.replace("{{{{","{").replace("}}}}","}")
+		#report_text = report_text.replace("{","{{").replace("}","}}")
+		#report_text = report_text.replace("{{{{","{").replace("}}}}","}")
 		
 		# fill in wildcards
-		report_wildcards_orig = re.findall("(?<!{){([^{}]+)}(?!})", report_text)
-		report_wildcards_prep = [rwo.replace(".","_") for rwo in report_wildcards_orig]
-		format_dict = {}
-		for rwo, rwp in zip(report_wildcards_orig, report_wildcards_prep):
-			report_text = report_text.replace(rwo, rwp)
-			parts = rwo.split("-")
-			if len(parts) == 2:
-				format_dict[rwp] = pph.file_path(parts[0], parts[1], contrast = "all")
-			elif len(parts) == 3:
-				format_dict[rwp] = pph.file_path(parts[0], parts[1], contrast = parts[2])
-			else:
-				format_dict[rwp] = "{" + rwp + "}"
+		#report_wildcards_orig = re.findall("(?<!{){([^{}]+)}(?!})", report_text)
+		#report_wildcards_prep = [rwo.replace(".","_") for rwo in report_wildcards_orig]
+		#format_dict = {}
+		#for rwo, rwp in zip(report_wildcards_orig, report_wildcards_prep):
+		#	report_text = report_text.replace(rwo, rwp)
+		#	parts = rwo.split("-")
+		#	if len(parts) == 2:
+		#		format_dict[rwp] = pph.file_path(parts[0], parts[1], contrast = "all")
+		#	elif len(parts) == 3:
+		#		format_dict[rwp] = pph.file_path(parts[0], parts[1], contrast = parts[2])
+		#	else:
+		#		format_dict[rwp] = "{" + rwp + "}"
 					
-		format_dict["WORKING_DIRECTORY"] = os.getcwd() + os.sep
-		format_dict["R_COMMON"]          = str(rt.report_snippet_base_dir/"R_common")
-		format_dict["FILE_TABLE"]        = file_table
+		#format_dict["WORKING_DIRECTORY"] = os.getcwd() + os.sep
+		#format_dict["R_COMMON"]          = str(rt.report_snippet_base_dir/"R_common")
+		#format_dict["FILE_TABLE"]        = file_table
 		
-		report_text = report_text.format(**format_dict)
-		report_text = report_text.replace("{{","{").replace("}}","}")
+		#report_text = report_text.format(**format_dict)
+		#report_text = report_text.replace("{{","{").replace("}}","}")
+
+		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
+		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"R_common"))
+		report_text = report_text.replace("{{FILE_TABLE}}", file_table)
 		
-		with open(output[0], "w") as f:
-			f.write(report_text)
+		with open(output[0], "w") as f: f.write(report_text)
 
 
 
