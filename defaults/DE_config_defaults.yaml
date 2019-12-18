@@ -57,7 +57,7 @@ contrasts:
 
 #---------------------------------------- report parameters
 report:
-  merge: null
+  #merge: null
   snippet_parameters:
     Normalisation_QC:
       n_most_varying: 500

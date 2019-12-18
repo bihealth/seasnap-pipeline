@@ -70,17 +70,5 @@ contrasts:
 report:
   defaults:
     __any__: [\S+]
-  report_snippets:
-    - __opt__:
-        - \S+
-        - __any__:
-            - __opt__:
-                - \S+
-                - __any__:
-                    __opt__:
-                      - .+
-                      - __any__: [\S+]
-                      -
-                        - __opt__: [.+, {__any__: [\S+]}]
 
 

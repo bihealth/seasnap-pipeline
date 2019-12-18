@@ -720,7 +720,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		:param path_pattern: explicitly set the path pattern (string)
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
-		path_pattern = self.log_path_pattern if log else self.out_path_pattern
+		if not path_pattern: path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, contrast=contrast, **kwargs_out)
 	
@@ -750,24 +750,26 @@ class DEPipelinePathHandler(PipelinePathHandler):
 					paths.append(self.file_path(step, extension, contrast=contr, **kwargs_out, **kwargs_ch))
 		return paths
 		
-	def log_generated_files(self, save_to="", **kwargs):
+	def log_generated_files(self, save_to="", path_pattern=None, **kwargs):
 		"""
 		Scan all generated output/intermediate files and list them in a file with their corresponding wildcard values.
 		This file can be used e.g. by the pipeline Rmd report to identify paths to files without the handler.
 		"""
-		input_files = iglob(re.sub("{[^}./]+}",   "*", self.out_path_pattern))
-		wildcards   =   re.findall("{([^}./]+)}",      self.out_path_pattern)
+		if not path_pattern: path_pattern = self.out_path_pattern
+		
+		input_files = iglob(re.sub("{[^}./]+}",   "*", path_pattern))
+		wildcards   =   re.findall("{([^}./]+)}",      path_pattern)
 			
 		table_cols = {w:[] for w in wildcards}
 		table_cols["filename"] = []
 		for inp in input_files:
 			table_cols["filename"].append(inp)
-			self._get_wildcard_values_from_file_path(inp, self.out_path_pattern, wildc_val=table_cols)
+			self._get_wildcard_values_from_file_path(inp, path_pattern, wildc_val=table_cols)
 		assert all([len(val)==len(table_cols["filename"]) for val in table_cols.values()])
 		
 		table = pd.DataFrame(table_cols)
 		if not save_to:
-			save_to = self.file_path(step="DEPipelinePathHandler", extension="tsv", contrast="all", **kwargs)
+			save_to = self.file_path(step="DEPipelinePathHandler", extension="tsv", contrast="all", path_pattern=path_pattern, **kwargs)
 		table.to_csv(save_to, sep="\t", index=False)
 
 
@@ -1093,30 +1095,29 @@ class ReportTool(PipelinePathHandler):
 		
 		self.report_snippet_defaults      = config_dict["report"]["defaults"]
 		
-		self.contrast_list = [contr["title"] for contr in config_dict["contrasts"]["contrast_list"]] if "contrasts" in config_dict else ""
-		
-		self.use_results = self._make_use_results_dict()
+		self.use_results = self._make_use_results_dict(config_dict)
+		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
 		
 		# define substitutions for report generation
-		self.substitutions = {"__contrasts__": self.get_contrast_id_dict}
+		self.substitutions = {"__contrasts__": self.path_handler.get_contrast_id_dict}
 		
 		self._contr_id_cache = {}
 	
 	
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
 	
-	def _make_use_results_dict(self):
+	def _make_use_results_dict(self, config_dict):
 		""" unify different definitions of the merge specification; it can be str, list, dict """
-		merge_spec = config_dict["report"]["merge"]
+		merge_spec = config_dict["report"]["merge"] if "merge" in config_dict["report"] else None
 		if isinstance(merge_spec, str): merge_spec = [merge_spec]
-		if isinstance(merge_spec, list): merge_spec = {"_analysis_": [path for path in merge_spec]}
+		if isinstance(merge_spec, list): merge_spec = {"analysis": [path for path in merge_spec]}
 		if isinstance(merge_spec, dict):
 			for k,v in merge_spec.items():
 				if isinstance(v, str): merge_spec[k] = [v]
-			merge_spec["_analysis_"].append(self.path_handler.out_path_pattern)
+			if "analysis" not in merge_spec: merge_spec["analysis"] = []
+			merge_spec["analysis"].insert(0, self.path_handler.out_path_pattern)
 		else:
-			merge_spec = {"_analysis_": [self.path_handler.out_path_pattern]}
-		for i,path in enumerate(merge_spec["_analysis_"]): merge_spec["_analysis_"+i] = [path]
+			merge_spec = {"analysis": [self.path_handler.out_path_pattern]}
 		return merge_spec
 		
 	def _split_template(self, template_text):
@@ -1131,7 +1132,7 @@ class ReportTool(PipelinePathHandler):
 					config_dict = yaml.safe_load(stream)
 				except yaml.YAMLError as exc:
 					print(exc)
-			id_dict = {"contrast": self.get_contrast_id_dict(config_dict["contrasts"]["contrast_list"])}
+			id_dict = {"contrast": self.path_handler.get_contrast_id_dict(config_dict["contrasts"]["contrast_list"])}
 			self._contr_id_cache[path] = id_dict
 		return self._contr_id_cache[path]
 		
@@ -1168,10 +1169,21 @@ class ReportTool(PipelinePathHandler):
 				text = text.replace("{{"+rwp+"}}", self.path_handler.file_path(parts[0], parts[1], contrast = parts[2], path_pattern=path_pattern))
 		return text
 		
+	def get_id_suffix(self, tag, num):
+		if len(self.use_results[tag])==1 and tag!="analysis": num=""
+		ana_id_var = "_{}{}".format(tag, num) if self.merge_mode else ""
+		ana_id_tit = " -- {}{}".format(tag, num) if self.merge_mode else ""
+		return (ana_id_var, ana_id_tit)
+	
 	def _edit_template(self, text, path_pattern, tag, num):
-		text = text.replace("file_tab", "file_tab_{}{}".format(tag, num))
-		text = text.replace("config", "config_{}{}".format(tag, num))
+		ana_id_var, ana_id_tit = self.get_id_suffix(tag, num)
+		text = text.replace("file_tab", "file_tab{}".format(ana_id_var))
+		text = text.replace("config", "config{}".format(ana_id_var))
+		text = re.sub("#+ [^{\n]+", "\g<0>{} ".format(ana_id_tit), text, count=1)
+		text = re.sub("{ ?r +[^,} ]+", "\g<0>{}".format(ana_id_var), text)
 		return self._insert_file_paths(text, path_pattern)
+		
+	#-------------------------------------------------- recursive assembly --------------------------------------------------#
 		
 	def _assemble_entries(self, entries, path, snippet_name, entry_heading_code, results_key):
 		""" assemble entry list (e.g. list of contrasts) """
@@ -1205,7 +1217,7 @@ class ReportTool(PipelinePathHandler):
 			
 		return "".join(entry_text)
 		
-	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("",""), results_key=(-1,"_analysis_")):
+	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("",""), results_key=(-1,"analysis")):
 		""" assemble snippet list """
 		
 		snippet_text = []
@@ -1221,7 +1233,7 @@ class ReportTool(PipelinePathHandler):
 				snippet_cont = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_cont)
 				req_fields   = ["step","extension","contrast"]
 				
-				for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or tup[0]<0):
+				for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 					if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
 						snippet_cont = self._insert_entry_name(snippet_cont, entry, results_path)
 						snippet_text.append(self._edit_template(snippet_cont, results_path, results_key[1], i))
@@ -1233,9 +1245,10 @@ class ReportTool(PipelinePathHandler):
 				
 				if snippet_key == "__list__":
 					# add list entries
-					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or tup[0]<0):
+					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 						snippet_text.append( self._assemble_entries(snippet_value, path, snippet_name, entry_heading_code, results_key=(i,results_key[1])) )
 				elif snippet_key in self.use_results:
+					if not isinstance(snippet_value, list): snippet_value = [snippet_value]
 					add_txt = self._assemble_template(snippet_value,path,snippet_name,entry_heading_code,entry, results_key=(-1,snippet_key))
 					snippet_text.append(add_txt)
 				else:
@@ -1247,7 +1260,7 @@ class ReportTool(PipelinePathHandler):
 					sub_template_text  = self._rem_entry_heading_code(sub_template_text)
 					
 					# add sub-section
-					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or tup[0]<0):
+					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 						temp_begin, temp_end = self._split_template(self._edit_template(sub_template_text, results_path, results_key[1], i))
 						
 						sub_section_text = self._assemble_template(snippet_value, path/snippet_key, snippet_key, entry_heading_code, entry, results_key=(i,results_key[1]))	
