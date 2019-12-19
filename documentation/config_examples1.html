@@ -221,7 +221,7 @@ summary {
     - contrast:
         - __list__: __contrasts__
   defaults:
-    contrast:
+    contrast_list:
       - Init_code.Rmd
       - MA_plot.Rmd
       - Result_table.Rmd</code></pre>
@@ -231,7 +231,7 @@ summary {
 <li>PCA_plot.Rmd</li>
 <li>SampleSimilarity_plot.Rmd</li>
 </ul>
-<p>Then, the pipeline will create a section “contrast” and add sub-sections for all (special keyword <code>__list__</code>) contrasts (special keyword <code>__contrast__</code>) defined in the config file. For each contrast, report snippets will be added in this order defined under <code>defaults: contrast:</code>:</p>
+<p>Then, the pipeline will create a section “contrast” and add sub-sections for all (special keyword <code>__list__</code>) contrasts (special keyword <code>__contrast__</code>) defined in the config file. For each contrast, report snippets will be added in this order defined under <code>defaults: contrast_list:</code>:</p>
 <ul>
 <li>Init_code.Rmd</li>
 <li>MA_plot.Rmd</li>
@@ -250,11 +250,58 @@ summary {
         - &quot;B vs C&quot;:
           - Result_table.Rmd
   defaults:
-    contrast:
+    contrast_list:
       - Init_code.Rmd
       - MA_plot.Rmd
       - Result_table.Rmd</code></pre>
 <p>Here, for the contrast “B vs C” the default snippet list is overwritten and only the snippet “Result_table.Rmd” is used.</p>
+<p>Defaults for list entries (created by <code>__list__</code>) have the suffix <code>_list</code>. Defaults for <em>blocks</em> can also be defined and have no suffix. This definition would be equivalent to the previous example:</p>
+<pre><code>report:
+  report_snippets:
+    - Covariate_table.Rmd
+    - PCA_plot.Rmd
+    - SampleSimilarity_plot.Rmd
+    - contrast: __defaults__
+  defaults:
+    contrast_list:
+      - Init_code.Rmd
+      - MA_plot.Rmd
+      - Result_table.Rmd
+    contrast:
+      - __list__:
+        - &quot;A vs C&quot;
+        - &quot;B vs C&quot;:
+          - Result_table.Rmd</code></pre>
+<p>Here, <code>contrast: __defaults__</code> would load <code>contrast:</code> from the defaults. There, in turn, via <code>__list__</code> the defaults from <code>contrast_list:</code> would be loaded for the entry “A vs C”.</p>
+<p>Note: <em>blocks</em> do not have to contain a <code>__list__</code>, they may simply be groups of snippets that are inserted under a common subsection.</p>
+<p>Tip: when configuring the report, it can be helpful to copy, paste and edit the report configuration from the <a href="../defaults/DE_config_defaults.yaml">default yaml file</a>.</p>
+</div>
+<div id="merging-reports-of-several-analyses" class="section level3">
+<h3>Merging reports of several analyses</h3>
+<p>You might want to perform different analyses of the same data, using e.g. different design formulas or filtering. To this end, it is possible to create a merged report of several analyses.</p>
+<p>Assume for example that results were stored using these two <code>out_path_patterns</code>:</p>
+<pre><code>previous_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}
+current_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}</code></pre>
+<p>If the second path pattern is the current path pattern, you may add the results of the first analysis to its report with the line:</p>
+<pre><code>report:
+  merge: previous_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}
+  report_snippets: ...
+  defaults: ...</code></pre>
+<p>Then all snippets will be inserted twice, alternating between results of the two analyses. Tags will be added to the sections: “– analysis0” for the current analysis and “– analysis1” for the added analysis. Suffixes “_analysis&lt;x&gt;&quot; will also be added to relevant variables in the report, to load and use the corresponding config files and lists of generated results files. Therefore, if you wish to replace the tag in the section names, do a replace with e.g. “– analysis0” by “– &lt;my title&gt;” including the “–”.</p>
+<p>The value of merge can also be a <em>list</em> or a <em>dict</em>. Especially if you don’t need all snippets inserted twice, you can then select which ones to add:</p>
+<pre><code>report:
+  merge:
+    pre_analysis: previous_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}
+  report_snippets:
+    - Covariate_table.Rmd
+    - PCA_plot.Rmd
+    - SampleSimilarity_plot.Rmd
+    - contrast: __defaults__
+    - pre_analysis:
+        contrast: __defaults__</code></pre>
+<p>Here, only the section contrast is added twice to the report, once with the tag <em>analysis0</em> for the current analysis and once with the tag <em>pre_analysis</em> for the previous analysis. In general, the value of merge can be a dictionary with multiple keys and either strings or lists as values.</p>
+<p><strong>Note: using tags like <code>pre_analysis:</code> inside of blocks like <code>contrast:</code> is not recommended, since some global variables might be defined there, that are used across different snippets. The values of such variables might differ between analyses, though.</strong></p>
+<p><em>Note: combining path patterns with differing wildcards in one report was not tested yet and might result in error messages.</em></p>
 <hr />
 <p><a href="../run_DE.md">Back</a> to run DE.</p>
 </div>
