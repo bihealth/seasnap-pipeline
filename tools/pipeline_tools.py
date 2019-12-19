@@ -1197,10 +1197,11 @@ class ReportTool(PipelinePathHandler):
 			if type(entry) is str:
 			
 				entry_name = entry
-				if snippet_name not in self.report_snippet_defaults:
+				snippet_list_defaults = snippet_name + "_list"
+				if snippet_list_defaults not in self.report_snippet_defaults:
 					raise KeyError("Error compiling report snippets for {snip} {entr}! (no snippets provided and "
-							"key {snip} not found in config defaults)".format(snip=snippet_name, entr=entry))
-				sub_snippet_list = self.report_snippet_defaults[snippet_name]
+							"key {snip} not found in config defaults)".format(snip=snippet_list_defaults, entr=entry))
+				sub_snippet_list = self.report_snippet_defaults[snippet_list_defaults]
 				
 			elif isinstance(entry, dict):
 			
@@ -1223,6 +1224,7 @@ class ReportTool(PipelinePathHandler):
 		snippet_text = []
 		
 		# add snippets
+		if type(snippet_list) is str: snippet_list = self.report_snippet_defaults[snippet_name] if snippet_list=="__defaults__" else [snippet_list]
 		for snippet in snippet_list:
 			if type(snippet) is str:
 				

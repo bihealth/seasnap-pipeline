@@ -63,21 +63,23 @@ report:
       n_most_varying: 500
       annotation_columns: [ "group" ]
   defaults:
+    NormalisationQC:
+      - PCA_plot.Rmd
+      - HierarchicalClustering_plot.Rmd
+      - SampleSimilarity_plot.Rmd
+      - NormExprDens_plot.Rmd
+      - DESeq2Norm_plot.Rmd
+      - CoxOutlier_plot.Rmd
     contrast:
+      - __list__: __contrasts__
+    contrast_list:
       - Init_code.Rmd
       - MA_plot.Rmd
       - Result_table.Rmd
       - Goseq_GO_table.Rmd
   report_snippets:
     - Covariate_table.Rmd
-    - NormalisationQC:
-        - PCA_plot.Rmd
-        - HierarchicalClustering_plot.Rmd
-        - SampleSimilarity_plot.Rmd
-        - NormExprDens_plot.Rmd
-        - DESeq2Norm_plot.Rmd
-        - CoxOutlier_plot.Rmd
-    - contrast:
-        - __list__: __contrasts__
+    - NormalisationQC: __defaults__
+    - contrast: __defaults__
 
 

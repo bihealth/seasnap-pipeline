@@ -66,9 +66,5 @@ contrasts:
         - vector: [{"__num__": [-1, 1]}]
       __any_other__: "contrasts:defaults"
 
-#---------------------------------------- report parameters
-report:
-  defaults:
-    __any__: [\S+]
 
 
