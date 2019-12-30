@@ -678,6 +678,23 @@ class DEPipelinePathHandler(PipelinePathHandler):
 			
 	def _make_contrast_id(self, contrast_title, index):
 		return self._make_name(contrast_title) + "_ID{}".format(index)
+		
+	@staticmethod
+	def _check_dict_set(check_dict, set_val):
+		try:
+			if isinstance(set_val, dict):
+				tmp_d = check_dict
+				all_set = True
+				for k,v in set_val.items():
+					tmp_d = tmp_d[k]
+					all_set = all_set and DEPipelinePathHandler._check_dict_set(tmp_d, v)
+				return all_set
+			else:
+				return check_dict == set_val
+		except KeyError:
+			return False
+		except:
+			raise
 			
 			
 	#-------------------------------------------- methods used in snakemake file --------------------------------------------#
@@ -741,7 +758,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 				for choice_comb in itertools.product(*[self.input_choice[eic] for eic in expand_input_choices])]
 		
 		paths = []
-		for contr in (c_id for i, c_id in enumerate(self.contrast_ids) if any({k:v}==if_set for k,v in self.contrasts[i].items()) or not if_set):
+		for contr in (c_id for i, c_id in enumerate(self.contrast_ids) if any(self._check_dict_set({k:v}, if_set) for k,v in self.contrasts[i].items()) or not if_set):
 			if not expand_input_choices:
 				paths.append(self.file_path(step, extension, contrast=contr, **kwargs_out))
 			else:

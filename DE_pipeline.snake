@@ -482,7 +482,7 @@ rule contrast:
 ##-------------------- functional annotation ----------------------------------------------------------------
 
 rule goseq:
-	""" functional annotation with goseq producing GO and KEGG lists """
+	""" over-representation analysis (ORA) with goseq producing GO and KEGG lists """
 	input:
 		txdb = pph.file_path("TxDb_from_GTF", "sqlite", contrast = "all"),
 		res  = pph.file_path("contrast", "rds")
@@ -548,6 +548,79 @@ rule goseq:
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="goseq", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+	
+	
+rule cluster_profiler:
+	""" gene set enrichment analysis (GSEA) or over-representation analysis (ORA) with cluster profiler for MSigDb"""
+	input:
+		res  = pph.file_path("contrast", "rds")
+	output:
+		pph.file_path(step = "cluster_profiler", extension = "rds")
+	log:
+		out           = pph.file_path(step = "cluster_profiler", extension = "output.log",    log=True),
+		contrast_yaml = pph.file_path(step = "cluster_profiler", extension = "contrast.yaml", log=True)
+	params:
+		annot_pkg = config["organism"]["R"]["annotations"],
+		genus = config["organism"]["genus"],
+		fit_pwf   = pph.file_path(step = "goseq", extension = "pwf_fit.pdf")
+	run:
+		contrast = pph.get_contrast(wildcards.contrast)
+		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		
+		fdr_threshold = contrast["GO"]["fdr_threshold"]
+		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
+		
+		if "category" in contrast["cluster_profiler"]:
+			category = 'c({})'.format(", ".join(contrast["cluster_profiler"]["category"]))
+		else:
+			category = 'c("H","C1","C2","C3","C4","C5","C6","C7")'
+		type = contrast["cluster_profiler"]["type"] if "type" in contrast["cluster_profiler"] else "gsea"
+		
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(clusterProfiler)
+		library(GenomicFeatures)
+		library(AnnotationDbi)
+		library({params.annot_pkg})
+		library(msigdbr)
+		library(dplyr)
+		
+		{R_SESSION_INFO}
+		
+		#----- load results
+		res <- readRDS("{input.res}")
+		
+		#----- gene list GSEA
+		geneList_gsea <- res$log2FoldChange[!is.na(res$entrez)]
+		names(geneList_gsea) <- as.character(res$entrez)
+		geneList_gsea <- sort(geneList_gsea, decreasing = TRUE)
+		
+		#----- gene list ORA
+		geneList_ora <- res$entrez[res$padj < {fdr_threshold}]
+		geneList_ora <- geneList_ora[!is.na(geneList_ora)]
+		geneList_ora <- as.character(geneList_ora)
+		
+		#----- load MSigDb gene set and run cluster_profiler
+		categories <- {categories}
+		cat_tests <- vector("list", length(categories))
+		for (i in 1:length(categories)){{
+			msigdb_cat <- categories[i]
+			msigdb_gs <- msigdbr(species = "{params.genus}", category = msigdb_cat) %>%
+			   dplyr::select(gs_name, entrez_gene)
+			if ({type} == "gsea"){{
+				em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
+			}} else {{
+				em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
+			}}
+			cat_tests[i] <- em
+		}}
+		
+		#----- save as rds
+		saveRDS(cat_tests, file="{output}")
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="cluster_profiler", extension="R", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 		
