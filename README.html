@@ -235,7 +235,7 @@ summary {
 <p><strong>set up a working directory</strong></p>
 <p>Set up a working directory to store the results produced by the pipeline. (For CUBI projects create a project directory in the cluster under <code>/fast/groups/cubi/projects/</code>). To create a directory and copy required files for the configuration of your pipeline run:</p>
 <pre><code>path/to/git/sea-snap.py working_dir</code></pre>
-<p>This will create a directory at the location from where you are running the command called <code>results_&lt;year&gt;_&lt;month&gt;_&lt;day&gt;/</code> and add config files for both pipelines, but you can customize this behaviour via the command line options (type <code>sea-snap.py working_dir -h</code> for help). Directory names you provide can include formatting instructions for pythons <a href="https://docs.python.org/3/library/time.md#time.strftime"><code>time</code></a> package.</p>
+<p>This will create a directory at the location from where you are running the command called <code>results_&lt;year&gt;_&lt;month&gt;_&lt;day&gt;/</code> and add config files for both pipelines, but you can customize this behaviour via the command line options (type <code>sea-snap.py working_dir -h</code> for help). Directory names you provide can include formatting instructions for pythons <a href="https://docs.python.org/3/library/time.html#time.strftime"><code>time</code></a> package.</p>
 <p><code>cd &lt;dir_name&gt;</code> to the newly created working directory. SeA-SnaP also creates a symbolic link to the sea-snap.py script, so that you can from now on use <code>./sea-snap</code> to run helpers or pipelines from the working directory. You should always run pipelines and helpers from there.</p>
 <hr />
 <p><strong>run the pipeline</strong></p>
