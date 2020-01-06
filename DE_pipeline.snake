@@ -61,8 +61,10 @@ def get_inputs_all():
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	
 	#functional annotation
-	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) )),
+	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
+	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
+	
 	
 	return inputs
 
@@ -556,14 +558,15 @@ rule cluster_profiler:
 	input:
 		res  = pph.file_path("contrast", "rds")
 	output:
-		pph.file_path(step = "cluster_profiler", extension = "rds")
+		rds = pph.file_path(step = "cluster_profiler", extension = "rds"),
+		csv = directory(pph.file_path(step = "cluster_profiler", extension = "csv"))
 	log:
 		out           = pph.file_path(step = "cluster_profiler", extension = "output.log",    log=True),
 		contrast_yaml = pph.file_path(step = "cluster_profiler", extension = "contrast.yaml", log=True)
 	params:
 		annot_pkg = config["organism"]["R"]["annotations"],
 		genus = config["organism"]["genus"],
-		fit_pwf   = pph.file_path(step = "goseq", extension = "pwf_fit.pdf")
+		csv_basename = "category_"
 	run:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
@@ -572,10 +575,10 @@ rule cluster_profiler:
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
 		
 		if "category" in contrast["cluster_profiler"]:
-			category = 'c({})'.format(", ".join(contrast["cluster_profiler"]["category"]))
+			categories = 'c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["category"]))
 		else:
-			category = 'c("H","C1","C2","C3","C4","C5","C6","C7")'
-		type = contrast["cluster_profiler"]["type"] if "type" in contrast["cluster_profiler"] else "gsea"
+			categories = 'c("H","C1","C2","C3","C4","C5","C6","C7")'
+		test_type = contrast["cluster_profiler"]["type"] if "type" in contrast["cluster_profiler"] else "gsea"
 		
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -592,8 +595,9 @@ rule cluster_profiler:
 		res <- readRDS("{input.res}")
 		
 		#----- gene list GSEA
-		geneList_gsea <- res$log2FoldChange[!is.na(res$entrez)]
-		names(geneList_gsea) <- as.character(res$entrez)
+		use_entries <- !is.na(res$entrez)
+		geneList_gsea <- res$log2FoldChange[use_entries]
+		names(geneList_gsea) <- as.character(res$entrez[use_entries])
 		geneList_gsea <- sort(geneList_gsea, decreasing = TRUE)
 		
 		#----- gene list ORA
@@ -608,16 +612,21 @@ rule cluster_profiler:
 			msigdb_cat <- categories[i]
 			msigdb_gs <- msigdbr(species = "{params.genus}", category = msigdb_cat) %>%
 			   dplyr::select(gs_name, entrez_gene)
-			if ({type} == "gsea"){{
+			if ("{test_type}" == "gsea"){{
 				em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
 			}} else {{
 				em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
 			}}
 			cat_tests[i] <- em
 		}}
+		names(cat_tests) <- {categories}
 		
-		#----- save as rds
-		saveRDS(cat_tests, file="{output}")
+		#----- save as rds & csv
+		saveRDS(cat_tests, file="{output.rds}")
+		dir.create("{output.csv}")
+		for (c in names(cat_tests)){{
+			write.table(data.frame(cat_tests[[c]]), file=paste0("{output.csv}/{params.csv_basename}",c,".csv"), sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+		}}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="cluster_profiler", extension="R", **wildcards)
