@@ -544,7 +544,9 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					if "mate" not in kwargs_filled: kwargs_filled["mate"] = "*"
 					pattern = self.in_path_pattern.format(sample=wildcards.sample, **kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
 				pattern_list.append(pattern)
-		return [path for pat in pattern_list for path in iglob(pat, recursive=True)]
+		paths = [path for pat in pattern_list for path in iglob(pat, recursive=True)]
+		paths.sort()
+		return paths
 		
 	def file_path(self, step, extension, sample="{sample}", log=False, **kwargs):
 		"""
