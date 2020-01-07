@@ -34,7 +34,7 @@ Config options
 | \|---`in_path_pattern`      | path pattern for input files. Wildcards can be used inside braces `{...}`.<br>Available wildcards mapping: `{sample}`, `{mate}`, `{batch}`, `{flowcell}`, `{lane}`, `{library}`<br>Available wildcards DE: same as `out_path_pattern` for mapping<br>*default mapping: `../input/{sample}/{sample}.{mate}`*<br>*default DE: `mapping/{step}/{sample}.{mate}/out/{step}.{sample}.{mate}.{extension}`* |
 | \|---`report_snippets`      | directory containing Rmd snippets; *default: `SeA-SnaP/report/`*                  |
 | \|---`input_choice:`        | (set choices for the `choose_input()` path handler method)                        |
-| ...\|---`mapping`           | For DE: list of rules to use as an input for `DESeq2`; first entry used if no wildcard `{mapping}` was set in the `out_path_pattern`<br>Options: `"import_gene_counts"` for input from STARs gene counts, `"import_sf"` for input from Salmon sf files |
+| ...\|---`mapping`           | For DE: list of rules to use as an input for `DESeq2`; first entry used if no wildcard `{mapping}` was set in the `out_path_pattern`<br>Options: `"import_gene_counts"` for input from STARs gene counts, `import_featurecounts` for input from FeatureCounts and `"import_sf"` for input from Salmon sf files |
 
 ### mapping pipeline
 
@@ -84,6 +84,10 @@ Config options
 | ......\|---`coef`           | alt. to `ratio`; the coefficient of DESeq2 results, e.g. "condition_classical_vs_nonclassical" |
 | ......\|---`vector`         | alt. to `ratio`; a list with entries corresponding to columns in the design matrix, defining the linear combination, e.g. [1,1,0,-1,0] |
 | ......\|---`goseq`          | whether to run GO and KEGG enrichment analysis with `goseq`; "true" or "false"    |
+| ......\|---`cluster_profiler` | options for running MSigDB GSEA or ORA with `cluster_profiler`                  |
+| .........\|---`run`         | whether to run `cluster_profiler`; "true" or "false"                              |
+| .........\|---`category`    | list of MSigDb categories to test; e.g. ["H","C1","C2"]; if `category` is not set, tests all categories |
+| .........\|---`type`        | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
 | ......\|---`...`            | any key from `defaults` (overwrite them for this contrast)                        |
 | \|---`defaults:`            |                                                                                   |
 | ...\|---`max_p_adj`         | FDR cutoff 'alpha' for DESeq2's results function; *default: 0.1*                  |

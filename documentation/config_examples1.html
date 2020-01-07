@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
@@ -145,6 +144,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -208,6 +208,11 @@ summary {
 <p>Analysis of e.g. GO and KEGG annotation enrichment can be optional for certain contrasts. For example by adding a key-value pair <code>goseq: true</code> to a contrast specification, <strong>goseq</strong> is run for that contrast for GO and KEGG enrichment analysis.</p>
 <p>At the level of the snakefile, the argument <code>if_set = dict(goseq=True)</code> of the <code>expand_path()</code> path handler function is used when collecting output files for the <code>all</code> rule. While expanding over the contrasts, only output files will be requested, if a <code>dict(goseq=True)</code> is in the definition of the respective contrast. This mechanism can also be used, when adding more analysis steps to the pipeline that are optional for contrasts.</p>
 <p>If results of some analysis steps are not computed for all contrasts, also the report must adapt by not including sections for those steps for a given contrast. See <a href="adding_rmd_snippets.md"><code>adding new snippets</code></a> on how to make snippet inclusion conditional.</p>
+<p><strong>included functional annotation methods so far:</strong></p>
+<ul>
+<li><code>goseq</code> for GO and KEGG over-representation analysis</li>
+<li><code>cluster_profiler</code> for MSigDb over-representation or gene set enrichment analysis</li>
+</ul>
 </div>
 <div id="configure-report" class="section level3">
 <h3>Configure report</h3>
@@ -288,7 +293,7 @@ current_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}</code></pre
   report_snippets: ...
   defaults: ...</code></pre>
 <p>Then all snippets will be inserted twice, alternating between results of the two analyses. Tags will be added to the sections: “– analysis0” for the current analysis and “– analysis1” for the added analysis. Suffixes “_analysis&lt;x&gt;&quot; will also be added to relevant variables in the report, to load and use the corresponding config files and lists of generated results files. Therefore, if you wish to replace the tag in the section names, do a replace with e.g. “– analysis0” by “– &lt;my title&gt;” including the “–”.</p>
-<p>The value of merge can also be a <em>list</em> or a <em>dict</em>. Especially if you don’t need all snippets inserted twice, you can then select which ones to add:</p>
+<p>The value of merge can also be a <em>list</em> or a <em>dict</em>. Especially if you don’t need all snippets inserted twice, you can select which ones to add:</p>
 <pre><code>report:
   merge:
     pre_analysis: previous_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}

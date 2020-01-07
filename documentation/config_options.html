@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
@@ -145,6 +144,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -293,7 +293,7 @@ summary {
 </tr>
 <tr class="even">
 <td>…|—<code>mapping</code></td>
-<td>For DE: list of rules to use as an input for <code>DESeq2</code>; first entry used if no wildcard <code>{mapping}</code> was set in the <code>out_path_pattern</code><br>Options: <code>&quot;import_gene_counts&quot;</code> for input from STARs gene counts, <code>&quot;import_sf&quot;</code> for input from Salmon sf files</td>
+<td>For DE: list of rules to use as an input for <code>DESeq2</code>; first entry used if no wildcard <code>{mapping}</code> was set in the <code>out_path_pattern</code><br>Options: <code>&quot;import_gene_counts&quot;</code> for input from STARs gene counts, <code>import_featurecounts</code> for input from FeatureCounts and <code>&quot;import_sf&quot;</code> for input from Salmon sf files</td>
 </tr>
 </tbody>
 </table>
@@ -484,6 +484,22 @@ summary {
 <tr class="even">
 <td>……|—<code>goseq</code></td>
 <td>whether to run GO and KEGG enrichment analysis with <code>goseq</code>; “true” or “false”</td>
+</tr>
+<tr class="odd">
+<td>……|—<code>cluster_profiler</code></td>
+<td>options for running MSigDB GSEA or ORA with <code>cluster_profiler</code></td>
+</tr>
+<tr class="even">
+<td>………|—<code>run</code></td>
+<td>whether to run <code>cluster_profiler</code>; “true” or “false”</td>
+</tr>
+<tr class="odd">
+<td>………|—<code>category</code></td>
+<td>list of MSigDb categories to test; e.g. [“H”,“C1”,“C2”]; if <code>category</code> is not set, tests all categories</td>
+</tr>
+<tr class="even">
+<td>………|—<code>type</code></td>
+<td>whether to run gene set enrichment analysis or overrepresentation analysis; options: “gsea” or “ora”; default: “gsea”</td>
 </tr>
 <tr class="odd">
 <td>……|—<code>...</code></td>

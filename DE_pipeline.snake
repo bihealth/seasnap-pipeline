@@ -236,7 +236,7 @@ rule import_featurecounts:
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
-		#----- merge count files from star
+		#----- merge count files
                 read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"), 
                                                      col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read_fc(files[i], samples[i])))

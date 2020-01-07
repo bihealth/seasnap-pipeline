@@ -47,6 +47,11 @@ This mechanism can also be used, when adding more analysis steps to the pipeline
 If results of some analysis steps are not computed for all contrasts, also the report must adapt by not including sections for those steps for a given contrast.
 See [`adding new snippets`](adding_rmd_snippets.md) on how to make snippet inclusion conditional.
 
+**included functional annotation methods so far:**
+
+- `goseq` for GO and KEGG over-representation analysis
+- `cluster_profiler` for MSigDb over-representation or gene set enrichment analysis
+
 ### Configure report
 
 In the config file under `report:` you can define a 'building plan' how to assemble the report from Rmd snippets.

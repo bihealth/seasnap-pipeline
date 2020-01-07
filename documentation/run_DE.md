@@ -59,7 +59,7 @@ It is a tab-delimited file with at least five columns:
 | --------- | --- | --------------- | ----------- | ------------- |
 | file path | ... | e.g. 'Cor_2_WT' | e.g.    '1' |  'Cor_2_WT_1' |
 
-(Note: at the moment only `filename` and `group` are actually used. Others might be blank.)
+(Note: at the moment only `filename`, `group` and `label` are actually used. Others might be blank.)
 
 To auto-generate a covariate file from the input path pattern defined in the config file, run:
 
