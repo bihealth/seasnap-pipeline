@@ -3,7 +3,7 @@
     {
         "snake_opt": "-j 100 -k --restart-times 0 --max-jobs-per-second 5 --rerun-incomplete",
 
-        "run_command": "--drmaa=\" -cwd -V -l h_vmem={cluster.h_vmem} -l h_rt={cluster.h_rt} -pe {cluster.pe} -j yes -P medium -o {cluster.output} -e {cluster.errors}\""
+        "run_command": "--drmaa=\" -cwd -V -l h_vmem={cluster.h_vmem} -l h_rt={cluster.h_rt} -pe {cluster.pe} -j yes -P control -o {cluster.output} -e {cluster.errors}\""
     },
     
     "__default__":
