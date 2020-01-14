@@ -20,7 +20,7 @@ After creating a working directory with the file `DE_config.yaml` you have to ed
 SeA-SnaP parses an internal config file with default values from the git repository first and the files you edit in your working directory will overwrite the default values.
 In this way the config can be kept simple and you do not need to specify all values.
 
-Many configuration options are available described in a [`separate section`](../config_options.md).
+Many configuration options are available described in a [`separate section`](../documentation/config_options.md).
 (Hint: it might also be helpful to look into the default configuration file in the [git repository](../defaults/DE_config_defaults.yaml)).
 
 Here, we describe the minimal settings required:
