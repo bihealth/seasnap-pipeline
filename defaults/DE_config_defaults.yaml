@@ -51,7 +51,7 @@ contrasts:
       independentFiltering: yes
     lfcShrink_parameters:
       type: none
-    GO:
+    ORA:
       fdr_threshold: 0.1
   #contrast_list: null
 

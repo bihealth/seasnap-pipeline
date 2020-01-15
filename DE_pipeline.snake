@@ -501,7 +501,7 @@ rule goseq:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
-		fdr_threshold = contrast["GO"]["fdr_threshold"]
+		fdr_threshold = contrast["ORA"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
 		
 		script = textwrap.dedent(r"""
@@ -571,14 +571,25 @@ rule cluster_profiler:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
-		fdr_threshold = contrast["GO"]["fdr_threshold"]
+		fdr_threshold = contrast["ORA"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
 		
-		if "category" in contrast["cluster_profiler"]:
-			categories = 'c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["category"]))
-		else:
-			categories = 'c("H","C1","C2","C3","C4","C5","C6","C7")'
-		test_type = contrast["cluster_profiler"]["type"] if "type" in contrast["cluster_profiler"] else "gsea"
+		msigdb_categories = go_ontologies = "'_not_run_'"
+		go_pval = go_qval = msigdb_type = go_type = ""
+		if "MSigDb" in contrast["cluster_profiler"]:
+			if "categories" in contrast["cluster_profiler"]["MSigDb"]:
+				msigdb_categories = 'c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["MSigDb"]["categories"]))
+			else:
+				msigdb_categories = 'c("H","C1","C2","C3","C4","C5","C6","C7")'
+			msigdb_type = contrast["cluster_profiler"]["MSigDb"]["type"] if "type" in contrast["cluster_profiler"]["MSigDb"] else "gsea"
+		if "GO" in contrast["cluster_profiler"]:
+			if "ontologies" in contrast["cluster_profiler"]["GO"]:
+				go_ontologies = 'c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["GO"]["ontologies"]))
+			else:
+				go_ontologies = 'c("MF", "BP", "CC")'
+			go_type = contrast["cluster_profiler"]["GO"]["type"] if "type" in contrast["cluster_profiler"]["GO"] else "gsea"
+			go_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["pval"]) if "pval" in contrast["cluster_profiler"]["GO"] else ""
+			go_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["qval"]) if "qval" in contrast["cluster_profiler"]["GO"] else ""
 		
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -605,28 +616,55 @@ rule cluster_profiler:
 		geneList_ora <- geneList_ora[!is.na(geneList_ora)]
 		geneList_ora <- as.character(geneList_ora)
 		
-		#----- load MSigDb gene set and run cluster_profiler
-		categories <- {categories}
-		cat_tests <- vector("list", length(categories))
-		for (i in 1:length(categories)){{
-			msigdb_cat <- categories[i]
-			msigdb_gs <- msigdbr(species = "{params.genus}", category = msigdb_cat) %>%
-			   dplyr::select(gs_name, entrez_gene)
-			if ("{test_type}" == "gsea"){{
-				em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
-			}} else {{
-				em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
-			}}
-			cat_tests[i] <- em
-		}}
-		names(cat_tests) <- {categories}
+		#----- collect results
+		tests <- list()
 		
-		#----- save as rds & csv
-		saveRDS(cat_tests, file="{output.rds}")
-		dir.create("{output.csv}")
-		for (c in names(cat_tests)){{
-			write.table(data.frame(cat_tests[[c]]), file=paste0("{output.csv}/{params.csv_basename}",c,".csv"), sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+		#----- MSigDb
+		if ({msigdb_categories} != "_not_run_"){{
+			dir.create("{output.csv}/MSigDb", recursive=TRUE)
+			categories <- {msigdb_categories}
+			cat_tests <- vector("list", length(categories))
+			for (i in 1:length(categories)){{
+				msigdb_cat <- categories[i]
+				msigdb_gs <- msigdbr(species = "{params.genus}", category = msigdb_cat) %>%
+				   dplyr::select(gs_name, entrez_gene)
+				if ("{msigdb_type}" == "gsea"){{
+					em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
+				}} else {{
+					em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
+				}}
+				cat_tests[i] <- em
+				write.table(data.frame(em), file=paste0("{output.csv}/MSigDb/{params.csv_basename}",msigdb_cat,".csv"), 
+				            sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+			}}
+			names(cat_tests) <- {msigdb_categories}
+			tests$MSigDb <- cat_tests
 		}}
+		
+		#----- GO
+		if ({go_ontologies} != "_not_run_"){{
+			dir.create("{output.csv}/GO", recursive=TRUE)
+			ontologies <- {go_ontologies}
+			ont_tests  <- vector("list", length(ontologies))
+			for (i in 1:length(ontologies)){{
+				go_ont <- ontologies[i]
+				if ("{go_type}" == "gsea"){{
+					em <- gseGO(geneList = geneList_gsea, OrgDb = {params.annot_pkg},
+					               ont = go_ont, pAdjustMethod = "BH"{go_pval})
+				}} else {{
+					em <- enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg},
+					               ont = go_ont, pAdjustMethod = "BH"{go_pval}{go_qval})
+				}}
+				ont_tests[i] <- em
+				write.table(data.frame(em), file=paste0("{output.csv}/GO/{params.csv_basename}",go_ont,".csv"), 
+				            sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+			}}
+			names(ont_tests) <- {go_ontologies}
+			tests$GO <- ont_tests
+		}}
+		
+		#----- save as rds
+		saveRDS(tests, file="{output.rds}")
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="cluster_profiler", extension="R", **wildcards)
