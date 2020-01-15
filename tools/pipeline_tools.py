@@ -1250,14 +1250,18 @@ class ReportTool(PipelinePathHandler):
 				snippet_file = path / snippet
 				snippet_cont = snippet_file.read_text()
 				
-				requirements = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", snippet_cont)
-				snippet_cont = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_cont)
 				req_fields   = ["step","extension","contrast"]
 				
 				for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
+					snippet_prep = self._insert_entry_name(snippet_cont, entry, results_path)
+					requirements = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", snippet_prep)
+					snippet_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_prep)
+					
+					for req in requirements:
+						print(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) ))
+					
 					if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
-						snippet_cont = self._insert_entry_name(snippet_cont, entry, results_path)
-						snippet_text.append(self._edit_template(snippet_cont, results_path, results_key[1], i))
+						snippet_text.append(self._edit_template(snippet_prep, results_path, results_key[1], i))
 					
 			elif isinstance(snippet, dict):
 				assert len(snippet)==1
