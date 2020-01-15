@@ -105,7 +105,16 @@ Config options
 |**`report:`**                | **(define which snippets to include in the report)**                               |
 | \|---`report_snippets`      | List of report snippets (Rmd files) in the `report/` directory. Snippets will be appended in the order defined in this list (see section [Adding Rmd Snippets](#adding-rmd-snippets)) |
 | \|---`defaults:`            |                                                                                    |
-| ...\|---`contrast`          | default list of report snippets (Rmd files) added to each contrast in the report   |
+| ...\|---`...`               | default lists of report snippets (Rmd files) added to the report in blocks; a dict with block name as key and snippet list as value |
+| \|---`snippet_parameters:`  | parameters used in report snippets:                                                |
+| ...\|---`Normalisation_QC:` | parameters used in Normalisation_QC sub-folder:                                    |
+| ......\|---`n_most_varying` | analyse the n most varying genes                                                   |
+| ......\|---`annotation_columns` | columns of the covariate table used to annotate PCA and clustering             |
+| ...\|---`contrast:`          | parameters used in contrast sub-folder:                                           |
+| ......\|---`filter_results:` | parameters to filter DESeq2 results table:                                        |
+| .........\|---`qval`        | threshold on qvalue, display rows with q-value < qval only; default 0.1            |
+| ......\|---`filter_goseq:`  | parameters to filter goseq results table:                                          |
+| .........\|---`qval`        | threshold on qvalue, display rows with q-value < qval only; default 0.1            |
 
 ---
 

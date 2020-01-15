@@ -62,8 +62,9 @@ E.g.
 report:
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - SampleSimilarity_plot.Rmd
     - contrast:
         - __list__: __contrasts__
   defaults:
@@ -76,6 +77,9 @@ report:
 Will first insert the snippets (from the `report/` directory) in this order:
 
 - Covariate_table.Rmd
+
+and from sub-folder `NormalisationQC/`:
+
 - PCA_plot.Rmd
 - SampleSimilarity_plot.Rmd
 
@@ -94,8 +98,9 @@ E.g.:
 report:
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - SampleSimilarity_plot.Rmd
     - contrast:
       - __list__:
         - "A vs C"
@@ -117,8 +122,7 @@ This definition would be equivalent to the previous example:
 report:
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC: __defaults__
     - contrast: __defaults__
   defaults:
     contrast_list:
@@ -130,6 +134,9 @@ report:
         - "A vs C"
         - "B vs C":
           - Result_table.Rmd
+    NormalisationQC:
+      - PCA_plot.Rmd
+      - SampleSimilarity_plot.Rmd
 ```
 
 Here, `contrast: __defaults__` would load `contrast:` from the defaults. There, in turn, via `__list__` the defaults from `contrast_list:` would be loaded for the entry "A vs C".
@@ -174,8 +181,9 @@ report:
     pre_analysis: previous_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - SampleSimilarity_plot.Rmd
     - contrast: __defaults__
     - pre_analysis:
         contrast: __defaults__
