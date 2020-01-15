@@ -849,6 +849,8 @@ class CovariateFileTool(PipelinePathHandler):
 		:returns: a list with paths to specified input files
 		"""
 		wildcard_combs = self._get_wildcard_combinations(self.wildcard_values, step, extension)
+		print("\nextracted combinations:\n{}".format("\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
+		
 		wildcard_placeholders = {"sample":"{sample}", **self.opt_wildcard_placeholders}
 		kwargs_out = {key: getattr(wildcards, key, val) for key, val in wildcard_placeholders.items()}
 		pattern_list = []
