@@ -12,6 +12,9 @@ res <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
 results_table <- as.data.frame(res); ids <- is.element(colnames(results_table), c("entrez", "symbol"))
 results_table <- results_table[,c(which(ids), which(!ids))]
 
+#----- filter results
+results_table <- subset(results_table, padj < config$report$snippet_parameters$contrast$filter_results$qval)
+
 #----- interactive table
 datatable(results_table, extensions=c('Buttons','FixedColumns'), escape=F,
           options = list(scrollX=TRUE, fixedColumns=list(leftColumns=3), dom='Bfrtip', buttons='csv')) %>%

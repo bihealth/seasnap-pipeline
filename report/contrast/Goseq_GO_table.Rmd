@@ -18,6 +18,9 @@ first_cols <- sapply(c("category","term","ontology","over_represented_qvalue", "
 other_cols <- (1:dim(goseq_go_res)[2])[-first_cols]
 goseq_go_res <- goseq_go_res[,c(first_cols, other_cols)]
 
+#----- filter results
+goseq_go_res <- subset(goseq_go_res, over_represented_qvalue < config$report$snippet_parameters$contrast$filter_goseq$qval)
+
 #----- plot interactive table
 datatable(goseq_go_res, extensions=c('Buttons','FixedColumns'), rownames=F, escape=F,
           options = list(scrollX=TRUE, fixedColumns=list(leftColumns=1), dom='Bfrtip', buttons='csv')) %>%

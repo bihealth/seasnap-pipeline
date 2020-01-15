@@ -58,10 +58,17 @@ contrasts:
 #---------------------------------------- report parameters
 report:
   #merge: null
+
   snippet_parameters:
     Normalisation_QC:
       n_most_varying: 500
       annotation_columns: [ "group" ]
+    contrast:
+      filter_results:
+        qval: 0.1
+      filter_goseq:
+        qval: 0.1
+
   defaults:
     NormalisationQC:
       - PCA_plot.Rmd
@@ -77,6 +84,7 @@ report:
       - MA_plot.Rmd
       - Result_table.Rmd
       - Goseq_GO_table.Rmd
+
   report_snippets:
     - Covariate_table.Rmd
     - NormalisationQC: __defaults__

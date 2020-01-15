@@ -8,12 +8,12 @@ import os, sys, yaml, re, textwrap, pandas as pd
 from collections import OrderedDict
 from time import asctime, localtime, time
 from pathlib import Path
-from snakemake.utils import report, format as snakemake_format
+from snakemake.utils import report, format as snakemake_format, min_version
 from snakemake.logging import logger
 from tools.pipeline_tools import MappingPipelinePathHandler
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
-
+min_version("3.7")
 shell.prefix("set -e  pipefail;")
 
 # source files
@@ -174,7 +174,7 @@ rule fastqc:
 	log:
 		out  = pph.file_path(step="fastqc", extension="output.log", log=True)
 	params:
-		outdir = pph.out_dir_name(step="fastqc")
+		outdir  = pph.out_dir_name(step="fastqc")
 	threads:
 		lambda wildcards: len(pph.get_fastq_pairs(wildcards))
 	run:
