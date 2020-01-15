@@ -420,7 +420,7 @@ rule contrast:
 			contrast_def = lfc_def = 'contrast=c("{}", "{}", "{}")'.format(contrast_column, contrast_num, contrast_ref)
 		elif "vector" in contrast:
 			contrast_type          = "vector"
-			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(contrast["vector"]))
+			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(map(str, contrast["vector"])))
 		else:
 			raise ValueError("Error in contrast: no valid contrast definition! must be one of {}".format(["coef:", "ratio:", "vector:"]))
 		
