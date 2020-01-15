@@ -3,8 +3,8 @@ RNA SeA-SnaP   <img align="right" width="140" src="documentation/pictures/SeA-Sn
 
 RNA SeA-SnaP is a RNA-(Se)q (A)nalysis (Sna)kemake (P)ipeline tool and combines two tasks:
 
-- A sub-pipeline mapping fastq files to a reference genome/transcriptome using STAR or Salmon
-- A sub-pipeline for Differential Expression (DE) analysis
+- A sub-pipeline mapping fastq files to a reference genome/transcriptome using `STAR` or `Salmon` and including extensive quality control (`Fastqc`, `Dupradar`, `Qualimap`, `RNASeQC`, `Preseq`, `infer_experiment`, `Multiqc`)
+- A sub-pipeline for Differential Expression (DE) analysis with `DESeq2`
 
 Both pipelines are based on [`Snakemake`](https://snakemake.readthedocs.io/en/stable/).
 
