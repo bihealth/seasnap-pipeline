@@ -554,7 +554,7 @@ rule goseq:
 	
 	
 rule cluster_profiler:
-	""" gene set enrichment analysis (GSEA) or over-representation analysis (ORA) with cluster profiler for MSigDb"""
+	""" gene set enrichment analysis (GSEA) or over-representation analysis (ORA) with cluster profiler for MSigDb, GO and/or KEGG"""
 	input:
 		res  = pph.file_path("contrast", "rds")
 	output:
@@ -573,23 +573,36 @@ rule cluster_profiler:
 		
 		fdr_threshold = contrast["ORA"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
+		go_pval = go_qval = kegg_pval = kegg_qval = keggm_pval = keggm_qval = ""
 		
-		msigdb_categories = go_ontologies = "'_not_run_'"
-		go_pval = go_qval = msigdb_type = go_type = ""
+		test_annotations = {}
 		if "MSigDb" in contrast["cluster_profiler"]:
 			if "categories" in contrast["cluster_profiler"]["MSigDb"]:
-				msigdb_categories = 'c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["MSigDb"]["categories"]))
+				test_annotations["MSigDb"] = dict(categories='c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["MSigDb"]["categories"])))
 			else:
-				msigdb_categories = 'c("H","C1","C2","C3","C4","C5","C6","C7")'
-			msigdb_type = contrast["cluster_profiler"]["MSigDb"]["type"] if "type" in contrast["cluster_profiler"]["MSigDb"] else "gsea"
+				test_annotations["MSigDb"] = dict(categories='c("H","C1","C2","C3","C4","C5","C6","C7")')
+			test_annotations["MSigDb"]["type"] = '"'+contrast["cluster_profiler"]["MSigDb"]["type"]+'"' if "type" in contrast["cluster_profiler"]["MSigDb"] else '"gsea"'
 		if "GO" in contrast["cluster_profiler"]:
 			if "ontologies" in contrast["cluster_profiler"]["GO"]:
-				go_ontologies = 'c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["GO"]["ontologies"]))
+				test_annotations["GO"] = dict(categories='c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["GO"]["ontologies"])))
 			else:
-				go_ontologies = 'c("MF", "BP", "CC")'
-			go_type = contrast["cluster_profiler"]["GO"]["type"] if "type" in contrast["cluster_profiler"]["GO"] else "gsea"
-			go_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["pval"]) if "pval" in contrast["cluster_profiler"]["GO"] else ""
-			go_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["qval"]) if "qval" in contrast["cluster_profiler"]["GO"] else ""
+				test_annotations["GO"] = dict(categories='c("MF", "BP", "CC")')
+			test_annotations["GO"]["type"] = '"'+contrast["cluster_profiler"]["GO"]["type"]+'"' if "type" in contrast["cluster_profiler"]["GO"] else '"gsea"'
+			if "pval" in contrast["cluster_profiler"]["GO"]: go_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["pval"])
+			if "qval" in contrast["cluster_profiler"]["GO"]: go_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["qval"])
+		if "KEGG" in contrast["cluster_profiler"]:
+			test_annotations["KEGG"] = dict(categories='c("pathways")')
+			test_annotations["KEGG"]["org"]  = '"'+contrast["cluster_profiler"]["KEGG"]["kegg_organism_code"]+'"'
+			test_annotations["KEGG"]["type"] = '"'+contrast["cluster_profiler"]["KEGG"]["type"]+'"' if "type" in contrast["cluster_profiler"]["KEGG"] else '"gsea"'
+			if "pval" in contrast["cluster_profiler"]["KEGG"]: kegg_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG"]["pval"])
+			if "qval" in contrast["cluster_profiler"]["KEGG"]: kegg_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG"]["qval"])
+		if "KEGG_modules" in contrast["cluster_profiler"]:
+			test_annotations["KEGG_modules"] = dict(categories='c("modules")')
+			test_annotations["KEGG_modules"]["org"]  = '"'+contrast["cluster_profiler"]["KEGG"]["kegg_organism_code"]+'"'
+			test_annotations["KEGG_modules"]["type"] = '"'+contrast["cluster_profiler"]["KEGG"]["type"]+'"' if "type" in contrast["cluster_profiler"]["KEGG"] else '"gsea"'
+			if "pval" in contrast["cluster_profiler"]["KEGG_modules"]: keggm_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG_modules"]["pval"])
+			if "qval" in contrast["cluster_profiler"]["KEGG_modules"]: keggm_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG_modules"]["qval"])
+		test_annot_R = "list({})".format(", ".join("{}=list({})".format(k, ",".join("{}={}".format(k2,v) for k2, v in d.items())) for k,d in test_annotations.items()))
 		
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -617,50 +630,37 @@ rule cluster_profiler:
 		geneList_ora <- as.character(geneList_ora)
 		
 		#----- collect results
+		test_annotations <- {test_annot_R}
 		tests <- list()
 		
-		#----- MSigDb
-		if ({msigdb_categories} != "_not_run_"){{
-			dir.create("{output.csv}/MSigDb", recursive=TRUE)
-			categories <- {msigdb_categories}
-			cat_tests <- vector("list", length(categories))
-			for (i in 1:length(categories)){{
-				msigdb_cat <- categories[i]
-				msigdb_gs <- msigdbr(species = "{params.genus}", category = msigdb_cat) %>%
-				   dplyr::select(gs_name, entrez_gene)
-				if ("{msigdb_type}" == "gsea"){{
-					em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
-				}} else {{
-					em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
+		#----- run tests
+		for (test in c("MSigDb", "GO", "KEGG", "KEGG_modules")){{
+			if (test %in% names(test_annotations)){{
+				dir.create(paste0("{output.csv}/", test), recursive=TRUE)
+				categories <- test_annotations[[test]]$categories
+				cat_tests <- vector("list", length(categories))
+				for (i in 1:length(categories)){{
+					cat <- categories[i]
+					if (test == "MSigDb") msigdb_gs <- msigdbr(species = "{params.genus}", category = cat) %>% dplyr::select(gs_name, entrez_gene)
+					if (test_annotations[[test]]$type == "gsea"){{
+						if      (test == "MSigDb")       em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
+						else if (test == "GO")           em <- gseGO(geneList = geneList_gsea, OrgDb = {params.annot_pkg}, ont = cat, pAdjustMethod = "BH"{go_pval})
+						else if (test == "KEGG")         em <- gseKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG$org{kegg_pval})
+						else if (test == "KEGG_modules") em <- gseMKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG_modules$org{keggm_pval})
+					}} else {{
+						if      (test == "MSigDb")       em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
+						else if (test == "GO")           em <- enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg}, 
+						                                                ont = cat, pAdjustMethod = "BH"{go_pval}{go_qval})
+						else if (test == "KEGG")         em <- enrichKEGG(gene = geneList_ora, organism = test_annotations$KEGG$org{kegg_pval}{kegg_qval})
+						else if (test == "KEGG_modules") em <- enrichMKEGG(gene = geneList_ora, organism = test_annotations$KEGG_modules$org{keggm_pval}{keggm_qval})
+					}}
+					cat_tests[i] <- em
+					write.table(data.frame(em), file=paste0("{output.csv}/",test,"/{params.csv_basename}",cat,".csv"), 
+						    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 				}}
-				cat_tests[i] <- em
-				write.table(data.frame(em), file=paste0("{output.csv}/MSigDb/{params.csv_basename}",msigdb_cat,".csv"), 
-				            sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+				names(cat_tests) <- test_annotations[[test]]$categories
+				tests$MSigDb <- cat_tests
 			}}
-			names(cat_tests) <- {msigdb_categories}
-			tests$MSigDb <- cat_tests
-		}}
-		
-		#----- GO
-		if ({go_ontologies} != "_not_run_"){{
-			dir.create("{output.csv}/GO", recursive=TRUE)
-			ontologies <- {go_ontologies}
-			ont_tests  <- vector("list", length(ontologies))
-			for (i in 1:length(ontologies)){{
-				go_ont <- ontologies[i]
-				if ("{go_type}" == "gsea"){{
-					em <- gseGO(geneList = geneList_gsea, OrgDb = {params.annot_pkg},
-					               ont = go_ont, pAdjustMethod = "BH"{go_pval})
-				}} else {{
-					em <- enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg},
-					               ont = go_ont, pAdjustMethod = "BH"{go_pval}{go_qval})
-				}}
-				ont_tests[i] <- em
-				write.table(data.frame(em), file=paste0("{output.csv}/GO/{params.csv_basename}",go_ont,".csv"), 
-				            sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
-			}}
-			names(ont_tests) <- {go_ontologies}
-			tests$GO <- ont_tests
 		}}
 		
 		#----- save as rds

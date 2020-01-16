@@ -1259,9 +1259,6 @@ class ReportTool(PipelinePathHandler):
 					requirements = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", snippet_prep)
 					snippet_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_prep)
 					
-					for req in requirements:
-						print(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) ))
-					
 					if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
 						snippet_text.append(self._edit_template(snippet_prep, results_path, results_key[1], i))
 					
