@@ -84,10 +84,26 @@ Config options
 | ......\|---`coef`           | alt. to `ratio`; the coefficient of DESeq2 results, e.g. "condition_classical_vs_nonclassical" |
 | ......\|---`vector`         | alt. to `ratio`; a list with entries corresponding to columns in the design matrix, defining the linear combination, e.g. [1,1,0,-1,0] |
 | ......\|---`goseq`          | whether to run GO and KEGG enrichment analysis with `goseq`; "true" or "false"    |
-| ......\|---`cluster_profiler` | options for running MSigDB GSEA or ORA with `cluster_profiler`                  |
+| ......\|---`cluster_profiler` |                                                                                 |
 | .........\|---`run`         | whether to run `cluster_profiler`; "true" or "false"                              |
-| .........\|---`category`    | list of MSigDb categories to test; e.g. ["H","C1","C2"]; if `category` is not set, tests all categories |
-| .........\|---`type`        | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| .........\|---`MSigDb:`     | test for MSigDb annotation:                                                       |
+| ............\|---`categories:` | list of MSigDb categories to test; e.g. ["H","C1","C2"]; if `categories` is not set, tests all categories |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| .........\|---`GO:`         | test for GO annotation:                                                           |
+| ............\|---`ontologies:` | list of GO ontologies to test; e.g. ["MF","BP","CC"]; if `ontologies` is not set, tests all three |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| ............\|---`pval:`    | p-value cutoff to use; default 0.05                                               |
+| ............\|---`qval:`    | q-value cutoff to use, only for ORA; default 0.2                                  |
+| .........\|---`KEGG:`       | test for KEGG pathway annotation:                                                 |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| ............\|---`kegg_organism_code` | [kegg code](https://www.genome.jp/kegg/catalog/org_list.html) for the organism; e.g. "mmu" for mouse or "hsa" for human |
+| ............\|---`pval:`    | p-value cutoff to use; default 0.05                                               |
+| ............\|---`qval:`    | q-value cutoff to use, only for ORA; default 0.2                                  |
+| .........\|---`KEGG_modules:` | test for KEGG module annotation:                                                |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| ............\|---`kegg_organism_code` | [kegg code](https://www.genome.jp/kegg/catalog/org_list.html) for the organism; e.g. "mmu" for mouse or "hsa" for human |
+| ............\|---`pval:`    | p-value cutoff to use; default 0.05                                               |
+| ............\|---`qval:`    | q-value cutoff to use, only for ORA; default 0.2                                  |
 | ......\|---`...`            | any key from `defaults` (overwrite them for this contrast)                        |
 | \|---`defaults:`            |                                                                                   |
 | ...\|---`max_p_adj`         | FDR cutoff 'alpha' for DESeq2's results function; *default: 0.1*                  |
@@ -99,8 +115,8 @@ Config options
 | ......\|---`independentFiltering` | perform independent filtering; "yes" or "no"                                 |
 | ...\|---`lfcShrink_parameters:` |                                                                                |
 | ......\|---`type`           | algorithm to use for log fold change shrinkage; Options: `none`, `apeglm`, `ashr`, `normal`<br>*default: "none"* |
-| ...\|---`GO:`               |                                                                                    |
-| ......\|---`fdr_threshold`  | FDR threshold to determine which results to use for functional annotation; *default: 0.1* |
+| ...\|---`ORA:`               |                                                                                    |
+| ......\|---`fdr_threshold`  | FDR threshold to determine which results to use for over-representation analysis; *default: 0.1* |
 |                             |                                                                                    |
 |**`report:`**                | **(define which snippets to include in the report)**                               |
 | \|---`report_snippets`      | List of report snippets (Rmd files) in the `report/` directory. Snippets will be appended in the order defined in this list (see section [Adding Rmd Snippets](#adding-rmd-snippets)) |

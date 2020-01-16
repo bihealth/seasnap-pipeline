@@ -487,19 +487,83 @@ summary {
 </tr>
 <tr class="odd">
 <td>……|—<code>cluster_profiler</code></td>
-<td>options for running MSigDB GSEA or ORA with <code>cluster_profiler</code></td>
+<td></td>
 </tr>
 <tr class="even">
 <td>………|—<code>run</code></td>
 <td>whether to run <code>cluster_profiler</code>; “true” or “false”</td>
 </tr>
 <tr class="odd">
-<td>………|—<code>category</code></td>
-<td>list of MSigDb categories to test; e.g. [“H”,“C1”,“C2”]; if <code>category</code> is not set, tests all categories</td>
+<td>………|—<code>MSigDb:</code></td>
+<td>test for MSigDb annotation:</td>
 </tr>
 <tr class="even">
-<td>………|—<code>type</code></td>
+<td>…………|—<code>categories:</code></td>
+<td>list of MSigDb categories to test; e.g. [“H”,“C1”,“C2”]; if <code>categories</code> is not set, tests all categories</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>type</code></td>
 <td>whether to run gene set enrichment analysis or overrepresentation analysis; options: “gsea” or “ora”; default: “gsea”</td>
+</tr>
+<tr class="even">
+<td>………|—<code>GO:</code></td>
+<td>test for GO annotation:</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>ontologies:</code></td>
+<td>list of GO ontologies to test; e.g. [“MF”,“BP”,“CC”]; if <code>ontologies</code> is not set, tests all three</td>
+</tr>
+<tr class="even">
+<td>…………|—<code>type</code></td>
+<td>whether to run gene set enrichment analysis or overrepresentation analysis; options: “gsea” or “ora”; default: “gsea”</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>pval:</code></td>
+<td>p-value cutoff to use; default 0.05</td>
+</tr>
+<tr class="even">
+<td>…………|—<code>qval:</code></td>
+<td>q-value cutoff to use, only for ORA; default 0.2</td>
+</tr>
+<tr class="odd">
+<td>………|—<code>KEGG:</code></td>
+<td>test for KEGG pathway annotation:</td>
+</tr>
+<tr class="even">
+<td>…………|—<code>type</code></td>
+<td>whether to run gene set enrichment analysis or overrepresentation analysis; options: “gsea” or “ora”; default: “gsea”</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>kegg_organism_code</code></td>
+<td><a href="https://www.genome.jp/kegg/catalog/org_list.html">kegg code</a> for the organism; e.g. “mmu” for mouse or “hsa” for human</td>
+</tr>
+<tr class="even">
+<td>…………|—<code>pval:</code></td>
+<td>p-value cutoff to use; default 0.05</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>qval:</code></td>
+<td>q-value cutoff to use, only for ORA; default 0.2</td>
+</tr>
+<tr class="even">
+<td>………|—<code>KEGG_modules:</code></td>
+<td>test for KEGG module annotation:</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>type</code></td>
+<td>whether to run gene set enrichment analysis or overrepresentation analysis; options: “gsea” or “ora”; default: “gsea”</td>
+</tr>
+<tr class="even">
+<td>…………|—<code>kegg_organism_code</code></td>
+<td><a href="https://www.genome.jp/kegg/catalog/org_list.html">kegg code</a> for the organism; e.g. “mmu” for mouse or “hsa” for human</td>
+</tr>
+<tr class="odd">
+<td>…………|—<code>pval:</code></td>
+<td>p-value cutoff to use; default 0.05</td>
+</tr>
+<tr class="even">
+<td>…………|—<code>qval:</code></td>
+<td>q-value cutoff to use, only for ORA; default 0.2</td>
 </tr>
 <tr class="odd">
 <td>……|—<code>...</code></td>
@@ -546,12 +610,12 @@ summary {
 <td>algorithm to use for log fold change shrinkage; Options: <code>none</code>, <code>apeglm</code>, <code>ashr</code>, <code>normal</code><br><em>default: “none”</em></td>
 </tr>
 <tr class="even">
-<td>…|—<code>GO:</code></td>
+<td>…|—<code>ORA:</code></td>
 <td></td>
 </tr>
 <tr class="odd">
 <td>……|—<code>fdr_threshold</code></td>
-<td>FDR threshold to determine which results to use for functional annotation; <em>default: 0.1</em></td>
+<td>FDR threshold to determine which results to use for over-representation analysis; <em>default: 0.1</em></td>
 </tr>
 <tr class="even">
 <td></td>

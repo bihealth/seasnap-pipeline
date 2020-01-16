@@ -213,6 +213,27 @@ summary {
 <li><code>goseq</code> for GO and KEGG over-representation analysis</li>
 <li><code>cluster_profiler</code> for MSigDb over-representation or gene set enrichment analysis</li>
 </ul>
+<p>To run both <code>goseq</code> and <code>cluster_profiler</code> on a contrast, e.g. set:</p>
+<pre><code>contrast_list:
+  - title: &quot;A vs C&quot;
+    vector: [1,1,0,1]
+    goseq: true
+    cluster_profiler:
+      run: true
+      MSigDb:
+        categories: [H, C2]
+        type: gsea
+      GO:
+        ontologies: [MF]
+        type: ora
+        pval: 0.1
+      KEGG:
+        type: ora
+        kegg_organism_code: mmu
+      KEGG_modules:
+        kegg_organism_code: mmu</code></pre>
+<p>For <code>cluster_profiler</code> more parameters can be configured. If any of <code>MSigDb</code>, <code>GO</code>, <code>KEGG</code> (pathways), <code>KEGG_modules</code> (modules) is set, the analysis will be run for the respective annotation. All parameters have defaults except for <code>kegg_organism_code</code>, which has to be provided. To use all defaults, e.g. for GO, set <code>GO: {}</code>. Separate tests will be performed for the categories/ontologies provided in the list. If categories/ontologies is not set, all categories/ontologies will be tested.</p>
+<hr />
 </div>
 <div id="configure-report" class="section level3">
 <h3>Configure report</h3>
@@ -287,6 +308,7 @@ summary {
 <p>Here, <code>contrast: __defaults__</code> would load <code>contrast:</code> from the defaults. There, in turn, via <code>__list__</code> the defaults from <code>contrast_list:</code> would be loaded for the entry “A vs C”.</p>
 <p>Note: <em>blocks</em> do not have to contain a <code>__list__</code>, they may simply be groups of snippets that are inserted under a common subsection.</p>
 <p>Tip: when configuring the report, it can be helpful to copy, paste and edit the report configuration from the <a href="../defaults/DE_config_defaults.yaml">default yaml file</a>.</p>
+<hr />
 </div>
 <div id="merging-reports-of-several-analyses" class="section level3">
 <h3>Merging reports of several analyses</h3>

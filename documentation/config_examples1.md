@@ -52,6 +52,33 @@ See [`adding new snippets`](adding_rmd_snippets.md) on how to make snippet inclu
 - `goseq` for GO and KEGG over-representation analysis
 - `cluster_profiler` for MSigDb over-representation or gene set enrichment analysis
 
+To run both `goseq` and `cluster_profiler` on a contrast, e.g. set:
+
+```
+contrast_list:
+  - title: "A vs C"
+    vector: [1,1,0,1]
+    goseq: true
+    cluster_profiler:
+      run: true
+      MSigDb:
+        categories: [H, C2]
+        type: gsea
+      GO:
+        ontologies: [MF]
+        type: ora
+        pval: 0.1
+      KEGG:
+        type: ora
+        kegg_organism_code: mmu
+      KEGG_modules:
+        kegg_organism_code: mmu
+```
+
+For `cluster_profiler` more parameters can be configured. If any of `MSigDb`, `GO`, `KEGG` (pathways), `KEGG_modules` (modules) is set, the analysis will be run for the respective annotation. All parameters have defaults except for `kegg_organism_code`, which has to be provided. To use all defaults, e.g. for GO, set `GO: {}`. Separate tests will be performed for the categories/ontologies provided in the list. If categories/ontologies is not set, all categories/ontologies will be tested.
+
+---
+
 ### Configure report
 
 In the config file under `report:` you can define a 'building plan' how to assemble the report from Rmd snippets.
@@ -145,6 +172,7 @@ Note: *blocks* do not have to contain a `__list__`, they may simply be groups of
 
 Tip: when configuring the report, it can be helpful to copy, paste and edit the report configuration from the [default yaml file](../defaults/DE_config_defaults.yaml).
 
+---
 
 ### Merging reports of several analyses
 
