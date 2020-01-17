@@ -659,7 +659,7 @@ rule cluster_profiler:
 						    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 				}}
 				names(cat_tests) <- test_annotations[[test]]$categories
-				tests$MSigDb <- cat_tests
+				tests[[test]] <- cat_tests
 			}}
 		}}
 		

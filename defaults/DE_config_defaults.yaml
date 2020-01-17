@@ -84,6 +84,11 @@ report:
       - MA_plot.Rmd
       - Result_table.Rmd
       - Goseq_GO_table.Rmd
+      - cluster_profiler: __defaults__
+    cluster_profiler:
+      - Dot_plot.Rmd
+      - EnrichmentMap_plot.Rmd
+      - Upset_plot.Rmd
 
   report_snippets:
     - Covariate_table.Rmd

@@ -50,7 +50,7 @@ See [`adding new snippets`](adding_rmd_snippets.md) on how to make snippet inclu
 **included functional annotation methods so far:**
 
 - `goseq` for GO and KEGG over-representation analysis
-- `cluster_profiler` for MSigDb over-representation or gene set enrichment analysis
+- `cluster_profiler` for MSigDb, GO and/or KEGG over-representation or gene set enrichment analysis
 
 To run both `goseq` and `cluster_profiler` on a contrast, e.g. set:
 
