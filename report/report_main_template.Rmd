@@ -15,7 +15,7 @@ fontsize: 14pt
 
 <!---
 - Compile from command-line
-Rscript -e "rmarkdown::render('report.Rmd', c('html_document'), clean=FALSE)"
+Rscript -e "rmarkdown::render('report.all.Rmd', c('html_document'), clean=FALSE)"
 -->
 
 ```{r setup, echo=FALSE, message=FALSE}

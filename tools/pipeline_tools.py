@@ -1242,17 +1242,16 @@ class ReportTool(PipelinePathHandler):
 	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("",""), results_key=(-1,"analysis")):
 		""" assemble snippet list """
 		
+		req_fields   = ["step","extension","contrast"]
 		snippet_text = []
 		
-		# add snippets
 		if type(snippet_list) is str: snippet_list = self.report_snippet_defaults[snippet_name] if snippet_list=="__defaults__" else [snippet_list]
 		for snippet in snippet_list:
+			#--- add snippets
 			if type(snippet) is str:
 				
 				snippet_file = path / snippet
 				snippet_cont = snippet_file.read_text()
-				
-				req_fields   = ["step","extension","contrast"]
 				
 				for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 					snippet_prep = self._insert_entry_name(snippet_cont, entry, results_path)
@@ -1267,28 +1266,35 @@ class ReportTool(PipelinePathHandler):
 				snippet_key   = list(snippet.keys())[0]
 				snippet_value = list(snippet.values())[0]
 				
+				#--- add list of entries
 				if snippet_key == "__list__":
-					# add list entries
 					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 						snippet_text.append( self._assemble_entries(snippet_value, path, snippet_name, entry_heading_code, results_key=(i,results_key[1])) )
+				#--- change results folder
 				elif snippet_key in self.use_results:
 					if not isinstance(snippet_value, list): snippet_value = [snippet_value]
 					add_txt = self._assemble_template(snippet_value,path,snippet_name,entry_heading_code,entry, results_key=(-1,snippet_key))
 					snippet_text.append(add_txt)
+				#--- open sub-template folder
 				else:
-					# load template
 					sub_template_path  = path / snippet_key / (snippet_key + "_main_template.Rmd")
 					sub_template_text  = sub_template_path.read_text()
-					# extract heading
+
 					entry_heading_code = self._get_entry_heading_code(sub_template_text)
 					sub_template_text  = self._rem_entry_heading_code(sub_template_text)
 					
 					# add sub-section
 					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 						temp_begin, temp_end = self._split_template(self._edit_template(sub_template_text, results_path, results_key[1], i))
+						sub_section_text = self._assemble_template(snippet_value, path/snippet_key, snippet_key, entry_heading_code, entry, results_key=(i,results_key[1]))
+						all_text = temp_begin + sub_section_text + temp_end
 						
-						sub_section_text = self._assemble_template(snippet_value, path/snippet_key, snippet_key, entry_heading_code, entry, results_key=(i,results_key[1]))	
-						snippet_text.append(temp_begin + sub_section_text + temp_end)
+						all_text_prep = self._insert_entry_name(all_text, entry, results_path)
+						requirements  = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", all_text_prep)
+						all_text_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", all_text_prep)	
+						
+						if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
+							snippet_text.append(all_text_prep)
 				
 			else:
 				raise TypeError("Error in report snippet building plan! (expected str or dict, got {})".format(type(snippet)))

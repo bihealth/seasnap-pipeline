@@ -1,0 +1,19 @@
+#REQUIRE {{cluster_profiler-rds-{{ENTRY_ID}}}}
+
+#### Enrichment map {.tabset .tabset-pills}
+
+Enrichment map for `cluster profiler` results for contrast {{ENTRY_NAME}}.
+
+```{r clusterprofiler_enrichmentmap_{{ENTRY_ID}}, results="asis"}
+library(enrichplot)
+
+for (test in names(ENRES)){
+  cat(sprintf("\n##### %s {- .tabset}\n", test))
+  for (cat in names(ENRES[[test]])){
+    cat(sprintf("\n###### %s {-}\n", cat))
+    
+    try({print(emapplot(ENRES[[test]][[cat]])); cat("\n")})
+  }
+}
+```
+
