@@ -1,5 +1,5 @@
 ## SeA-SnaP differential expression pipeline for RNA-seq analysis
-## version: 0.9.9
+## version: 1.0
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
 #TODO: replace config value check by built-in? https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation
