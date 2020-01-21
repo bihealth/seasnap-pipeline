@@ -549,7 +549,7 @@ rule qualimap_rnaseq:
 	log:
 		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
 	resources:
-		mem_mb = 4000
+		mem_mb = 64000
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		paired   = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
@@ -575,7 +575,7 @@ rule qualimap_bamqc:
 	log:
 		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
 	resources:
-		mem_mb = 4000
+		mem_mb = 64000
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		
@@ -689,8 +689,8 @@ rule multiqc:
 		
 		# set search directory
 		dirs = Path(str(output)).parents
-		results_base_dir = str(dirs[len(dirs)-2])
-		
+		results_base_dir = str(dirs[3])
+
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
