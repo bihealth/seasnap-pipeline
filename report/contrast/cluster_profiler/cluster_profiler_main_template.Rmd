@@ -1,0 +1,18 @@
+#REQUIRE {{cluster_profiler-rds-{{ENTRY_ID}}}}
+
+### cluster profiler results
+
+```{r clusterprofilersetup_{{ENTRY_ID}}}
+require(magrittr)
+
+#----- load cluster profiler results
+ENRES <- readRDS(subset(file_tab, step=="cluster_profiler" & extension=="rds" & contrast=="{{ENTRY_ID}}")$filename)
+
+PLOTS_DIR  <- file.path(PLOTS_BASE_DIR, "cluster_profiler")
+dir.create(PLOTS_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
+```
+
+#HSTART
+#### {{ENTRY_NAME}}
+#HEND
+#>--------------------------------------------INSERT--------------------------------------------<#

@@ -34,7 +34,7 @@ Config options
 | \|---`in_path_pattern`      | path pattern for input files. Wildcards can be used inside braces `{...}`.<br>Available wildcards mapping: `{sample}`, `{mate}`, `{batch}`, `{flowcell}`, `{lane}`, `{library}`<br>Available wildcards DE: same as `out_path_pattern` for mapping<br>*default mapping: `../input/{sample}/{sample}.{mate}`*<br>*default DE: `mapping/{step}/{sample}.{mate}/out/{step}.{sample}.{mate}.{extension}`* |
 | \|---`report_snippets`      | directory containing Rmd snippets; *default: `SeA-SnaP/report/`*                  |
 | \|---`input_choice:`        | (set choices for the `choose_input()` path handler method)                        |
-| ...\|---`mapping`           | For DE: list of rules to use as an input for `DESeq2`; first entry used if no wildcard `{mapping}` was set in the `out_path_pattern`<br>Options: `"import_gene_counts"` for input from STARs gene counts, `"import_sf"` for input from Salmon sf files |
+| ...\|---`mapping`           | For DE: list of rules to use as an input for `DESeq2`; first entry used if no wildcard `{mapping}` was set in the `out_path_pattern`<br>Options: `"import_gene_counts"` for input from STARs gene counts, `import_featurecounts` for input from FeatureCounts and `"import_sf"` for input from Salmon sf files |
 
 ### mapping pipeline
 
@@ -84,6 +84,26 @@ Config options
 | ......\|---`coef`           | alt. to `ratio`; the coefficient of DESeq2 results, e.g. "condition_classical_vs_nonclassical" |
 | ......\|---`vector`         | alt. to `ratio`; a list with entries corresponding to columns in the design matrix, defining the linear combination, e.g. [1,1,0,-1,0] |
 | ......\|---`goseq`          | whether to run GO and KEGG enrichment analysis with `goseq`; "true" or "false"    |
+| ......\|---`cluster_profiler` |                                                                                 |
+| .........\|---`run`         | whether to run `cluster_profiler`; "true" or "false"                              |
+| .........\|---`MSigDb:`     | test for MSigDb annotation:                                                       |
+| ............\|---`categories:` | list of MSigDb categories to test; e.g. ["H","C1","C2"]; if `categories` is not set, tests all categories |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| .........\|---`GO:`         | test for GO annotation:                                                           |
+| ............\|---`ontologies:` | list of GO ontologies to test; e.g. ["MF","BP","CC"]; if `ontologies` is not set, tests all three |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| ............\|---`pval:`    | p-value cutoff to use; default 0.05                                               |
+| ............\|---`qval:`    | q-value cutoff to use, only for ORA; default 0.2                                  |
+| .........\|---`KEGG:`       | test for KEGG pathway annotation:                                                 |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| ............\|---`kegg_organism_code` | [kegg code](https://www.genome.jp/kegg/catalog/org_list.html) for the organism; e.g. "mmu" for mouse or "hsa" for human |
+| ............\|---`pval:`    | p-value cutoff to use; default 0.05                                               |
+| ............\|---`qval:`    | q-value cutoff to use, only for ORA; default 0.2                                  |
+| .........\|---`KEGG_modules:` | test for KEGG module annotation:                                                |
+| ............\|---`type`     | whether to run gene set enrichment analysis or overrepresentation analysis; options: "gsea" or "ora"; default: "gsea" |
+| ............\|---`kegg_organism_code` | [kegg code](https://www.genome.jp/kegg/catalog/org_list.html) for the organism; e.g. "mmu" for mouse or "hsa" for human |
+| ............\|---`pval:`    | p-value cutoff to use; default 0.05                                               |
+| ............\|---`qval:`    | q-value cutoff to use, only for ORA; default 0.2                                  |
 | ......\|---`...`            | any key from `defaults` (overwrite them for this contrast)                        |
 | \|---`defaults:`            |                                                                                   |
 | ...\|---`max_p_adj`         | FDR cutoff 'alpha' for DESeq2's results function; *default: 0.1*                  |
@@ -95,13 +115,22 @@ Config options
 | ......\|---`independentFiltering` | perform independent filtering; "yes" or "no"                                 |
 | ...\|---`lfcShrink_parameters:` |                                                                                |
 | ......\|---`type`           | algorithm to use for log fold change shrinkage; Options: `none`, `apeglm`, `ashr`, `normal`<br>*default: "none"* |
-| ...\|---`GO:`               |                                                                                    |
-| ......\|---`fdr_threshold`  | FDR threshold to determine which results to use for functional annotation; *default: 0.1* |
+| ...\|---`ORA:`               |                                                                                    |
+| ......\|---`fdr_threshold`  | FDR threshold to determine which results to use for over-representation analysis; *default: 0.1* |
 |                             |                                                                                    |
 |**`report:`**                | **(define which snippets to include in the report)**                               |
 | \|---`report_snippets`      | List of report snippets (Rmd files) in the `report/` directory. Snippets will be appended in the order defined in this list (see section [Adding Rmd Snippets](#adding-rmd-snippets)) |
 | \|---`defaults:`            |                                                                                    |
-| ...\|---`contrast`          | default list of report snippets (Rmd files) added to each contrast in the report   |
+| ...\|---`...`               | default lists of report snippets (Rmd files) added to the report in blocks; a dict with block name as key and snippet list as value |
+| \|---`snippet_parameters:`  | parameters used in report snippets:                                                |
+| ...\|---`Normalisation_QC:` | parameters used in Normalisation_QC sub-folder:                                    |
+| ......\|---`n_most_varying` | analyse the n most varying genes                                                   |
+| ......\|---`annotation_columns` | columns of the covariate table used to annotate PCA and clustering             |
+| ...\|---`contrast:`          | parameters used in contrast sub-folder:                                           |
+| ......\|---`filter_results:` | parameters to filter DESeq2 results table:                                        |
+| .........\|---`qval`        | threshold on qvalue, display rows with q-value < qval only; default 0.1            |
+| ......\|---`filter_goseq:`  | parameters to filter goseq results table:                                          |
+| .........\|---`qval`        | threshold on qvalue, display rows with q-value < qval only; default 0.1            |
 
 ---
 

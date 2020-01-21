@@ -47,7 +47,7 @@ export:
       compress: zip
 ```
 
-SeA-SnaP will go through the list of path patterns under `path_patterns:` and try to create the files, while compiling the wildcard values from the config ({GENOME}), replacing [time formatting](https://docs.python.org/3/library/time.md#time.strftime) ("%Y_%m_%d") and filling additional wildcards from other entries under `export:`.
+SeA-SnaP will go through the list of path patterns under `path_patterns:` and try to create the files, while compiling the wildcard values from the config ({GENOME}), replacing [time formatting](https://docs.python.org/3/library/time.html#time.strftime) ("%Y_%m_%d") and filling additional wildcards from other entries under `export:`.
 
 A special wildcard `{files:<A>[:<B>]}` is searched. It will be replaced by `A` and an entry `export: A[_B]:` is looked up. This entry contains instructions for the path handler to construct file paths based on wildcard values. E.g. if `files: {step:star, extension:bam}` is included, the path to the *bam* output files of *STAR* is constructed and this file is copied to the new location, while the {step} and {extension} wildcards of the destination file path under `path_pattern:` are also filled in respectively.
 

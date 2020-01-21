@@ -1,0 +1,19 @@
+#REQUIRE {{cluster_profiler-rds-{{ENTRY_ID}}}}
+
+#### UpSet plot {.tabset .tabset-pills}
+
+UpSet plot for `cluster profiler` results for contrast {{ENTRY_NAME}}.
+
+```{r clusterprofiler_upsetplot_{{ENTRY_ID}}, results="asis"}
+library(enrichplot)
+
+for (test in names(ENRES)){
+  cat(sprintf("\n##### %s {- .tabset}\n", test))
+  for (cat in names(ENRES[[test]])){
+    cat(sprintf("\n###### %s {-}\n", cat))
+    
+    try({print(upsetplot(ENRES[[test]][[cat]])); cat("\n")})
+  }
+}
+```
+

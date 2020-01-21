@@ -1,0 +1,30 @@
+#REQUIRE {{cluster_profiler-rds-{{ENTRY_ID}}}}
+
+#### Annotation results table {.tabset .tabset-pills}
+
+Annotation results table for `cluster profiler` results for contrast {{ENTRY_NAME}}.
+
+```{r, echo=FALSE,include = FALSE}
+library(DT)
+# dependences attaching
+datatable(matrix())
+```
+
+```{r clusterprofiler_resultstable_{{ENTRY_ID}}, results="asis"}
+library(enrichplot)
+
+for (test in names(ENRES)){
+  cat(sprintf("\n##### %s {- .tabset}\n", test))
+  for (cat in names(ENRES[[test]])){
+    cat(sprintf("\n###### %s {-}\n", cat))
+    
+    cp_res_df <- as.data.frame(ENRES[[test]][[cat]])
+    try({knitr::knit_print(datatable(cp_res_df, extensions=c('Buttons','FixedColumns'), rownames=F, escape=F,
+          options = list(scrollX=TRUE, fixedColumns=list(leftColumns=1), dom='Bfrtip', buttons='csv')) %>%
+            formatRound('pvalue', 4) %>%
+            formatRound('p.adjust', 4) %>%
+            formatStyle("ID","white-space"="nowrap")); cat("\n")})
+  }
+}
+```
+

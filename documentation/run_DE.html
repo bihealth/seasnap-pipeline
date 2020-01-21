@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
@@ -145,6 +144,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -193,7 +193,7 @@ summary {
 <h3>1) edit the config file</h3>
 <p>After creating a working directory with the file <code>DE_config.yaml</code> you have to edit that file to set your configuration.</p>
 <p>SeA-SnaP parses an internal config file with default values from the git repository first and the files you edit in your working directory will overwrite the default values. In this way the config can be kept simple and you do not need to specify all values.</p>
-<p>Many configuration options are available described in a <a href="../config_options.md"><code>separate section</code></a>. (Hint: it might also be helpful to look into the default configuration file in the <a href="../defaults/DE_config_defaults.yaml">git repository</a>).</p>
+<p>Many configuration options are available described in a <a href="config_options.md"><code>separate section</code></a>. (Hint: it might also be helpful to look into the default configuration file in the <a href="../defaults/DE_config_defaults.yaml">git repository</a>).</p>
 <p>Here, we describe the minimal settings required:</p>
 <p><strong>required settings</strong></p>
 <p>In the config file which was copied to your working directory values that need to be filled are marked with <code>### FILL IN ###</code>. For other sections of the config file <code>__options__</code> gives hints to which further adjustments can be made. But you can also completely delete these other sections, if not required.</p>
@@ -233,7 +233,7 @@ summary {
 </tr>
 </tbody>
 </table>
-<p>(Note: at the moment only <code>filename</code> and <code>group</code> are actually used. Others might be blank.)</p>
+<p>(Note: at the moment only <code>filename</code>, <code>group</code> and <code>label</code> are actually used. Others might be blank.)</p>
 <p>To auto-generate a covariate file from the input path pattern defined in the config file, run:</p>
 <pre><code>./sea-snap covariate_file &lt;step&gt; &lt;extension&gt;</code></pre>
 <p>With e.g. &lt;step&gt;=‘salmon’ and &lt;extension&gt;=‘sf’ this would parse all files matching the wildcards <code>step</code> and <code>extension</code> with ‘salmon’ and ‘sf’ respectively. You can also directly add additional columns using the <code>--col</code> option.</p>

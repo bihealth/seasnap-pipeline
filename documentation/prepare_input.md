@@ -36,8 +36,14 @@ The file extension, e.g. `.fastq.gz` is left out from the path pattern, because 
 
 ### SODAR import
 
-To import data from SODAR, use iRods as explained elsewhere to download the **fastq files**.
-The `input_path_pattern` can then be adapted to match the folder structure.
+<p align="center">
+  <img width="600" src="pictures/import/sodar_import.svg" />
+</p>
+
+To import data from SODAR, use iRods to download the **fastq files**.
+Further, you can download an **ISA-tab file** from SODAR with meta information about the samples.
+
+The `input_path_pattern` in the config file should then be adapted to match the folder structure.
 
 E.g. for files like
 
@@ -53,21 +59,20 @@ inputs/{sample}/*_{mate,R1|R2}_*
 
 to parse "YRJZTT-T1-RNA1-mRNA_seq1" as sample ID and "R1" as mate name.
 
-Further, you can download an **ISA-tab file** from SODAR with meta information about the samples.
-
-the `sample_info` wrapper has an option to parse both the folder structure and the ISA-tab file and merge the results into a sample_info file.
-Run:
+The `sample_info` wrapper has an option to parse both the folder structure and the ISA-tab file and merge the results into a sample_info file.
+*After* editing the path pattern in the config file, run:
 
 ```
 ./sea-snap sample_info --from sodar --input path/to/isa-tab
 ```
 
-*after* editing the path pattern in the config file.
+A file called `sample_info.yaml` should be created, which contains information about the samples.
+Check the file, edit other relevant sections of the config file and you are ready to run the pipeline.
 
 **Note: The solution of parsing information from ISA-tab files is more or less temporary, since an API for SODAR is about to come at some point. 
 Nevertheless, until then the sea-snap helper can be used to extract information from the file.**
 
-Unfortunately, sometimes there are errors in the file, so please make sure to double-check the extracted ionformation.
+Unfortunately, sometimes there are errors in the ISA-tab files, so please make sure to double-check the extracted information.
 
 Further, the recognition of different ISA-tab column names and extraction of values is rudimentary at the moment, but can be extended in a separate configuration file that is located under [`tools/ISAtab_parse_conf.yaml`](../tools/ISAtab_parse_conf.yaml).
 It contains entries of this form:

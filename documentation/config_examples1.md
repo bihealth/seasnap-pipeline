@@ -47,6 +47,38 @@ This mechanism can also be used, when adding more analysis steps to the pipeline
 If results of some analysis steps are not computed for all contrasts, also the report must adapt by not including sections for those steps for a given contrast.
 See [`adding new snippets`](adding_rmd_snippets.md) on how to make snippet inclusion conditional.
 
+**included functional annotation methods so far:**
+
+- `goseq` for GO and KEGG over-representation analysis
+- `cluster_profiler` for MSigDb, GO and/or KEGG over-representation or gene set enrichment analysis
+
+To run both `goseq` and `cluster_profiler` on a contrast, e.g. set:
+
+```
+contrast_list:
+  - title: "A vs C"
+    vector: [1,1,0,1]
+    goseq: true
+    cluster_profiler:
+      run: true
+      MSigDb:
+        categories: [H, C2]
+        type: gsea
+      GO:
+        ontologies: [MF]
+        type: ora
+        pval: 0.1
+      KEGG:
+        type: ora
+        kegg_organism_code: mmu
+      KEGG_modules:
+        kegg_organism_code: mmu
+```
+
+For `cluster_profiler` more parameters can be configured. If any of `MSigDb`, `GO`, `KEGG` (pathways), `KEGG_modules` (modules) is set, the analysis will be run for the respective annotation. All parameters have defaults except for `kegg_organism_code`, which has to be provided. To use all defaults, e.g. for GO, set `GO: {}`. Separate tests will be performed for the categories/ontologies provided in the list. If categories/ontologies is not set, all categories/ontologies will be tested.
+
+---
+
 ### Configure report
 
 In the config file under `report:` you can define a 'building plan' how to assemble the report from Rmd snippets.
@@ -57,8 +89,9 @@ E.g.
 report:
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - SampleSimilarity_plot.Rmd
     - contrast:
         - __list__: __contrasts__
   defaults:
@@ -71,6 +104,9 @@ report:
 Will first insert the snippets (from the `report/` directory) in this order:
 
 - Covariate_table.Rmd
+
+and from sub-folder `NormalisationQC/`:
+
 - PCA_plot.Rmd
 - SampleSimilarity_plot.Rmd
 
@@ -89,8 +125,9 @@ E.g.:
 report:
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - SampleSimilarity_plot.Rmd
     - contrast:
       - __list__:
         - "A vs C"
@@ -112,8 +149,7 @@ This definition would be equivalent to the previous example:
 report:
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC: __defaults__
     - contrast: __defaults__
   defaults:
     contrast_list:
@@ -125,6 +161,9 @@ report:
         - "A vs C"
         - "B vs C":
           - Result_table.Rmd
+    NormalisationQC:
+      - PCA_plot.Rmd
+      - SampleSimilarity_plot.Rmd
 ```
 
 Here, `contrast: __defaults__` would load `contrast:` from the defaults. There, in turn, via `__list__` the defaults from `contrast_list:` would be loaded for the entry "A vs C".
@@ -133,6 +172,7 @@ Note: *blocks* do not have to contain a `__list__`, they may simply be groups of
 
 Tip: when configuring the report, it can be helpful to copy, paste and edit the report configuration from the [default yaml file](../defaults/DE_config_defaults.yaml).
 
+---
 
 ### Merging reports of several analyses
 
@@ -169,8 +209,9 @@ report:
     pre_analysis: previous_analysis/{contrast}/{step}/out/{step}.{contrast}.{extension}
   report_snippets:
     - Covariate_table.Rmd
-    - PCA_plot.Rmd
-    - SampleSimilarity_plot.Rmd
+    - NormalisationQC:
+        - PCA_plot.Rmd
+        - SampleSimilarity_plot.Rmd
     - contrast: __defaults__
     - pre_analysis:
         contrast: __defaults__

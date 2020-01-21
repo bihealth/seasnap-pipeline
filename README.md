@@ -3,8 +3,8 @@ RNA SeA-SnaP   <img align="right" width="140" src="documentation/pictures/SeA-Sn
 
 RNA SeA-SnaP is a RNA-(Se)q (A)nalysis (Sna)kemake (P)ipeline tool and combines two tasks:
 
-- A sub-pipeline mapping fastq files to a reference genome/transcriptome using STAR or Salmon
-- A sub-pipeline for Differential Expression (DE) analysis
+- A sub-pipeline mapping fastq files to a reference genome/transcriptome using `STAR` or `Salmon` and including extensive quality control (`Fastqc`, `Dupradar`, `Qualimap`, `RNASeQC`, `Preseq`, `infer_experiment`, `Multiqc`)
+- A sub-pipeline for Differential Expression (DE) analysis with `DESeq2`
 
 Both pipelines are based on [`Snakemake`](https://snakemake.readthedocs.io/en/stable/).
 
@@ -76,7 +76,7 @@ path/to/git/sea-snap.py working_dir
 ```
 
 This will create a directory at the location from where you are running the command called `results_<year>_<month>_<day>/` and add config files for both pipelines, but you can customize this behaviour via the command line options (type `sea-snap.py working_dir -h` for help).
-Directory names you provide can include formatting instructions for pythons [`time`](https://docs.python.org/3/library/time.md#time.strftime) package.
+Directory names you provide can include formatting instructions for pythons [`time`](https://docs.python.org/3/library/time.html#time.strftime) package.
 
 `cd <dir_name>` to the newly created working directory.
 SeA-SnaP also creates a symbolic link to the sea-snap.py script, so that you can from now on use `./sea-snap` to run helpers or pipelines from the working directory.

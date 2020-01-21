@@ -16,11 +16,14 @@ dependencies:
   - bioconductor-goseq
   - bioconductor-apeglm
   - bioconductor-dupradar
+  - bioconductor-clusterprofiler
   - r-blob=1.2.0 #for deseq2
   - r-readr
   - r-ashr
   - r-pheatmap
   - r-shiny
+  - r-msigdbr
+  - r-dplyr
   - rpy2
 
   - drmaa

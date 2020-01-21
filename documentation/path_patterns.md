@@ -33,6 +33,10 @@ The following wildcards are available in path patterns:
 **Note: {step} and {extension} are not read from the input files.
 They are only filled directly by pipeline rules using methods of the path handler.**
 
+<p align="center">
+  <img width="300" src="pictures/path_patterns/wildcards.svg" />
+</p>
+
 `{step}` is the name of a rule and `{extension}` is the file extension of produced output files.
 Both are required to save the output of different pipeline steps in unique locations.
 

@@ -1,8 +1,8 @@
 ## SeA-SnaP differential expression pipeline for RNA-seq analysis
-## version: 0.9.9
+## version: 1.0
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
-#TODO: auto-check config values, https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation
+#TODO: replace config value check by built-in? https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation
 
 import os, re, yaml, textwrap, pandas as pd
 from collections import OrderedDict
@@ -61,8 +61,10 @@ def get_inputs_all():
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	
 	#functional annotation
-	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) )),
+	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
+	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
+	
 	
 	return inputs
 
@@ -234,7 +236,7 @@ rule import_featurecounts:
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
-		#----- merge count files from star
+		#----- merge count files
                 read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"), 
                                                      col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read_fc(files[i], samples[i])))
@@ -418,7 +420,7 @@ rule contrast:
 			contrast_def = lfc_def = 'contrast=c("{}", "{}", "{}")'.format(contrast_column, contrast_num, contrast_ref)
 		elif "vector" in contrast:
 			contrast_type          = "vector"
-			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(contrast["vector"]))
+			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(map(str, contrast["vector"])))
 		else:
 			raise ValueError("Error in contrast: no valid contrast definition! must be one of {}".format(["coef:", "ratio:", "vector:"]))
 		
@@ -482,7 +484,7 @@ rule contrast:
 ##-------------------- functional annotation ----------------------------------------------------------------
 
 rule goseq:
-	""" functional annotation with goseq producing GO and KEGG lists """
+	""" over-representation analysis (ORA) with goseq producing GO and KEGG lists """
 	input:
 		txdb = pph.file_path("TxDb_from_GTF", "sqlite", contrast = "all"),
 		res  = pph.file_path("contrast", "rds")
@@ -499,7 +501,7 @@ rule goseq:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
 		
-		fdr_threshold = contrast["GO"]["fdr_threshold"]
+		fdr_threshold = contrast["ORA"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
 		
 		script = textwrap.dedent(r"""
@@ -548,6 +550,124 @@ rule goseq:
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="goseq", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+	
+	
+rule cluster_profiler:
+	""" gene set enrichment analysis (GSEA) or over-representation analysis (ORA) with cluster profiler for MSigDb, GO and/or KEGG"""
+	input:
+		res  = pph.file_path("contrast", "rds")
+	output:
+		rds = pph.file_path(step = "cluster_profiler", extension = "rds"),
+		csv = directory(pph.file_path(step = "cluster_profiler", extension = "csv"))
+	log:
+		out           = pph.file_path(step = "cluster_profiler", extension = "output.log",    log=True),
+		contrast_yaml = pph.file_path(step = "cluster_profiler", extension = "contrast.yaml", log=True)
+	params:
+		annot_pkg = config["organism"]["R"]["annotations"],
+		genus = config["organism"]["genus"],
+		csv_basename = "category_"
+	run:
+		contrast = pph.get_contrast(wildcards.contrast)
+		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		
+		fdr_threshold = contrast["ORA"]["fdr_threshold"]
+		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
+		go_pval = go_qval = kegg_pval = kegg_qval = keggm_pval = keggm_qval = ""
+		
+		test_annotations = {}
+		if "MSigDb" in contrast["cluster_profiler"]:
+			if "categories" in contrast["cluster_profiler"]["MSigDb"]:
+				test_annotations["MSigDb"] = dict(categories='c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["MSigDb"]["categories"])))
+			else:
+				test_annotations["MSigDb"] = dict(categories='c("H","C1","C2","C3","C4","C5","C6","C7")')
+			test_annotations["MSigDb"]["type"] = '"'+contrast["cluster_profiler"]["MSigDb"]["type"]+'"' if "type" in contrast["cluster_profiler"]["MSigDb"] else '"gsea"'
+		if "GO" in contrast["cluster_profiler"]:
+			if "ontologies" in contrast["cluster_profiler"]["GO"]:
+				test_annotations["GO"] = dict(categories='c({})'.format(", ".join('"'+c+'"' for c in contrast["cluster_profiler"]["GO"]["ontologies"])))
+			else:
+				test_annotations["GO"] = dict(categories='c("MF", "BP", "CC")')
+			test_annotations["GO"]["type"] = '"'+contrast["cluster_profiler"]["GO"]["type"]+'"' if "type" in contrast["cluster_profiler"]["GO"] else '"gsea"'
+			if "pval" in contrast["cluster_profiler"]["GO"]: go_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["pval"])
+			if "qval" in contrast["cluster_profiler"]["GO"]: go_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["GO"]["qval"])
+		if "KEGG" in contrast["cluster_profiler"]:
+			test_annotations["KEGG"] = dict(categories='c("pathways")')
+			test_annotations["KEGG"]["org"]  = '"'+contrast["cluster_profiler"]["KEGG"]["kegg_organism_code"]+'"'
+			test_annotations["KEGG"]["type"] = '"'+contrast["cluster_profiler"]["KEGG"]["type"]+'"' if "type" in contrast["cluster_profiler"]["KEGG"] else '"gsea"'
+			if "pval" in contrast["cluster_profiler"]["KEGG"]: kegg_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG"]["pval"])
+			if "qval" in contrast["cluster_profiler"]["KEGG"]: kegg_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG"]["qval"])
+		if "KEGG_modules" in contrast["cluster_profiler"]:
+			test_annotations["KEGG_modules"] = dict(categories='c("modules")')
+			test_annotations["KEGG_modules"]["org"]  = '"'+contrast["cluster_profiler"]["KEGG"]["kegg_organism_code"]+'"'
+			test_annotations["KEGG_modules"]["type"] = '"'+contrast["cluster_profiler"]["KEGG"]["type"]+'"' if "type" in contrast["cluster_profiler"]["KEGG"] else '"gsea"'
+			if "pval" in contrast["cluster_profiler"]["KEGG_modules"]: keggm_pval = ", pvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG_modules"]["pval"])
+			if "qval" in contrast["cluster_profiler"]["KEGG_modules"]: keggm_qval = ", qvalueCutoff = {}".format(contrast["cluster_profiler"]["KEGG_modules"]["qval"])
+		test_annot_R = "list({})".format(", ".join("{}=list({})".format(k, ",".join("{}={}".format(k2,v) for k2, v in d.items())) for k,d in test_annotations.items()))
+		
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(clusterProfiler)
+		library(GenomicFeatures)
+		library(AnnotationDbi)
+		library({params.annot_pkg})
+		library(msigdbr)
+		library(dplyr)
+		
+		{R_SESSION_INFO}
+		
+		#----- load results
+		res <- readRDS("{input.res}")
+		
+		#----- gene list GSEA
+		use_entries <- !is.na(res$entrez)
+		geneList_gsea <- res$log2FoldChange[use_entries]
+		names(geneList_gsea) <- as.character(res$entrez[use_entries])
+		geneList_gsea <- sort(geneList_gsea, decreasing = TRUE)
+		
+		#----- gene list ORA
+		geneList_ora <- res$entrez[res$padj < {fdr_threshold}]
+		geneList_ora <- geneList_ora[!is.na(geneList_ora)]
+		geneList_ora <- as.character(geneList_ora)
+		
+		#----- collect results
+		test_annotations <- {test_annot_R}
+		tests <- list()
+		
+		#----- run tests
+		for (test in c("MSigDb", "GO", "KEGG", "KEGG_modules")){{
+			if (test %in% names(test_annotations)){{
+				dir.create(paste0("{output.csv}/", test), recursive=TRUE)
+				categories <- test_annotations[[test]]$categories
+				cat_tests <- vector("list", length(categories))
+				for (i in 1:length(categories)){{
+					cat <- categories[i]
+					if (test == "MSigDb") msigdb_gs <- msigdbr(species = "{params.genus}", category = cat) %>% dplyr::select(gs_name, entrez_gene)
+					if (test_annotations[[test]]$type == "gsea"){{
+						if      (test == "MSigDb")       em <- GSEA(geneList_gsea, TERM2GENE = msigdb_gs)
+						else if (test == "GO")           em <- gseGO(geneList = geneList_gsea, OrgDb = {params.annot_pkg}, ont = cat, pAdjustMethod = "BH"{go_pval})
+						else if (test == "KEGG")         em <- gseKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG$org{kegg_pval})
+						else if (test == "KEGG_modules") em <- gseMKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG_modules$org{keggm_pval})
+					}} else {{
+						if      (test == "MSigDb")       em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
+						else if (test == "GO")           em <- enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg}, 
+						                                                ont = cat, pAdjustMethod = "BH"{go_pval}{go_qval})
+						else if (test == "KEGG")         em <- enrichKEGG(gene = geneList_ora, organism = test_annotations$KEGG$org{kegg_pval}{kegg_qval})
+						else if (test == "KEGG_modules") em <- enrichMKEGG(gene = geneList_ora, organism = test_annotations$KEGG_modules$org{keggm_pval}{keggm_qval})
+					}}
+					cat_tests[i] <- em
+					write.table(data.frame(em), file=paste0("{output.csv}/",test,"/{params.csv_basename}",cat,".csv"), 
+						    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+				}}
+				names(cat_tests) <- test_annotations[[test]]$categories
+				tests[[test]] <- cat_tests
+			}}
+		}}
+		
+		#----- save as rds
+		saveRDS(tests, file="{output.rds}")
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="cluster_profiler", extension="R", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 		
