@@ -957,12 +957,13 @@ class SampleInfoTool(PipelinePathHandler):
 			match_pattern = re.sub(r"\\\*\\\*",            "[^{}]*",   match_pattern)
 			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*", "[^{}./]*", match_pattern)
 		
+		print("\ninput files:\n{}".format("\n".join(input_files)))
+		print(f"\nmatch pattern:\n{match_pattern}")
+
 		wildcard_values = {w:[] for w in wildcards}
 		for inp in input_files:
 			self._get_wildcard_values_from_file_path(inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 			
-		print("\ninput files:\n{}".format("\n".join(input_files)))
-		print(f"\nmatch pattern:\n{match_pattern}")
 		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern,f).group(0), "") for f in input_files]}
 		
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
