@@ -4,6 +4,7 @@
 
 import sys, os, re, shutil, hashlib, itertools, yaml, pandas as pd
 from collections import namedtuple, Mapping, OrderedDict
+from contextlib import contextmanager
 from copy import deepcopy
 from time import strftime
 from warnings import warn
@@ -125,7 +126,7 @@ class PipelinePathHandler:
 			# if string
 			elif isinstance(val, str):
 				if isinstance(base_dict[key], str):
-					if not re.fullmatch(val, base_dict[key]):
+					if not re.fullmatch(val, base_dict[key], re.DOTALL):
 						raise ValueError("Error in config file: value of '{}' ('{}') does not match '{}'!".format(key, base_dict[key], val))
 				else:
 					raise TypeError("Error in config file: value of '{}' should be a string! got: {}".format(key, base_dict[key]))
@@ -386,60 +387,69 @@ class PipelinePathHandler:
 		export selected results into a separate folder structure (as configured in config file)
 		"""
 		export_spec = self.snakemake_workflow.config["export"]
-		for pattern in export_spec["path_pattern"]:
-			#--- go through path patterns (that specify which location to copy to)
-			pat = strftime(pattern).replace("{GENOME}", self.snakemake_workflow.config["organism"]["genome_version"])
-			wildcards = self._get_wildcard_list(pat)
-			key_wcs   = [wc for wc in wildcards if wc[:6] == "files:"]
-			assert len(key_wcs)==1 # no nested keys for now
-			key = key_wcs[0].split(":")[1:]
-			assert len(key)>0
-			pat = pat.replace("{{{}}}".format(key_wcs[0]), key[0])
-			#--- read specification for fetching files
-			for opt_dct in export_spec["_".join(key)]:
-				#--- read options
-				if "files" in opt_dct: mode = "files"
-				elif "dir" in opt_dct: mode = "dir"
-				else: raise ValueError("Error in export: no mode (files or dir) specfied in config!")
-				compress = opt_dct["compress"] if "compress" in opt_dct else None
-				arg_dct = opt_dct[mode]
-				#--- extract files
-				extra_wcs = set(wildcards) - set(key_wcs) - (set(arg_dct) & set(wildcards))
-				assert len(extra_wcs)<=1 # only either 'sample' (mapping) or 'contrast' (DE) for now
-				if extra_wcs:
-					extra_wc   = list(extra_wcs)[0]
-					wc_in_dct  = {k:v for k,v in arg_dct.items() if k in wildcards}
-					search_pat = self.out_path_pattern if not "log" in arg_dct else self.log_path_pattern
-					
-					if mode == "files":
-						source = self.expand_path(**arg_dct)
-					else:
-						source = self.file_path(**{**arg_dct, "extension": "{extension}"})
-						source = str(Path(source).parent / ("" if compress else "**"))
-						source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
-						search_pat = str(Path(search_pat).parent)
+		blueprint = export_spec["blueprint"]
+		none_context = contextmanager(lambda: iter([None]))()
+		with (open(blueprint["file"], "w") if blueprint and blueprint["file"] else none_context) as bp_out:
+			for pattern in export_spec["path_pattern"]:
+				#--- go through path patterns (that specify which location to copy to)
+				pat = strftime(pattern).replace("{GENOME}", self.snakemake_workflow.config["organism"]["genome_version"])
+				wildcards = self._get_wildcard_list(pat)
+				key_wcs   = [wc for wc in wildcards if wc[:6] == "files:"]
+				assert len(key_wcs)==1 # no nested keys for now
+				key = key_wcs[0].split(":")[1:]
+				assert len(key)>0
+				pat = pat.replace("{{{}}}".format(key_wcs[0]), key[0])
+				#--- read specification for fetching files
+				for opt_dct in export_spec["_".join(key)]:
+					#--- read options
+					if "files" in opt_dct: mode = "files"
+					elif "dir" in opt_dct: mode = "dir"
+					else: raise ValueError("Error in export: no mode (files or dir) specfied in config!")
+					compress = opt_dct["compress"] if "compress" in opt_dct else None
+					arg_dct = opt_dct[mode]
+					#--- extract files
+					extra_wcs = set(wildcards) - set(key_wcs) - (set(arg_dct) & set(wildcards))
+					assert len(extra_wcs)<=1 # only either 'sample' (mapping) or 'contrast' (DE) for now
+					if extra_wcs:
+						extra_wc   = list(extra_wcs)[0]
+						wc_in_dct  = {k:v for k,v in arg_dct.items() if k in wildcards}
+						search_pat = self.out_path_pattern if not "log" in arg_dct else self.log_path_pattern
 						
-					get_wc = self._get_wildcard_values_from_file_path
-					target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
-				else:
-					source = [self.file_path(**arg_dct)]
-					target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
-				#--- copy files
-				assert len(source)==len(target)
-				for i in range(len(source)):
-					if mode == "dir" and not compress: target[i] = str(Path(target[i]) / Path(source[i]).name)
-					Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
-					src, trg = Path(source[i]).resolve(), Path(target[i]).resolve()
-					if not compress:
-						print("copy {} to {}...".format(source[i], target[i]))
-						shutil.copy2(source[i], target[i])
-					elif compress == "zip":
-						print("zip {} into {}...".format(source[i], target[i]))
-						os.system(f"cd {str(src.parent)}; zip -r {str(trg)} {str(src.name)}")
-					elif compress == "tar":
-						print("tar {} into {}...".format(source[i], target[i]))
-						os.system(f"cd {str(src.parent)}; tar -czf {str(trg)} {str(src.name)}")
-					Path(target[i] + ".md5").write_text(self._md5(target[i]))
+						if mode == "files":
+							source = self.expand_path(**arg_dct)
+						else:
+							source = self.file_path(**{**arg_dct, "extension": "{extension}"})
+							source = str(Path(source).parent / ("" if compress else "**"))
+							source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
+							search_pat = str(Path(search_pat).parent)
+							
+						get_wc = self._get_wildcard_values_from_file_path
+						target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
+					else:
+						source = [self.file_path(**arg_dct)]
+						target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
+					#--- copy files or write blueprint
+					assert len(source)==len(target)
+					for i in range(len(source)):
+						if mode == "dir" and not compress: target[i] = str(Path(target[i]) / Path(source[i]).name)
+						Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
+						f_src, f_trg = Path(source[i]).resolve(), Path(target[i]).resolve()
+						if compress == "zip":
+							to_zip = str(f_src.with_suffix('.zip'))
+							print(f"compression: create {to_zip} ...")
+							os.system(f"zip -r {to_zip} {str(f_src)}")
+							source[i], f_src = to_zip, Path(to_zip)
+						elif compress == "tar":
+							to_tar = str(f_src.with_suffix('.tar'))
+							print(f"compression: create {to_tar} ...")
+							os.system(f"zip -r {to_tar} {str(f_src)}")
+							source[i], f_src = to_tar, Path(to_tar)
+						print("copy {} to {} ...".format(source[i], target[i]))
+						if bp_out: 
+							print(blueprint["command"].format(src=f_src, dest=target[i]), file=bp_out)
+						else: 
+							shutil.copy2(source[i], target[i])
+							Path(target[i] + ".md5").write_text(self._md5(target[i]))
 		
 		
 ##################################################################################################################################
