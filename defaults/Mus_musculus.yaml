@@ -1,0 +1,20 @@
+organism:
+  name: mouse
+  genus: "Mus Musculus"
+  taxon: 10090
+
+  genome_version: GRCm38
+  
+  files:
+    genome: ""
+    transcriptome: ""
+    gtf: ""
+    
+    bed: ""
+    seqc_gtf: ""
+    
+  star_index: null
+  salmon_index: null
+    
+  R:
+    annotations: org.Mm.eg.db

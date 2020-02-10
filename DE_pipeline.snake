@@ -114,8 +114,15 @@ rule all:
 			:literal:
 		
 		""", output.html, graph = rule_execution, table = summary)
-	
 
+
+rule export:
+	input:
+		get_inputs_all()
+	run:
+		pph.export()
+
+	
 ##-------------------- make TxDb -----------------------------------------------------------------------------
 
 rule TxDb_from_GTF:

@@ -95,4 +95,25 @@ report:
     - NormalisationQC: __defaults__
     - contrast: __defaults__
 
+#---------------------------------------- configuration for export
+export:
+  blueprint:
+    file: SODAR_export_DE_blueprint.txt
+    command: |
+      imkdir -p $(dirname {dest} )
+      irsync -a -K {src} i:{dest}
+  path_pattern:
+    - __SODAR__/{contrast}/{GENOME}/%Y_%m_%d/{files:differential_expression}/out/{step}.{contrast}.{extension}
+    - __SODAR__/{contrast}/{GENOME}/%Y_%m_%d/{files:functional_analysis:rds}/{step}/out/{step}.{contrast}.{extension}
+    - __SODAR__/{contrast}/{GENOME}/%Y_%m_%d/{files:functional_analysis:csv}/{step}/out/{step}.{contrast}.zip
+  differential_expression:
+    - files: {step: contrast, extension: rds}
+  functional_analysis_rds:
+    - files: {step: goseq, extension: go.rds}
+    - files: {step: goseq, extension: kegg.rds}
+    - files: {step: cluster_profiler, extension: rds}
+  functional_analysis_csv:
+    - files: {step: cluster_profiler, extension: csv}
+      compress: zip
+
 

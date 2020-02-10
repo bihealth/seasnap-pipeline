@@ -432,24 +432,37 @@ class PipelinePathHandler:
 					assert len(source)==len(target)
 					for i in range(len(source)):
 						if mode == "dir" and not compress: target[i] = str(Path(target[i]) / Path(source[i]).name)
-						Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
-						f_src, f_trg = Path(source[i]).resolve(), Path(target[i]).resolve()
-						if compress == "zip":
-							to_zip = str(f_src.with_suffix('.zip'))
-							print(f"compression: create {to_zip} ...")
-							os.system(f"zip -r {to_zip} {str(f_src)}")
-							source[i], f_src = to_zip, Path(to_zip)
-						elif compress == "tar":
-							to_tar = str(f_src.with_suffix('.tar'))
-							print(f"compression: create {to_tar} ...")
-							os.system(f"zip -r {to_tar} {str(f_src)}")
-							source[i], f_src = to_tar, Path(to_tar)
-						print("copy {} to {} ...".format(source[i], target[i]))
-						if bp_out: 
-							print(blueprint["command"].format(src=f_src, dest=target[i]), file=bp_out)
-						else: 
-							shutil.copy2(source[i], target[i])
-							Path(target[i] + ".md5").write_text(self._md5(target[i]))
+						f_src, f_trg = Path(source[i]).resolve(), Path(target[i])
+						print("\n...copy {} to {} ...\n".format(source[i], target[i]))
+						if f_src.exists():
+							if compress == "zip":
+								to_zip = str(f_src.with_suffix('.zip'))
+								print(f"compression: create {to_zip} ...")
+								os.system(f"cd {str(f_src.parent)}; zip -r {to_zip} {str(f_src.name)}")
+								source[i], f_src = to_zip, Path(to_zip)
+							elif compress == "tar":
+								to_tar = str(f_src.with_suffix('.tar'))
+								print(f"compression: create {to_tar} ...")
+								os.system(f"cd {str(src.parent)}; tar -czf {to_tar} {str(f_src.name)}")
+								source[i], f_src = to_tar, Path(to_tar)
+							if bp_out:
+								print(blueprint["command"].format(
+									src  = f_src, 
+									dest = target[i]
+								), file=bp_out)
+								#-- create md5 sum
+								md5_path = Path(source[i] + ".md5")
+								if not md5_path.exists(): md5_path.write_text(self._md5(source[i]))
+								print(blueprint["command"].format(
+									src  = md5_path.resolve(), 
+									dest = f_trg.with_suffix(f_trg.suffix+".md5")
+								), file=bp_out)
+							else: 
+								Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
+								shutil.copy2(source[i], target[i])
+								Path(target[i] + ".md5").write_text(self._md5(target[i]))
+						else:
+							warn(f"Source file {str(f_src)} does not exist!")
 		
 		
 ##################################################################################################################################
