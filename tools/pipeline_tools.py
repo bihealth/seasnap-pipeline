@@ -268,7 +268,7 @@ class PipelinePathHandler:
 			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*",      "[^{}./]*", match_pattern)
 			
 		wildcard_values = wildc_val if wildc_val else {w:[] for w in wildcards}
-		
+
 		matches = re.match(match_pattern, filename).groups()
 		assert len(matches)==len(wildcards)
 		seen = set()
@@ -377,7 +377,7 @@ class PipelinePathHandler:
 		os.system('echo "--------------- snakefile --------------" >> {}'.format(out_log))
 		os.system('echo "snakefile name: {}" >> {}'.format(self.snakemake_workflow.snakefile, out_log))
 		os.system('echo "snakefile md5 : {}" >> {}'.format(self._md5(self.snakemake_workflow.snakefile), out_log))
-		os.system('echo "----------------------------------------" >> {l}; echo >> {l}'.format(l=out_log))
+		os.system('echo "----------------------------------------" >> "{l}"; echo >> "{l}"'.format(l=out_log))
 		
 		return script_file
 

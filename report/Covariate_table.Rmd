@@ -15,7 +15,6 @@ covariate_table <- covariate_table[,c(2:dim(covariate_table)[2], 1)]
 #----- create table
 datatable(covariate_table, rownames=F, extensions='Buttons', escape=F,
           options = list(scrollX = TRUE, dom='Bfrtip', buttons=c('copy', 'csv', 'pdf'))) %>%
-  formatRound('sizeFactor', 3) %>%
   formatStyle("filename","white-space"="nowrap") %>%
   formatStyle("group","white-space"="nowrap") %>%
   formatStyle("label","white-space"="nowrap")

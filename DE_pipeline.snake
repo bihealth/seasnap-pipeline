@@ -305,8 +305,9 @@ rule import_sf:
 		for (col in names(level_cols)) {{
 			sample_df[,col] <- factor(sample_df[,col], levels = level_cols[[col]])
 		}}
-		
+
 		#----- import txi in DESeq2
+		rownames(sample_df) <- sample_df$label
 		dds <- DESeqDataSetFromTximport(txi, colData = sample_df, design = {DESIGN})
 		
 		#----- save as rds
@@ -654,6 +655,7 @@ rule cluster_profiler:
 						else if (test == "KEGG")         em <- enrichKEGG(gene = geneList_ora, organism = test_annotations$KEGG$org{kegg_pval}{kegg_qval})
 						else if (test == "KEGG_modules") em <- enrichMKEGG(gene = geneList_ora, organism = test_annotations$KEGG_modules$org{keggm_pval}{keggm_qval})
 					}}
+					em <- setReadable(em, OrgDb={params.annot_pkg}, keyType="ENTREZID")
 					cat_tests[i] <- em
 					write.table(data.frame(em), file=paste0("{output.csv}/",test,"/{params.csv_basename}",cat,".csv"), 
 						    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)

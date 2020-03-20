@@ -176,7 +176,8 @@ rule fastqc:
 	params:
 		outdir  = pph.out_dir_name(step="fastqc")
 	threads:
-		lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
+		2
+		# lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
 	run:
 		reads = " ".join(input)
 		
@@ -462,8 +463,18 @@ rule dupradar:
 		#----- prepare
 		set -eux
 		
+		#----- work on temp dir (because of sort)
+		TMPDIR=$(mktemp -d)
+		trap "rm -rf $TMPDIR" EXIT
+
+		bam=$(realpath {input.bam})
+		gtf=$(realpath {input.gtf})
+		out=$(realpath {output})
+		
+		cd $TMPDIR
+
 		#----- dupradar
-		Rscript --vanilla {SCRIPTDIR}/dupradar.R {input.bam} {wildcards.sample} {input.gtf} {protocol} {paired} {threads} $(dirname {output})
+		Rscript --vanilla {SCRIPTDIR}/dupradar.R $bam {wildcards.sample} $gtf {protocol} {paired} {threads} $(dirname $out)
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="dupradar", extension="sh", **wildcards)
@@ -501,7 +512,7 @@ rule preseq_lc_extrap:
 	log:
 		out = pph.file_path(step="preseq_lc_extrap", extension="output.log", log=True)
 	run:
-		paired   = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired   = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -523,7 +534,7 @@ rule preseq_c_curve:
 	log:
 		out = pph.file_path(step="preseq_c_curve", extension="output.log", log=True)
 	run:
-		paired   = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired   = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -549,7 +560,7 @@ rule qualimap_rnaseq:
 	log:
 		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
 	resources:
-		mem_mb = 64000
+		mem_mb = 24000
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		paired   = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
@@ -557,6 +568,11 @@ rule qualimap_rnaseq:
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
+		
+		#----- set tmpdir
+		export TMPDIR=$(mktemp -d)
+		trap "rm -rf $TMPDIR" EXIT
+		export JAVA_OPTS="-Djava.io.tmpdir=$TMPDIR"
 		
 		#----- rna-seqc
 		qualimap --java-mem-size={resources.mem_mb}M rnaseq -bam {input.bam} -gtf {input.gtf} -outdir {output.outdir} -p {protocol} {paired}
@@ -575,7 +591,7 @@ rule qualimap_bamqc:
 	log:
 		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
 	resources:
-		mem_mb = 64000
+		mem_mb = 24000
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		
@@ -583,6 +599,11 @@ rule qualimap_bamqc:
 		#----- prepare
 		set -eux
 		
+		#----- set tmpdir
+		export TMPDIR=$(mktemp -d)
+		trap "rm -rf $TMPDIR" EXIT
+		export JAVA_OPTS="-Djava.io.tmpdir=$TMPDIR"
+
 		#----- rna-seqc
 		qualimap --java-mem-size={resources.mem_mb}M bamqc -bam {input.bam} -outdir {output.outdir} -c -ip -p {protocol}
 		find {output.outdir} -name "*.txt" -exec sh -c 'mv "{{}}" $(dirname "{{}}")/{wildcards.sample}_$(basename "{{}}")' \;
