@@ -9,11 +9,14 @@ from contextlib import contextmanager
 from copy import deepcopy
 from time import strftime
 from warnings import warn
+import warnings
 from pathlib import Path
 from glob import iglob, glob
 #from snakemake.io import glob_wildcards
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
+
+warnings.simplefilter("always")
 
 ##################################################################################################################################
 #---------------------------------------------- base class for handling file paths ----------------------------------------------#
@@ -378,19 +381,24 @@ class PipelinePathHandler:
 			# other Iterable
 			data_keys, data_values = PipelinePathHandler._get_names_values(data)
 			# auto-determine target type to_type
-			if not to_type:
-				same_type = all(isinstance(i, type(data_values[0])) for i in data_values)
-				to_type = "vector" if same_type else "list"
+			same_type = all(isinstance(i, type(data_values[0])) for i in data_values)
+			no_iter_inside = not isinstance(data_values[0], Iterable) or isinstance(data_values[0], str) if data_values else True
+			use_type = "vector" if same_type and no_iter_inside else "list"
+			if to_type:
+				if to_type == "vector" and to_type != use_type:
+					warn("Cannot use 'vector' for all Iterables, using 'list'!")
+				else:
+					use_type = to_type
 			# set substitute string
-			if to_type == "vector":
+			if use_type == "vector":
 				subs = "c({})"
-			elif to_type == "list":
+			elif use_type == "list":
 				subs = "list({})"
 			else:
-				raise ValueError(f"Wrong value {to_type} for to_type!")
+				raise ValueError(f"Wrong value {use_type} for to_type!")
 			# fill values
 			data_values = (
-				PipelinePathHandler.get_r_repr(value, round_float=round_float)
+				PipelinePathHandler.get_r_repr(value, round_float=round_float, to_type=to_type)
 				for value in data_values
 			)
 			if data_keys:
