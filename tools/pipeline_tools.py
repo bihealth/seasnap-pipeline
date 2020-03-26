@@ -3,7 +3,8 @@
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
 import sys, os, re, shutil, hashlib, itertools, yaml, pandas as pd
-from collections import namedtuple, Mapping, OrderedDict
+from builtins import isinstance, TypeError
+from collections import namedtuple, Mapping, OrderedDict, Iterable
 from contextlib import contextmanager
 from copy import deepcopy
 from time import strftime
@@ -214,7 +215,19 @@ class PipelinePathHandler:
 			for chunk in iter(lambda: f.read(4096), b""):
 				hash_md5.update(chunk)
 		return hash_md5.hexdigest()
-		
+
+	@staticmethod
+	def _get_names_values(data):
+		if isinstance(data, Mapping):
+			data_values = list(data.values())
+			data_keys = list(data.keys())
+		elif isinstance(data, Iterable):
+			data_values = list(data)
+			data_keys = None
+		else:
+			raise TypeError(f"Cannot get names and values for type {type(data)}!")
+		return data_keys, data_values
+
 	def _get_wildcard_combinations(self, wildcard_values):
 		""" go through wildcard values and get combinations """
 		
@@ -339,6 +352,52 @@ class PipelinePathHandler:
 			return self._get_wildcard_values_from_file_path(filepath, self.in_path_pattern)
 		else:
 			return self._get_wildcard_values_from_file_path(filepath, self.out_path_pattern)
+
+	@staticmethod
+	def get_r_repr(data, to_type=None, round_float=None):
+		"""
+		Translate python data structure into R representation for vector (i.e. c(...)) or list (i.e. list(...)).
+		If to_type==None, choose c() or list() automatically. Named vector/list is created if data is of type
+		Mapping (e.g. a dictionary).
+
+		:param data: data to convert into R representation
+		:param to_type: "vector" or "list"; if None, choose automatically
+		:param round_float: round floats to N digits; if None do not round
+		:returns: a string with R representation of data
+		"""
+		if not isinstance(data, Iterable):
+			# single value
+			if isinstance(data, bool):
+				return "TRUE" if data else "FALSE"
+			elif isinstance(data, (int, float)):
+				return str(round(data, round_float) if round_float else data)
+		elif isinstance(data, str):
+			# string
+			return '"' + data + '"'
+		else:
+			# other Iterable
+			data_keys, data_values = PipelinePathHandler._get_names_values(data)
+			# auto-determine target type to_type
+			if not to_type:
+				same_type = all(isinstance(i, type(data_values[0])) for i in data_values)
+				to_type = "vector" if same_type else "list"
+			# set substitute string
+			if to_type == "vector":
+				subs = "c({})"
+			elif to_type == "list":
+				subs = "list({})"
+			else:
+				raise ValueError(f"Wrong value {to_type} for to_type!")
+			# fill values
+			data_values = (
+				PipelinePathHandler.get_r_repr(value, round_float=round_float)
+				for value in data_values
+			)
+			if data_keys:
+				return subs.format(", ".join(f'"{k}"={v}' for k, v in zip(data_keys, data_values)))
+			else:
+				return subs.format(", ".join(data_values))
+		raise TypeError(f"No R representation set for {type(data)}!")
 		
 	def log(self, out_log, script, step, extension, **kwargs):
 		"""
