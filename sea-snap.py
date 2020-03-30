@@ -16,7 +16,10 @@ CONFIGS    = dict(DE      = "DE_config.yaml",
 
 CLUSTER_CONFIG = "cluster_config.json"
 
-CLUSTER_START  = "qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh"
+CLUSTER_START = dict(
+	sge="qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	slurm="sbatch -c 1 --mem_per_cpu=4G -t 100:00:00 -p control -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+)
 
 
 ############################## HELPER FUNCTIONS
@@ -168,9 +171,12 @@ def run_pipeline(snakefile, args):
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
 		s_command += " " + data["__set_run_command__"]["snake_opt"]
 		s_command += " " + "--cluster-config " + CLUSTER_CONFIG
-		s_command += " " + data["__set_run_command__"]["run_command"]
+		if args.slurm:
+			s_command += " " + data["__set_run_command__"]["run_command_slurm"]
+		else:
+			s_command += " " + data["__set_run_command__"]["run_command_sge"]
 		run_script.write_text(s_command)
-		command = "set -e; " + CLUSTER_START
+		command = "set -e; " + CLUSTER_START["slurm" if args.slurm else "sge"]
 		print(command)
 	# run
 	os.system(command)
@@ -243,12 +249,14 @@ parser_select_contrast.set_defaults(func=select_contrast)
 #--- parser for mapping pipeline
 parser_mapping = subparsers.add_parser('mapping', help="run mapping pipeline")
 parser_mapping.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
+parser_mapping.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
 parser_mapping.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_mapping.set_defaults(func=run_mapping_pipeline)
 
 #--- parser for DE pipeline
 parser_DE = subparsers.add_parser('DE', help="run DE pipeline")
 parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
+parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
 
