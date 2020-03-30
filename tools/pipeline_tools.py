@@ -374,6 +374,8 @@ class PipelinePathHandler:
 				return "TRUE" if data else "FALSE"
 			elif isinstance(data, (int, float)):
 				return str(round(data, round_float) if round_float else data)
+			elif data is None:
+				return "NULL"
 		elif isinstance(data, str):
 			# string
 			return '"' + data + '"'
