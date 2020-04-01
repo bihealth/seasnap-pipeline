@@ -18,7 +18,7 @@ CLUSTER_CONFIG = "cluster_config.json"
 
 CLUSTER_START = dict(
 	sge="qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
-	slurm="sbatch -c 1 --mem_per_cpu=4G -t 100:00:00 -p control -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	slurm="sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
 )
 
 
@@ -141,7 +141,7 @@ def cleanup_cluster_log(args):
 					item.unlink()
 			dir_path.rmdir()
 
-	rmdir("sge_log")
+	rmdir("cluster_log")
 	for p in Path(".").glob("temp_snakemake*.sh"): p.unlink()
 	for p in Path(".").glob("run_pipeline.sh"): p.unlink()
 	for p in Path(".").glob("core.*"): p.unlink()
@@ -165,9 +165,9 @@ def run_pipeline(snakefile, args):
 	elif args.mode in ["cluster", "c"]:
 		with open(CLUSTER_CONFIG, "r") as json_file:
 			data = json.load(json_file)
-		Path("sge_log").mkdir(exist_ok=True)
+		Path("cluster_log").mkdir(exist_ok=True)
 		run_script = Path("run_pipeline.sh")
-		s_command  = "snakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
+		s_command  = "#!/bin/bash\nsnakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
 		s_command += " " + data["__set_run_command__"]["snake_opt"]
 		s_command += " " + "--cluster-config " + CLUSTER_CONFIG
@@ -176,7 +176,7 @@ def run_pipeline(snakefile, args):
 		else:
 			s_command += " " + data["__set_run_command__"]["run_command_sge"]
 		run_script.write_text(s_command)
-		command = "set -e; " + CLUSTER_START["slurm" if args.slurm else "sge"]
+		command = "set -e;" + CLUSTER_START["slurm" if args.slurm else "sge"]
 		print(command)
 	# run
 	os.system(command)
