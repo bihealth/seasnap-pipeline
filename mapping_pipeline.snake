@@ -36,6 +36,7 @@ pph = MappingPipelinePathHandler(workflow, test_config)
 
 # link indices
 pph.link_index(step="star_index", fix="all")
+pph.link_index(step="bwa_index", fix="all")
 pph.link_index(step="salmon_index", fix="all")
 pph.link_index(step="generate_transcriptome", fix="all", entry=config["organism"]["files"]["transcriptome"])
 
@@ -305,6 +306,78 @@ rule star:
 		script_file = pph.log(log.out, snakemake_format(script), step="star", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+##-------------------- bwa ---------------------------------------------------------------------------------
+
+rule bwa_index:
+    """ create index for BWA """
+	input:
+		genome = config["organism"]["files"]["genome"]
+	output:
+		index = pph.out_dir_name(step = "bwa_index")+"/"+config["organism"]["files"]["genome"]
+	log:
+		out = pph.file_path(step="bwa_index", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["bwa_index"]["cmd_opt"]
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		rm -fr $(dirname {output.index})/*
+		bwa --version
+
+		#----- run bwa index
+		bwa index -p {output.index} {params.options} {input.genome}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="bwa_index", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+rule bwa:
+    """ run BWA mem """
+	input:
+		index = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries") + "/" + config["organism"]["files"]["genome"],
+		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
+		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unpaired
+	output:
+		sam = pph.file_path(step="bwa", extension="sam")
+	log:
+		out = pph.file_path(step="bwa", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["bwa"]["cmd_opt"],
+		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False
+	threads: 8
+	run:
+		# prepare read input
+		unpaired = input.reads1 == input.reads2
+		file_ext = config["sample_info"][wildcards.sample]["read_extension"].split(".")[-1]
+
+		if params.trim:
+		    preprocess = f"trimadap-mt -p {threads//2}"
+		elif file_ext == "gz":
+		    preprocess = "zcat"
+		else:
+		    preprocess = "echo"
+
+		if unpaired:
+		    reads = f"<({preprocess} {" ".join(input.reads1)})"
+		else:
+		    reads = f"<({preprocess} {" ".join(input.reads1)}) <({preprocess} {" ".join(input.reads2)})"
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		rm -fr $(dirname {output.sam})/*
+		bwa --version
+
+		#----- run bwa mem
+		bwa mem {params.options} -t {threads} {input.index} {reads} 1> {output.sam}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="bwa", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
 ##-------------------- salmon -------------------------------------------------------------------------------
 
 rule generate_transcriptome:
@@ -369,7 +442,7 @@ rule salmon:
 	input:
 		index = pph.out_dir_name(step = "salmon_index", fix="all")+"/pos.bin",
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
-		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unstranded
+		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unpaired
 	output:
 		sf = pph.file_path(step = "salmon", extension="sf")
 	log:
@@ -380,14 +453,14 @@ rule salmon:
 	threads: 8
 	run:
 		# prepare read input and trimming
-		unstranded = input.reads1 == input.reads2
+		unpaired = input.reads1 == input.reads2
 		if params.trim:
-			if unstranded:
+			if unpaired:
 				reads = "-r <(for var in {rds}; do trimadap-mt $var -p {thr}; done)".format(thr=threads//2, rds=" ".join(input.reads1))
 			else:
 				reads = "-1 <(trimadap-mt -p {thr} {rds1}) -2 <(trimadap-mt -p {thr} {rds2})".format(thr=threads//2, rds1=" ".join(input.reads1), rds2=" ".join(input.reads2))
 		else:
-			if unstranded:
+			if unpaired:
 				reads = "-r {rds}".format(rds=" ".join(input.reads1))
 			else:
 				reads = "-1 {rds1} -2 {rds2}".format(rds1=" ".join(input.reads1), rds2=" ".join(input.reads2))

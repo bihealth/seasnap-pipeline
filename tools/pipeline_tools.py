@@ -738,7 +738,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		Generate symbolic link to index folder (if provided in config).
 		
 		A key-value pair is assumed to be in the organism config file with the name of the step (e.g. "star_index") as key 
-		and a path to a corresponding index/input file. If no index should be linked, keep the key, but leave the value empty.
+		and a path to a corresponding index/input file. If no index should be linked, keep the key in the config file,
+		but leave the value empty.
 		
 		:param step:  Snakemake rule for which the paths are generated
 		:param sample: sample ID to be included in the file path
