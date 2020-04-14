@@ -11,8 +11,11 @@ from pathlib import Path
 from tools.pipeline_tools import CovariateFileTool, SampleInfoTool
 
 SCRIPT_DIR = Path(sys.path[0])
-CONFIGS    = dict(DE      = "DE_config.yaml",
-                  mapping = "mapping_config.yaml")
+CONFIGS = dict(
+	DE="DE_config.yaml",
+	mapping="mapping_config.yaml",
+	sc="sc_config.yaml",
+)
 
 CLUSTER_CONFIG = "cluster_config.json"
 
@@ -31,7 +34,7 @@ def setup_working_directory(args):
 	choice = args.configs
 	
 	# paths of config files
-	config_files = [SCRIPT_DIR / val for key,val in CONFIGS.items() if key in choice]
+	config_files = [SCRIPT_DIR / val for key, val in CONFIGS.items() if key in choice]
 
 	# create working directory
 	working_dir = Path(time.strftime(args.dirname))
@@ -188,11 +191,19 @@ def run_mapping_pipeline(args):
 	"""
 	run_pipeline("mapping_pipeline.snake", args)
 
+
 def run_DE_pipeline(args):
 	"""
 	run differential expression (DE) pipeline
 	"""
 	run_pipeline("DE_pipeline.snake", args)
+
+
+def run_sc_pipeline(args):
+	"""
+	run single cell pipeline
+	"""
+	run_pipeline("sc_pipeline.snake", args)
 
 
 ############################## DEFINE PARSER
@@ -205,7 +216,7 @@ subparsers = parser.add_subparsers(title="subcommands",   metavar="COMMAND", hel
 #--- parser for setup_working_directory
 parser_working_dir = subparsers.add_parser('working_dir', help="setup a working directory for running the pipeline")
 parser_working_dir.add_argument('--dirname', '-d',   default="results_%Y_%m_%d/", help="name of directory")
-parser_working_dir.add_argument('--configs', '-c', nargs='+', default=["mapping", "DE"], choices=["mapping", "DE"], help="configs to be imported")
+parser_working_dir.add_argument('--configs', '-c', nargs='+', default=["mapping", "DE", "sc"], choices=["mapping", "DE", "sc"], help="configs to be imported")
 parser_working_dir.set_defaults(func=setup_working_directory)
 
 #--- parser for generate_sample_info
@@ -259,6 +270,13 @@ parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run lo
 parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
+
+#--- parser for sc pipeline
+parser_DE = subparsers.add_parser('sc', help="run single cell pipeline")
+parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
+parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
+parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
+parser_DE.set_defaults(func=run_sc_pipeline)
 
 #--- parser for cleanup_cluster_log
 parser_cleanup_log = subparsers.add_parser('cleanup_log', help="delete log files from cluster execution")
