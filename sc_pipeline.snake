@@ -1,0 +1,195 @@
+## SeA-SnaP single cell pipeline for RNA-seq analysis
+## version: 0.1
+## author: J.P.Pett (patrick.pett@bihealth.de)
+
+import os, sys, yaml, re, textwrap, pandas as pd
+from collections import OrderedDict
+from time import asctime, localtime, time
+from pathlib import Path
+from snakemake.utils import report, format as snakemake_format, min_version
+from snakemake.logging import logger
+from tools.pipeline_tools import MappingPipelinePathHandler
+
+yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
+min_version("3.7")
+shell.prefix("set -e  pipefail;")
+
+# source files
+SNAKEDIR  = Path(workflow.current_basedir)
+SNAKEFILE = workflow.snakefile
+SCRIPTDIR = str(SNAKEDIR / "external_scripts")
+
+# assemble config
+configfile: str(SNAKEDIR / "defaults" / "sc_config_defaults.yaml")
+configfile: "sc_config.yaml"
+configfile: "sample_info.yaml"
+if config["organism_defaults"]:
+	configfile: str(SNAKEDIR / "defaults" / config["organism_defaults"])
+	configfile: "sc_config.yaml"
+
+# create path handler
+conf_ranges = str(SNAKEDIR / "defaults" / "sc_config_ranges.yaml")
+test_config = conf_ranges if config["pipeline_param"]["test_config"] else None
+pph = MappingPipelinePathHandler(workflow, test_config)
+
+# link indices
+#pph.link_index(step="star_index",             sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+#pph.link_index(step="salmon_index",           sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+#pph.link_index(step="generate_transcriptome", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries", entry=config["organism"]["files"]["transcriptome"])
+
+# exclude symbols '.' and '/' from wildcards
+wildcard_constraints: 
+	sample="[^./]+",
+	mate  ="[^./]+"
+
+onstart:
+	# draw a dag
+	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
+	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
+	# info about the pipeline run
+	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	os.makedirs(os.path.dirname(info_file), exist_ok=True)
+	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+	# save merged config
+	config_file = pph.file_path(step="pipeline_report", extension="yaml", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
+	# warnings
+	#mapping_choices, qc_choices = (config["pipeline_param"][key] for key in ["mapping_results", "QC_results"])
+	#for qc_step in ["dupradar", "infer_experiment", "rna_seqc", "qualimap", "qc"]:
+	#	if qc_step in qc_choices and "star-gene_counts" not in mapping_choices:
+	#		logger.warning("{}: cannot run, because 'star-gene_counts' was not selected as mapping output".format(qc_step))
+
+##-------------------- starting point ----------------------------------------------------------------------
+
+def get_inputs_all():
+	inputs = []
+
+	inputs += pph.expand_path("cellranger_count", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	inputs += pph.expand_path("velocyto_run10x", "loom", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+
+	return inputs
+
+
+shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")))
+
+rule all:
+	input:
+		get_inputs_all()
+	output:
+		html = pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	run:
+		loctime = asctime(localtime(time()))
+		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		summary        = pph.file_path("pipeline_report", "summary.csv",        sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt",   sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		dag = rule_execution.split("/")[-1]
+		shell("conda list > {}".format(version_info))
+		shell("conda info > {}".format(conda_info))
+		report("""
+		===========================
+		RNAseq single cell pipeline
+		===========================
+		
+		**Finished: {loctime}**
+		
+		.. image:: {dag}
+		
+		File status at pipeline start:
+		==============================
+		
+		.. csv-table::
+			:file: {summary}
+			
+		Version info:
+		=============
+		
+		.. include:: {version_info}
+			:literal:
+		
+		Conda info:
+		===========
+		
+		.. include:: {conda_info}
+			:literal:
+		
+		""", output.html, graph = rule_execution, table = summary)
+		
+rule export:
+	input:
+		get_inputs_all()
+	run:
+		pph.export()
+
+##-------------------- CellRanger -------------------------------------------------------------------------------
+
+rule cellranger_count:
+    """ run cellranger count """
+	input:
+		reads = pph.get_fastq_pairs,
+		transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
+	output:
+	    outdir = directory(pph.out_dir_name(step="cellranger_count")),
+		done   = touch(pph.file_path(step="cellranger_count", extension="done"))
+	log:
+		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["cellranger_count"]["cmd_opt"]
+	run:
+	    dirnames = ",".join(os.path.dirname(p) for p in input.reads)
+	    basenames = ",".join(os.path.basename(p) for p in input.reads)
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		cellranger --version
+
+		#----- Cellranger counting
+		cellranger count \
+        --id {input.outdir} \
+        --fastqs {dirnames} \
+        --sample {basenames} \
+        --transcriptome {input.transcriptome} \
+        {params.options}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="cellranger_count", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- Velocyto -------------------------------------------------------------------------------
+
+rule velocyto_run10x:
+    """ run velocyto on 10X Chromium samples """
+	input:
+	    gtf = config["organism"]["files"]["cellranger_gtf"],
+		cellranger_done = pph.file_path(step="cellranger_count", extension="done")
+	output:
+		pph.file_path(step="velocyto_run10x", extension="loom")
+	log:
+		out = pph.file_path(step="velocyto_run10x", extension="output.log", log=True)
+	params:
+	    cellranger_outdir = pph.out_dir_name(step="cellranger_count"),
+	    options = config["rule_options"]["velocyto_run10x"]["cmd_opt"]
+	run:
+		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
+		paired   = "-p" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		velocyto --version
+
+		#----- run velocyto
+		velocyto run10x \
+		{params.cellranger_outdir} \
+		{input.gtf} \
+        {params.options}
+
+        #----- move results
+        mv {params.cellranger_outdir}/velocyto/*.loom {output}
+        rmdir {params.cellranger_outdir}/velocyto
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="velocyto_run10x", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
