@@ -1189,8 +1189,8 @@ class SampleInfoTool(PipelinePathHandler):
 		for inp in input_files:
 			self._get_wildcard_values_from_file_path(inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style)
 
-		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern,f).group(0), "") for f in input_files]}
-
+		return {**wildcard_values, "read_extension": [f.replace(re.match(match_pattern, f).group(0), "") for f in input_files if re.match(match_pattern, f)]}
+		
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
 		""" for importing lists from table entries """
 		for smpl_info in self.sample_info.values():
