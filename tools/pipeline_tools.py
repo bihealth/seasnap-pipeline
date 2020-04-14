@@ -317,7 +317,7 @@ class PipelinePathHandler:
 		wildcard_values = wildc_val if wildc_val else {w:[] for w in wildcards}
 		
 		match_obj = re.match(match_pattern, filename)
-		if not match_obj:	
+		if not match_obj:
 			warn(f"Skipping file in working dir: '{filename}', because not matching match pattern: '{match_pattern}' ..will not be tracked.")
 			found = False
 		else:
@@ -331,7 +331,7 @@ class PipelinePathHandler:
 			found = True
 				
 		return (found, wildcard_values)
-		
+
 
 	def _collect_generated_files(self, path_pattern=None):
 		if not path_pattern: path_pattern = self.out_path_pattern
@@ -568,7 +568,7 @@ class PipelinePathHandler:
 							elif compress == "tar":
 								to_tar = str(f_src.with_suffix('.tar'))
 								print(f"compression: create {to_tar} ...")
-								os.system(f"cd {str(src.parent)}; tar -czf {to_tar} {str(f_src.name)}")
+								os.system(f"cd {str(f_src.parent)}; tar -czf {to_tar} {str(f_src.name)}")
 								source[i], f_src = to_tar, Path(to_tar)
 							if bp_out:
 								print(blueprint["command"].format(
@@ -588,8 +588,8 @@ class PipelinePathHandler:
 								Path(target[i] + ".md5").write_text(self._md5(target[i]))
 						else:
 							warn(f"Source file {str(f_src)} does not exist!")
-		
-		
+
+
 ##################################################################################################################################
 #----------------------------------------------- child class for mapping pipline ------------------------------------------------#
 ##################################################################################################################################
