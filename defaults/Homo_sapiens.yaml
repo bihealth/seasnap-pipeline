@@ -12,7 +12,9 @@ organism:
     
     bed: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/25/GRCh38/gencode.v25.chr_scaff.annotation.bed                                   # required for infer_experiment
     seqc_gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/25/GRCh38/gencode.v25.chr_scaff.annotation.no_genes.protein_coding.rRNA.gtf # required for qc
-    
+    cellranger_transcriptome: /scratch/cellranger_indices/refdata-cellranger-GRCh38-3.0.0
+    cellranger_gtf: ""
+
   star_index: null
   salmon_index: null
     

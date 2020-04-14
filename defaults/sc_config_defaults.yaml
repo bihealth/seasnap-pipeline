@@ -1,0 +1,94 @@
+#---------------------------------------- general pipeline parameters
+pipeline_param:
+  # adjust pattern of stored files
+  out_path_pattern: mapping/{step}/{sample}.{mate}/out/{step}.{sample}.{mate}.{extension}
+  log_path_pattern: mapping/{step}/{sample}.{mate}/report/{step}.{sample}.{mate}.{extension}
+  in_path_pattern: ../input/{sample}/{sample}.{mate}
+  
+  # adjust which files to produce
+  mapping_results:
+    - salmon-transcript_counts
+    - star-gene_counts
+  QC_results:
+    - fastqc
+    - dupradar
+    - infer_experiment
+    - qualimap_rnaseq
+    - qualimap_bamqc
+    - rna_seqc
+    - preseq_c_curve
+    - preseq_lc_extrap
+    
+  test_config: true
+
+#---------------------------------------- organism annotation
+organism_defaults: null
+
+#---------------------------------------- parameters for rules
+rule_options:
+  star: 
+    cmd_opt: "--outSAMunmapped Within --outFilterType BySJout --outFilterMultimapNmax 20 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverLmax 0.04 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000 --genomeLoad NoSharedMemory --outSAMattributes NH HI AS NM MD --outSAMtype BAM Unsorted"
+    trim: yes
+  star_index: 
+    cmd_opt: "--sjdbOverhang 49" # optimally sjdbOverhang = <read_length> - 1
+  salmon_index:
+    cmd_opt: "-k 31"             # (k the default k-mer size of 31 is suitable for read length around 75)
+  salmon: 
+    cmd_opt: ""
+    trim: yes
+  rna_seqc:
+    cmd_opt: ""
+  cellranger_count:
+    cmd_opt: "--jobmode sge --maxjobs=100 --jobinterval=1000"
+  velocyto_run10x:
+    cmd_opt: "--samtools-memory 4000 -@ 4"
+
+#---------------------------------------- parameters for the report
+report:
+  multiqc:
+    title: SeA-SnaP mapping pipeline QC report
+    subtitle: run at the BIH CUBI
+    intro_text: The reports summarises results of several analyses
+    custom_logo: documentation/pictures/SeA-SnaP_logo.png
+    sp:
+      fastqc/zip:
+        fn: '*_fastqc.zip'
+      qualimap/rnaseq/rnaseq_results:
+        fn: '*rnaseq_qc_results.txt'
+      qualimap/rnaseq/coverage:
+        fn: '*coverage_profile_along_genes_(total).txt'
+      qualimap/bamqc/genome_results:
+        fn: '*genome_results.txt'
+      qualimap/bamqc/coverage:
+        fn: '*coverage_histogram.txt'
+      qualimap/bamqc/insert_size:
+        fn: '*insert_size_histogram.txt'
+      qualimap/bamqc/genome_fraction:
+        fn: '*genome_fraction_coverage.txt'
+      qualimap/bamqc/gc_dist:
+        fn: '*mapped_reads_gc-content_distribution.txt'
+      salmon/meta:
+        fn: '*meta_info.json'
+        contents: 'salmon_version'
+      salmon/fld:
+        fn: '*flenDist.txt'
+        
+#---------------------------------------- configuration for export
+export:
+  blueprint:
+    file: SODAR_export_blueprint.txt
+    command: |
+      imkdir -p $(dirname {dest} )
+      irsync -a -K {src} i:{dest}
+  path_pattern:
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:out}/{step}/out/{step}.{sample}.{extension}
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:rep}/{step}/report.zip
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:gene_expression_quantification}/{step}/out/{step}.{sample}.{extension}
+  ngs_mapping_out:
+    - files: {step: star, extension: bam}
+  ngs_mapping_rep:
+    - dir: {step: star, log: true}
+      compress: zip
+  gene_expression_quantification:
+    - files: {step: star, extension: gene_counts.tab}
+    - files: {step: salmon, extension: sf}
