@@ -328,10 +328,11 @@ rule DESeq2:
 		dict(step = "import_sf",            extension = "rds", contrast = "all")
 		])
 	output:
-		dds       = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
-		rld_blind = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
-		rld_model = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
-		rld_csv   = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
+		dds           = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
+		rld_blind     = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
+		rld_model     = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
+		rld_blind_csv = pph.file_path("DESeq2", "rld.blind.csv", contrast = "all"),
+		rld_model_csv = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
 	log:
 		out = pph.file_path("DESeq2", "output.log", contrast = "all", log=True)
 	params:
@@ -378,12 +379,22 @@ rule DESeq2:
 		writeLines(resultsNames(dds), "{params.coef_names}")
 		write.table(data.frame(
 			gene_id=rownames(rld_model),
-			assays(rld_model),
+			assay(rld_model),
 			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
 			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
 			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-			              column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-			), file="{output.rld_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+			check.names=FALSE
+			), file="{output.rld_model_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+		write.table(data.frame(
+			gene_id=rownames(rld_blind),
+			assay(rld_blind),
+			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+			check.names=FALSE
+			), file="{output.rld_blind_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="DESeq2", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -649,14 +660,14 @@ rule cluster_profiler:
 						else if (test == "KEGG")         em <- gseKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG$org{kegg_pval})
 						else if (test == "KEGG_modules") em <- gseMKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG_modules$org{keggm_pval})
 					}} else {{
-						if      (test == "MSigDb")       em <- enricher(geneList_ora, TERM2GENE = msigdb_gs)
+						if      (test == "MSigDb")       em <- if (any(geneList_ora %in% msigdb_gs$entrez_gene)) enricher(geneList_ora, TERM2GENE = msigdb_gs) else data.frame()
 						else if (test == "GO")           em <- enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg}, 
 						                                                ont = cat, pAdjustMethod = "BH"{go_pval}{go_qval})
 						else if (test == "KEGG")         em <- enrichKEGG(gene = geneList_ora, organism = test_annotations$KEGG$org{kegg_pval}{kegg_qval})
 						else if (test == "KEGG_modules") em <- enrichMKEGG(gene = geneList_ora, organism = test_annotations$KEGG_modules$org{keggm_pval}{keggm_qval})
 					}}
-					em <- setReadable(em, OrgDb={params.annot_pkg}, keyType="ENTREZID")
-					cat_tests[i] <- em
+					if (is(em, "enrichResult") || is(em, "gseaResult")) em <- setReadable(em, OrgDb={params.annot_pkg}, keyType="ENTREZID")
+					cat_tests[[i]] <- em
 					write.table(data.frame(em), file=paste0("{output.csv}/",test,"/{params.csv_basename}",cat,".csv"), 
 						    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 				}}
