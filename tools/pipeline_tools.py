@@ -701,7 +701,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					pattern  = self.in_path_pattern.format(sample = wildcards.sample, **kwargs_filled)
 					pattern += self.samples[wildcards.sample]["read_extension"]
 				else:
-					if "mate" not in kwargs_filled: kwargs_filled["mate"] = "*"
+					if "mate" not in kwargs_filled or mate=="*": kwargs_filled["mate"] = "*"
 					pattern = self.in_path_pattern.format(sample=wildcards.sample, **kwargs_filled) + self.samples[wildcards.sample]["read_extension"]
 				pattern_list.append(pattern)
 		paths = [path for pat in pattern_list for path in iglob(pat, recursive=True)]
