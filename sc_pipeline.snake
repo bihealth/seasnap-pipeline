@@ -127,31 +127,36 @@ rule export:
 rule cellranger_count:
     """ run cellranger count """
 	input:
-		reads = pph.get_fastq_pairs,
+		reads = lambda wildcards: pph.get_fastq_pairs(wildcards, mate="*"),
 		transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
 	output:
-	    outdir = directory(pph.out_dir_name(step="cellranger_count")),
+		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/outdir"),
+		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
 		done   = touch(pph.file_path(step="cellranger_count", extension="done"))
 	log:
 		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["cellranger_count"]["cmd_opt"]
 	run:
-	    dirnames = ",".join(os.path.dirname(p) for p in input.reads)
-	    basenames = ",".join(os.path.basename(p) for p in input.reads)
+		dirnames = ",".join(os.path.dirname(p) for p in input.reads)
+		basenames = ",".join(os.path.basename(p) for p in input.reads)
 
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
 		cellranger --version
 
+		#----- collect input links
+		mkdir {output.links}
+		ln -s {input.reads} {output.links}
+
 		#----- Cellranger counting
 		cellranger count \
-        --id {input.outdir} \
-        --fastqs {dirnames} \
-        --sample {basenames} \
-        --transcriptome {input.transcriptome} \
-        {params.options}
+		  --id={output.outdir} \
+		  --fastqs={output.links} \
+		  --sample='' \
+		  --transcriptome={input.transcriptome} \
+		  {params.options}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="cellranger_count", extension="sh", **wildcards)
@@ -162,14 +167,14 @@ rule cellranger_count:
 rule velocyto_run10x:
     """ run velocyto on 10X Chromium samples """
 	input:
-	    gtf = config["organism"]["files"]["cellranger_gtf"],
+		gtf = config["organism"]["files"]["cellranger_gtf"],
 		cellranger_done = pph.file_path(step="cellranger_count", extension="done")
 	output:
 		pph.file_path(step="velocyto_run10x", extension="loom")
 	log:
 		out = pph.file_path(step="velocyto_run10x", extension="output.log", log=True)
 	params:
-	    cellranger_outdir = pph.out_dir_name(step="cellranger_count"),
+	    cellranger_outdir = pph.out_dir_name(step="cellranger_count")+"/outdir",
 	    options = config["rule_options"]["velocyto_run10x"]["cmd_opt"]
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
