@@ -741,7 +741,13 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		self.contrasts         = self.snakemake_workflow.config["contrasts"]["contrast_list"]
 		self.contrast_defaults = self.snakemake_workflow.config["contrasts"]["defaults"]
 		self.contrast_ids = [self._make_contrast_id(contr["title"], index) for index, contr in enumerate(self.contrasts)] #used in pipeline to fill in wildcards
-		
+
+		# edit the config dictionary
+		for i, (c_dict, c_id) in enumerate(zip(self.contrasts, self.contrast_ids)):
+			c_dict["ID"] = c_id
+			c_merged = self.get_contrast(c_id)
+			self.contrasts[i] = c_merged
+
 		# write log with parsed values to file for debugging
 		self._write_log(contrast="all")
 		
