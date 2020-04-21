@@ -75,7 +75,12 @@ def get_inputs_all():
 		inputs += pph.expand_path("feature_counts", "feature_counts", fix="!sample")
 	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", fix="!sample")
-		
+	if "ciri-circRNA" in mapping_choices:
+		inputs += pph.expand_path("bwa", "sam", fix="!sample")
+		inputs += pph.expand_path("ciri", "tsv", fix="!sample")
+	elif "bwa-gene_counts" in mapping_choices:
+		inputs += pph.expand_path("bwa", "sam", fix="!sample")
+
 	# QC results
 	qc_choices = config["pipeline_param"]["QC_results"]
 	if "fastqc" in qc_choices: 
@@ -336,7 +341,7 @@ rule bwa_index:
 rule bwa:
     """ run BWA mem """
 	input:
-		index = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries") + "/" + config["organism"]["files"]["genome"],
+		index = pph.out_dir_name(step = "bwa_index", fix="all") + "/" + config["organism"]["files"]["genome"],
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unpaired
 	output:
@@ -375,6 +380,32 @@ rule bwa:
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bwa", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- ciri -------------------------------------------------------------------------------
+
+rule ciri:
+	input:
+		sam = pph.file_path(step="bwa", extension="sam"),
+		gtf = config["organism"]["files"]["gtf"],
+		bwa_index = pph.out_dir_name(step = "bwa_index", fix="all") + "/" + config["organism"]["files"]["genome"]
+	output:
+		pph.file_path(step="ciri", extension="tsv")
+	log:
+		out = pph.file_path(step="ciri", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["ciri"]["cmd_opt"]
+	threads: 8
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+
+		#----- run ciri
+		perl {SCRIPTDIR}/CIRI2.pl -I {input.sam} -O {output} -F {input.bwa_index} -A {input.gtf} -T {threads} {params.options} -G {log.out}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="ciri", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
 

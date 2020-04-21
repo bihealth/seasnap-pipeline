@@ -9,6 +9,7 @@ pipeline_param:
   mapping_results:
     - salmon-transcript_counts
     - star-gene_counts
+    - ciri-circRNA
   QC_results:
     - fastqc
     - dupradar
@@ -37,6 +38,13 @@ rule_options:
     cmd_opt: ""
     trim: yes
   rna_seqc:
+    cmd_opt: ""
+  ciri:
+    cmd_opt: "-low -S 500000"
+  bwa:
+    cmd_opt: "-T 19"
+    trim: yes
+  bwa_index:
     cmd_opt: ""
 
 #---------------------------------------- parameters for the report
