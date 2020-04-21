@@ -33,7 +33,7 @@ test_config = conf_ranges if config["pipeline_param"]["test_config"] else None
 pph = MappingPipelinePathHandler(workflow, test_config)
 
 # link indices
-#pph.link_index(step="star_index",             sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+pph.link_index(step="cellranger_count", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries", subdir="outdir", add_done=True)
 #pph.link_index(step="salmon_index",           sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 #pph.link_index(step="generate_transcriptome", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries", entry=config["organism"]["files"]["transcriptome"])
 
@@ -65,8 +65,8 @@ onstart:
 def get_inputs_all():
 	inputs = []
 
-	inputs += pph.expand_path("cellranger_count", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-	inputs += pph.expand_path("velocyto_run10x", "loom", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	#inputs += pph.expand_path("cellranger_count", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	inputs += [pph.file_path("velocyto_run", "loom", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")]
 
 	return inputs
 
@@ -132,7 +132,6 @@ rule cellranger_count:
 	output:
 		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/outdir"),
 		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
-		done   = touch(pph.file_path(step="cellranger_count", extension="done"))
 	log:
 		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
 	params:
@@ -164,37 +163,36 @@ rule cellranger_count:
 
 ##-------------------- Velocyto -------------------------------------------------------------------------------
 
-rule velocyto_run10x:
+rule velocyto_run:
     """ run velocyto on 10X Chromium samples """
 	input:
 		gtf = config["organism"]["files"]["cellranger_gtf"],
+		mask = config["organism"]["files"]["velocyto_mask_gtf"],
 		cellranger_done = pph.file_path(step="cellranger_count", extension="done")
 	output:
-		pph.file_path(step="velocyto_run10x", extension="loom")
+		pph.file_path(step="velocyto_run", extension="loom")
 	log:
-		out = pph.file_path(step="velocyto_run10x", extension="output.log", log=True)
+		out = pph.file_path(step="velocyto_run", extension="output.log", log=True)
 	params:
 	    cellranger_outdir = pph.out_dir_name(step="cellranger_count")+"/outdir",
-	    options = config["rule_options"]["velocyto_run10x"]["cmd_opt"]
-	run:
-		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
-		paired   = "-p" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
-
+	    options = config["rule_options"]["velocyto_run"]["cmd_opt"]
+	run:	
+		mask = f"-m {input.mask}" if input.mask else ""
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
 		velocyto --version
 
 		#----- run velocyto
-		velocyto run10x \
-		{params.cellranger_outdir} \
-		{input.gtf} \
-        {params.options}
+		#velocyto run10x \
+		#{params.cellranger_outdir} \
+		#{input.gtf} \
+		#{params.options}
+		velocyto run -b {params.cellranger_outdir}/filtered_feature_bc_matrix/barcodes.tsv {mask} -o $(dirname {output}) {params.options} {params.cellranger_outdir}/possorted_genome_bam.bam {input.gtf}
 
-        #----- move results
-        mv {params.cellranger_outdir}/velocyto/*.loom {output}
-        rmdir {params.cellranger_outdir}/velocyto
+		#----- move results
+		mv $(dirname {output})/*.loom {output}
 		""")
 
-		script_file = pph.log(log.out, snakemake_format(script), step="velocyto_run10x", extension="sh", **wildcards)
+		script_file = pph.log(log.out, snakemake_format(script), step="velocyto_run", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
