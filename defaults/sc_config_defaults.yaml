@@ -40,7 +40,7 @@ rule_options:
     cmd_opt: ""
   cellranger_count:
     cmd_opt: "--jobmode sge --maxjobs=100 --jobinterval=1000"
-  velocyto_run10x:
+  velocyto_run:
     cmd_opt: "--samtools-memory 4000 -@ 4"
 
 #---------------------------------------- parameters for the report
