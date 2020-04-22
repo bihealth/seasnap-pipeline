@@ -36,7 +36,7 @@ pph = MappingPipelinePathHandler(workflow, test_config)
 
 # link indices
 pph.link_index(step="star_index", fix="all")
-pph.link_index(step="bwa_index", fix="all")
+pph.link_index(step="bwa_index", fix="all", add_done=True, subdir="index")
 pph.link_index(step="salmon_index", fix="all")
 pph.link_index(step="generate_transcriptome", fix="all", entry=config["organism"]["files"]["transcriptome"])
 
@@ -355,7 +355,8 @@ rule bwa:
 	params:
 		options = config["rule_options"]["bwa"]["cmd_opt"],
 		index_dir = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries"),
-		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False
+		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False,
+		run_stats = "true" if config["rule_options"]["bwa"]["run_stats"] else "false"
 	threads: 8
 	run:
 		db_prefix = os.path.join(params.index_dir, GENOME_FILE_NAME)
@@ -383,6 +384,13 @@ rule bwa:
 
 		#----- run bwa mem
 		bwa mem {params.options} -t {threads} {db_prefix} {reads} 1> {output.sam}
+		
+		#----- compute statistics
+		if {run_stats}; then
+		  samtools stats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.bamstats.txt
+		  samtools flagstat {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.flagstat.log
+		  samtools idxstats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.idxstats.log
+		fi
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bwa", extension="sh", **wildcards)
@@ -410,6 +418,7 @@ rule ciri:
 		#----- prepare
 		set -eux
 		rm -fr $(dirname {output})/*
+		perl {SCRIPTDIR}/CIRI2.pl --help
 
 		#----- run ciri
 		perl {SCRIPTDIR}/CIRI2.pl -I {input.sam} -O {output} -F {input.genome} -A {input.gtf} -T {samtools_threads} {params.options} -G {log.out}

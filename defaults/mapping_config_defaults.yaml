@@ -44,6 +44,7 @@ rule_options:
   bwa:
     cmd_opt: "-T 19"
     trim: yes
+    run_stats: yes
   bwa_index:
     cmd_opt: ""
 
