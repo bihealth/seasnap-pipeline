@@ -313,25 +313,29 @@ rule star:
 
 ##-------------------- bwa ---------------------------------------------------------------------------------
 
+GENOME_FILE_NAME = os.path.basename(config["organism"]["files"]["genome"])
+
 rule bwa_index:
     """ create index for BWA """
 	input:
 		genome = config["organism"]["files"]["genome"]
 	output:
-		index = pph.out_dir_name(step = "bwa_index")+"/"+config["organism"]["files"]["genome"]
+		done = touch(pph.file_path(step="bwa_index", extension="done")),
+		index = directory(pph.out_dir_name(step = "bwa_index") + "/index")
 	log:
 		out = pph.file_path(step="bwa_index", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["bwa_index"]["cmd_opt"]
 	run:
+		db_prefix = os.path.join(output.index, GENOME_FILE_NAME)
+		
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
 		rm -fr $(dirname {output.index})/*
-		bwa --version
 
 		#----- run bwa index
-		bwa index -p {output.index} {params.options} {input.genome}
+		bwa index -p {db_prefix} {params.options} {input.genome}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bwa_index", extension="sh", **wildcards)
@@ -341,7 +345,7 @@ rule bwa_index:
 rule bwa:
     """ run BWA mem """
 	input:
-		index = pph.out_dir_name(step = "bwa_index", fix="all") + "/" + config["organism"]["files"]["genome"],
+		index_present = pph.file_path(step="bwa_index", extension="done", fix="all"),
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unpaired
 	output:
@@ -350,9 +354,12 @@ rule bwa:
 		out = pph.file_path(step="bwa", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["bwa"]["cmd_opt"],
+		index_dir = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries"),
 		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False
 	threads: 8
 	run:
+		db_prefix = os.path.join(params.index_dir, GENOME_FILE_NAME)
+
 		# prepare read input
 		unpaired = input.reads1 == input.reads2
 		file_ext = config["sample_info"][wildcards.sample]["read_extension"].split(".")[-1]
@@ -365,18 +372,17 @@ rule bwa:
 		    preprocess = "echo"
 
 		if unpaired:
-		    reads = f"<({preprocess} {" ".join(input.reads1)})"
+		    reads = f"<({preprocess} {' '.join(input.reads1)})"
 		else:
-		    reads = f"<({preprocess} {" ".join(input.reads1)}) <({preprocess} {" ".join(input.reads2)})"
+		    reads = f"<({preprocess} {' '.join(input.reads1)}) <({preprocess} {' '.join(input.reads2)})"
 
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
 		rm -fr $(dirname {output.sam})/*
-		bwa --version
 
 		#----- run bwa mem
-		bwa mem {params.options} -t {threads} {input.index} {reads} 1> {output.sam}
+		bwa mem {params.options} -t {threads} {db_prefix} {reads} 1> {output.sam}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bwa", extension="sh", **wildcards)
@@ -386,9 +392,10 @@ rule bwa:
 
 rule ciri:
 	input:
+		index_present = pph.file_path(step="bwa_index", extension="done", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries"),
 		sam = pph.file_path(step="bwa", extension="sam"),
 		gtf = config["organism"]["files"]["gtf"],
-		bwa_index = pph.out_dir_name(step = "bwa_index", fix="all") + "/" + config["organism"]["files"]["genome"]
+		genome = config["organism"]["files"]["genome"]
 	output:
 		pph.file_path(step="ciri", extension="tsv")
 	log:
@@ -397,12 +404,15 @@ rule ciri:
 		options = config["rule_options"]["ciri"]["cmd_opt"]
 	threads: 8
 	run:
+		samtools_threads = threads//2
+
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
+		rm -fr $(dirname {output})/*
 
 		#----- run ciri
-		perl {SCRIPTDIR}/CIRI2.pl -I {input.sam} -O {output} -F {input.bwa_index} -A {input.gtf} -T {threads} {params.options} -G {log.out}
+		perl {SCRIPTDIR}/CIRI2.pl -I {input.sam} -O {output} -F {input.genome} -A {input.gtf} -T {samtools_threads} {params.options} -G {log.out}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="ciri", extension="sh", **wildcards)

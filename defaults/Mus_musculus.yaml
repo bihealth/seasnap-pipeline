@@ -15,6 +15,7 @@ organism:
     
   star_index: null
   salmon_index: null
+  bwa_index: null
     
   R:
     annotations: org.Mm.eg.db
