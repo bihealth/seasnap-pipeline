@@ -664,7 +664,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		paths.sort()
 		return paths
 		
-	def file_path(self, step, extension, sample="{sample}", log=False, fix=None, **kwargs):
+	def file_path(self, step, extension, sample="{sample}", log=False, fix=None, path_pattern=None, **kwargs):
 		"""
 		Generate single path for intermediate and output or log files.
 		
@@ -673,6 +673,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param sample: sample ID to be included in the file path
 		:param log: generate path to logfile if log==True otherwise generate path to output/intermediate file
 		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
+		:param path_pattern: explicitly set the path pattern (string)
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		if fix:
@@ -680,7 +681,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			if sample == "{sample}" and "sample" in fixed_wildcards:
 				sample = fixed_wildcards["sample"]
 			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "sample"}, **kwargs}
-		path_pattern = self.log_path_pattern if log else self.out_path_pattern
+		if not path_pattern: path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, sample=sample, **kwargs_out)
 		
@@ -1252,7 +1253,7 @@ class ReportTool(PipelinePathHandler):
 	insert_pattern        = "#>.*INSERT.*<#"
 	entry_name_wildcard   = "{{ENTRY_NAME}}", "{{ENTRY_ID}}"
 
-	def __init__(self, pph):
+	def __init__(self, pph, profile="DE"):
 		#if type(config) is dict:
 		#	config_dict = config
 		#elif isinstance(config, str):
@@ -1279,9 +1280,21 @@ class ReportTool(PipelinePathHandler):
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
 		
 		# define substitutions for report generation
-		self.substitutions = {"__contrasts__": self.path_handler.get_contrast_id_dict}
-		
-		self._contr_id_cache = {}
+		# self.substitutions = {"__contrasts__": self.path_handler.get_contrast_id_dict}
+
+		# define profiles (different kinds of reports)
+		if profile == "DE":
+			# main report of DE pipeline
+			self.start_template = "report_main_template.Rmd"
+			self.req_fields = ["step", "extension", "contrast"]
+			self.id_dict_for_analysis = self._DE_id_dict_from_path
+		elif profile == "circRNA":
+			# report for circRNA analysis
+			self.start_template = "circRNA_report_main_template.Rmd"
+			self.req_fields = ["step", "extension", "sample"]
+			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+
+		self._id_cache = {}
 	
 	
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
@@ -1304,21 +1317,43 @@ class ReportTool(PipelinePathHandler):
 		before, after = re.split(self.insert_pattern, template_text, maxsplit=1, flags=re.MULTILINE)
 		return (before, after)
 		
-	def _contrast_id_from_path(self, path):
-		if path not in self._contr_id_cache:
+	def _DE_id_dict_from_path(self, path):
+		"""
+		return a dict of contrast title to ID,
+		constructed from the config file corresponding to a specific analysis
+		which is described by the respective path pattern
+		"""
+		if path not in self._id_cache:
 			config_file = self.path_handler.file_path("pipeline_report", "yaml", contrast="all", path_pattern=path)
 			with open(config_file, "r") as stream:
 				try:
 					config_dict = yaml.safe_load(stream)
 				except yaml.YAMLError as exc:
 					print(exc)
-			id_dict = {"contrast": self.path_handler.get_contrast_id_dict(config_dict["contrasts"]["contrast_list"])}
-			self._contr_id_cache[path] = id_dict
-		return self._contr_id_cache[path]
+			id_dict = dict(contrast=self.path_handler.get_contrast_id_dict(config_dict["contrasts"]["contrast_list"]))
+			self._id_cache[path] = id_dict
+		return self._id_cache[path]
+
+	def _mapping_id_dict_from_path(self, path):
+		"""
+		return a dict of sample name to ID (currently identical)
+		that is constructed from the config file (corresponding to a specific analysis)
+		which is described by the respective path pattern
+		"""
+		if path not in self._id_cache:
+			config_file = self.path_handler.file_path("pipeline_report", "yaml", sample="all_sample", path_pattern=path)
+			with open(config_file, "r") as stream:
+				try:
+					config_dict = yaml.safe_load(stream)
+				except yaml.YAMLError as exc:
+					print(exc)
+			id_dict = dict(sample={s: s for s in list(config_dict["sample_info"])})
+			self._id_cache[path] = id_dict
+		return self._id_cache[path]
 		
 	def _make_id(self, name, results_path):
 		entry_name, templ_name = name
-		id_dicts = self._contrast_id_from_path(results_path)
+		id_dicts = self.id_dict_for_analysis(results_path)
 		if templ_name in id_dicts:
 			return id_dicts[templ_name][entry_name]
 		else:
@@ -1348,6 +1383,15 @@ class ReportTool(PipelinePathHandler):
 			elif len(parts) == 3:
 				text = text.replace("{{"+rwp+"}}", self.path_handler.file_path(parts[0], parts[1], contrast = parts[2], path_pattern=path_pattern))
 		return text
+
+	def _get_entry_list_from_str(self, entries, results_path):
+		""" expand predefined placeholders to entry lists """
+		if entries == "__contrasts__":
+			return list(self._DE_id_dict_from_path(results_path)["contrast"])
+		elif entries == "__samples__":
+			return list(self._mapping_id_dict_from_path(results_path)["sample"])
+		else:
+			return [entries]
 		
 	def get_id_suffix(self, tag, num):
 		if len(self.use_results[tag])==1 and tag!="analysis": num=""
@@ -1372,7 +1416,7 @@ class ReportTool(PipelinePathHandler):
 		
 		# add subsection entries
 		results_path = self.use_results[results_key[1]][results_key[0]]
-		if type(entries) is str: entries = list(self._contrast_id_from_path(results_path)["contrast"]) if entries=="__contrasts__" else [entries]
+		if type(entries) is str: entries = self._get_entry_list_from_str(entries, results_path)
 		for entry in entries:
 			if type(entry) is str:
 			
@@ -1397,11 +1441,11 @@ class ReportTool(PipelinePathHandler):
 					self._assemble_template(sub_snippet_list, path, snippet_name, entry_heading_code, (entry_name, snippet_name), results_key)]
 			
 		return "".join(entry_text)
-		
+
+
 	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("",""), results_key=(-1,"analysis")):
 		""" assemble snippet list """
-		
-		req_fields   = ["step","extension","contrast"]
+
 		snippet_text = []
 		
 		if type(snippet_list) is str: snippet_list = self.report_snippet_defaults[snippet_name] if snippet_list=="__defaults__" else [snippet_list]
@@ -1417,7 +1461,7 @@ class ReportTool(PipelinePathHandler):
 					requirements = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", snippet_prep)
 					snippet_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_prep)
 					
-					if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
+					if all(Path(self.path_handler.file_path( **dict(zip( self.req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
 						snippet_text.append(self._edit_template(snippet_prep, results_path, results_key[1], i))
 					
 			elif isinstance(snippet, dict):
@@ -1451,8 +1495,8 @@ class ReportTool(PipelinePathHandler):
 						all_text_prep = self._insert_entry_name(all_text, entry, results_path)
 						requirements  = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", all_text_prep)
 						all_text_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", all_text_prep)	
-						
-						if all(Path(self.path_handler.file_path( **dict(zip( req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
+
+						if all(Path(self.path_handler.file_path( **dict(zip( self.req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
 							snippet_text.append(all_text_prep)
 				
 			else:
@@ -1470,7 +1514,7 @@ class ReportTool(PipelinePathHandler):
 		Starts in report directory and recursively alternates between concatenating lists of snippets 
 		and creating sub-lists of entries (e.g. contrasts).
 		"""
-		template_path = self.report_snippet_base_dir / "report_main_template.Rmd"
+		template_path = self.report_snippet_base_dir / self.start_template
 		template_text = template_path.read_text()
 		
 		# generate report
