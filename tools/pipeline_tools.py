@@ -733,7 +733,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					paths.append(out_path_pattern)
 		return paths
 	
-	def link_index(self, step, sample="{sample}", entry="nopath", fix=None, **kwargs):
+	def link_index(self, step, sample="{sample}", entry="nopath", subdir="", add_done=False, fix=None, **kwargs):
 		"""
 		Generate symbolic link to index folder (if provided in config).
 		
@@ -752,7 +752,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			if sample == "{sample}" and "sample" in fixed_wildcards:
 				sample = fixed_wildcards["sample"]
 			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "sample"}, **kwargs}
-		loc = Path(self.out_dir_name(step, sample, **kwargs))
+		loc = Path(self.out_dir_name(step, sample, **kwargs)) / subdir
 		if entry != "nopath":
 			index = entry
 		elif step in self.data_paths:
@@ -769,6 +769,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 				# update
 				loc.unlink()
 				loc.symlink_to(ind.resolve(), target_is_directory=True)
+		if add_done:
+			Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
 
 
 ##################################################################################################################################
