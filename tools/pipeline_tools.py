@@ -308,16 +308,37 @@ class PipelinePathHandler:
 			
 		wildcard_values = wildc_val if wildc_val else {w:[] for w in wildcards}
 		
-		matches = re.match(match_pattern, filename).groups()
-		assert len(matches)==len(wildcards)
-		seen = set()
-		for index,wildc in enumerate(wildcards):
-			if not wildc in seen:
-				wildcard_values[wildc].append(matches[index])
-				seen.add(wildc)
+		match_obj = re.match(match_pattern, filename)
+		if not match_obj:	
+			warn(f"File: {filename} not matched by: {match_pattern}.")
+		else:
+			matches = match_obj.groups()
+			assert len(matches)==len(wildcards)
+			seen = set()
+			for index,wildc in enumerate(wildcards):
+				if not wildc in seen:
+					wildcard_values[wildc].append(matches[index])
+					seen.add(wildc)
 				
 		return wildcard_values
 		
+
+	def _collect_generated_files(self, path_pattern=None):
+		if not path_pattern: path_pattern = self.out_path_pattern
+		
+		input_files = iglob(re.sub("{[^}./]+}",   "*", path_pattern))
+		wildcards   =   re.findall("{([^}./]+)}",      path_pattern)
+			
+		table_cols = {w:[] for w in wildcards}
+		table_cols["filename"] = []
+		for inp in input_files:
+			table_cols["filename"].append(inp)
+			self._get_wildcard_values_from_file_path(inp, path_pattern, wildc_val=table_cols)
+		assert all([len(val)==len(table_cols["filename"]) for val in table_cols.values()])
+
+		return table_cols
+
+
 	def _choose_input(self, wildcards, choice_name, options):
 		""" called by wrapper choose_input() """
 		if wildcards and hasattr(wildcards, choice_name):
@@ -473,6 +494,7 @@ class PipelinePathHandler:
 		os.system('echo "----------------------------------------" >> {l}; echo >> {l}'.format(l=out_log))
 		
 		return script_file
+
 
 	def export(self):
 		"""
@@ -766,12 +788,26 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			if not loc.is_dir():
 				# create
 				loc.symlink_to(ind.resolve(), target_is_directory=True)
+				if add_done:
+					Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
 			elif not loc.samefile(index):
 				# update
 				loc.unlink()
 				loc.symlink_to(ind.resolve(), target_is_directory=True)
-		if add_done:
-			Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
+				if add_done:
+					Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
+
+
+	def log_generated_files(self, save_to="", path_pattern=None, **kwargs):
+		"""
+		Scan all generated output/intermediate files and list them in a file with their corresponding wildcard values.
+		This file can be used e.g. by the pipeline Rmd report to identify paths to files without the handler.
+		"""
+		table_cols = self._collect_generated_files(path_pattern=path_pattern)	
+		table = pd.DataFrame(table_cols)
+		if not save_to:
+			save_to = self.file_path(step="MappingPipelinePathHandler", extension="tsv", batch="all_batches", flowcell="all_flowcells", lane="all_lanes", library="all_libraries", path_pattern=path_pattern, **kwargs)
+		table.to_csv(save_to, sep="\t", index=False)
 
 
 ##################################################################################################################################
@@ -927,29 +963,19 @@ class DEPipelinePathHandler(PipelinePathHandler):
 				for kwargs_ch in choice_kwargs:
 					paths.append(self.file_path(step, extension, contrast=contr, **kwargs_out, **kwargs_ch))
 		return paths
-		
+
+
 	def log_generated_files(self, save_to="", path_pattern=None, **kwargs):
 		"""
 		Scan all generated output/intermediate files and list them in a file with their corresponding wildcard values.
 		This file can be used e.g. by the pipeline Rmd report to identify paths to files without the handler.
 		"""
-		if not path_pattern: path_pattern = self.out_path_pattern
-		
-		input_files = iglob(re.sub("{[^}./]+}",   "*", path_pattern))
-		wildcards   =   re.findall("{([^}./]+)}",      path_pattern)
-			
-		table_cols = {w:[] for w in wildcards}
-		table_cols["filename"] = []
-		for inp in input_files:
-			table_cols["filename"].append(inp)
-			self._get_wildcard_values_from_file_path(inp, path_pattern, wildc_val=table_cols)
-		assert all([len(val)==len(table_cols["filename"]) for val in table_cols.values()])
-		
+		table_cols = self._collect_generated_files(path_pattern=path_pattern)
 		table = pd.DataFrame(table_cols)
 		if not save_to:
 			save_to = self.file_path(step="DEPipelinePathHandler", extension="tsv", contrast="all", path_pattern=path_pattern, **kwargs)
 		table.to_csv(save_to, sep="\t", index=False)
-
+		
 
 ##################################################################################################################################
 #----------------------------------------------------- covariate file tool ------------------------------------------------------#
@@ -1272,9 +1298,6 @@ class ReportTool(PipelinePathHandler):
 		else:
 			self.report_snippet_base_dir = Path(sys.path[0]) / "report"
 		
-		self.report_snippet_building_plan = config_dict["report"]["report_snippets"]
-		
-		self.report_snippet_defaults      = config_dict["report"]["defaults"]
 		
 		self.use_results = self._make_use_results_dict(config_dict)
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
@@ -1288,11 +1311,15 @@ class ReportTool(PipelinePathHandler):
 			self.start_template = "report_main_template.Rmd"
 			self.req_fields = ["step", "extension", "contrast"]
 			self.id_dict_for_analysis = self._DE_id_dict_from_path
+			self.report_snippet_building_plan = config_dict["report"]["report_snippets"]
+			self.report_snippet_defaults      = config_dict["report"]["defaults"]
 		elif profile == "circRNA":
 			# report for circRNA analysis
 			self.start_template = "circRNA_report_main_template.Rmd"
 			self.req_fields = ["step", "extension", "sample"]
 			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.report_snippet_building_plan = config_dict["circRNA_report"]["report_snippets"]
+			self.report_snippet_defaults      = config_dict["circRNA_report"]["defaults"]
 
 		self._id_cache = {}
 	

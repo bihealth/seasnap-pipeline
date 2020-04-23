@@ -10,7 +10,7 @@ from time import asctime, localtime, time
 from pathlib import Path
 from snakemake.utils import report, format as snakemake_format, min_version
 from snakemake.logging import logger
-from tools.pipeline_tools import MappingPipelinePathHandler
+from tools.pipeline_tools import MappingPipelinePathHandler, ReportTool
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
 min_version("3.7")

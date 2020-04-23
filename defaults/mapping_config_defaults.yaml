@@ -21,6 +21,7 @@ pipeline_param:
     - preseq_lc_extrap
     
   test_config: true
+  report_snippets: ""
 
 #---------------------------------------- organism annotation
 organism_defaults: null
@@ -97,3 +98,10 @@ export:
   gene_expression_quantification:
     - files: {step: star, extension: gene_counts.tab}
     - files: {step: salmon, extension: sf}
+
+
+#---------------------------------------- circRNA report
+circRNA_report:
+  snippet_parameters: {}
+  defaults: {}
+  report_snippets: []
