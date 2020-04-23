@@ -33,6 +33,7 @@ class PipelinePathHandler:
 	allowed_wildcards          = ["step", "extension"]
 	required_wildcards_out_log = ["step", "extension"]
 	required_wildcards_in      = []
+	wildcard_fix_values = {}
 	
 	def __init__(self, workflow, test_config=False, test_allowed_wildcards=True):
 		self.test_config = self._load_test_config(test_config)
@@ -249,9 +250,30 @@ class PipelinePathHandler:
 		for wildcard in wildcards:
 			comp = wildcard.split(",")
 			if len(comp)>1:
-				wildcard_constraints[comp[0]] = comp[1]
+				wildcard_constraints[comp[0]] = comp[1] + "|" + self.wildcard_fix_values[comp[0]]
 				self.in_path_pattern = self.in_path_pattern.replace(wildcard, comp[0])
 		return wildcard_constraints
+
+	def _get_wildcard_fix_values(self, fix):
+		inv = ["!", "-"]  # invert selection if these characters precede wildcard name
+		if isinstance(fix, str):
+			if fix == "all":
+				return self.wildcard_fix_values
+			else:
+				fix = [fix]
+		if isinstance(fix, list):
+			include = set([w for w in fix if w[0] not in inv])
+			exclude = set([w[1:] for w in fix if w[0] in inv])
+			if exclude and not include:
+				include = set(self.wildcard_fix_values)  # all wildcards
+			for wcd in include | exclude:
+				if wcd not in self.allowed_wildcards:
+					raise ValueError(f"Unknown wildcard: '{wcd}'!")
+			use_wcd = include - exclude
+			return {w: self.wildcard_fix_values[w] for w in use_wcd}
+		else:
+			raise ValueError(f"Wrong argument for 'fix': {fix}.")
+
 		
 	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True):
 		""" go through files in input path and get values matching the wildcards """
@@ -408,8 +430,8 @@ class PipelinePathHandler:
 			else:
 				return subs.format(", ".join(data_values))
 		raise TypeError(f"No R representation set for {type(data)}!")
-		
-	def log(self, out_log, script, step, extension, **kwargs):
+
+	def log(self, out_log, script, step, extension, fix=None, **kwargs):
 		"""
 		create various log files and return a path to the script file for execution
 		
@@ -417,13 +439,14 @@ class PipelinePathHandler:
 		:param script: the script with wildcards filled by snakemake
 		:param step: the rule for which logs shall be generated
 		:param extension: the extension of the script file, e.g. '.R' or '.sh'
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		:returns: path to a file containing the script
 		"""
-		script_file = self.file_path(step, extension,        log=True, **kwargs)
-		config_yaml = self.file_path(step, "config.yaml",    log=True, **kwargs)
-		conda_list  = self.file_path(step, "conda_list.txt", log=True, **kwargs)
-		conda_info  = self.file_path(step, "conda_info.txt", log=True, **kwargs)
-		conda_env   = self.file_path(step, "conda_env.yaml", log=True, **kwargs)
+		script_file = self.file_path(step, extension,        log=True, fix=fix, **kwargs)
+		config_yaml = self.file_path(step, "config.yaml",    log=True, fix=fix, **kwargs)
+		conda_list  = self.file_path(step, "conda_list.txt", log=True, fix=fix, **kwargs)
+		conda_info  = self.file_path(step, "conda_info.txt", log=True, fix=fix, **kwargs)
+		conda_env   = self.file_path(step, "conda_env.yaml", log=True, fix=fix, **kwargs)
 		
 		# write script to file
 		with open(script_file, "w") as f: f.write(script)
@@ -544,6 +567,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "library"]
 	required_wildcards_out_log = ["step", "extension", "sample"]
 	required_wildcards_in      = ["sample"]
+	wildcard_fix_values = dict(sample="all_samples", mate="all_mates", batch="all_batches", flowcell="all_flowcells", lane="all_lanes", library="all_libraries")
 	
 	def __init__(self, workflow, test_config=False, **kwargs):
 		super().__init__(workflow, test_config, **kwargs)
@@ -640,7 +664,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		paths.sort()
 		return paths
 		
-	def file_path(self, step, extension, sample="{sample}", log=False, **kwargs):
+	def file_path(self, step, extension, sample="{sample}", log=False, fix=None, **kwargs):
 		"""
 		Generate single path for intermediate and output or log files.
 		
@@ -648,23 +672,29 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param extension: file extension for the generated file path
 		:param sample: sample ID to be included in the file path
 		:param log: generate path to logfile if log==True otherwise generate path to output/intermediate file
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
+		if fix:
+			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
 		path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, sample=sample, **kwargs_out)
 		
-	def out_dir_name(self, step, sample="{sample}", **kwargs):
+	def out_dir_name(self, step, sample="{sample}", fix=None,  **kwargs):
 		"""
 		Generate single path to intermediate and output file directory.
 		
 		:param step:  Snakemake rule for which the paths are generated
 		:param sample: sample ID to be included in the file path
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		"""
+		if fix:
+			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildc_placeh_outdir.items()}
 		return self.out_dir_pattern.format(step=step, sample=sample, **kwargs_out)
 		
-	def expand_path(self, step, extension="", **kwargs):
+	def expand_path(self, step, extension="", fix=None, **kwargs):
 		"""
 		Generate multiple paths for intermediate and output files corresponding to different sample IDs (and e.g. paired end extensions).
 
@@ -674,9 +704,12 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		
 		:param step:  Snakemake rule name (string) for which the paths are generated
 		:param extension: file extension for the generated file path; '' to generate paths to directories
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		:param **kwargs: replacement strings for optional wildcards, e.g. batch, flowcell, lane (see description)
 		:returns: list of paths
 		"""
+		if fix:
+			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		paths = []
 		for sample in self.sample_ids:
@@ -693,7 +726,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 					paths.append(out_path_pattern)
 		return paths
 	
-	def link_index(self, step, sample="{sample}", entry="nopath", **kwargs):
+	def link_index(self, step, sample="{sample}", entry="nopath", fix=None, **kwargs):
 		"""
 		Generate symbolic link to index folder (if provided in config).
 		
@@ -703,8 +736,11 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param step:  Snakemake rule for which the paths are generated
 		:param sample: sample ID to be included in the file path
 		:param entry: set the path to be linked explicitly
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
+		if fix:
+			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
 		loc = Path(self.out_dir_name(step, sample, **kwargs))
 		if entry != "nopath":
 			index = entry
@@ -734,6 +770,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 	allowed_wildcards          = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "contrast", "mapping", "library"]
 	required_wildcards_out_log = ["step", "extension", "contrast"]
 	required_wildcards_in      = ["step", "extension", "sample"]
+	wildcard_fix_values = dict(contrast="all")
 	
 	def __init__(self, workflow, test_config=False, **kwargs):
 		super().__init__(workflow, test_config, **kwargs)
@@ -826,7 +863,7 @@ class DEPipelinePathHandler(PipelinePathHandler):
 			warn("titles of contrasts defined in config are not unique! using last ID for each title")
 		return {title: self._make_contrast_id(title, i) for i,title in enumerate(titles)}
 	
-	def file_path(self, step, extension, contrast="{contrast}", log=False, path_pattern=None, **kwargs):
+	def file_path(self, step, extension, contrast="{contrast}", log=False, path_pattern=None, fix=None, **kwargs):
 		"""
 		Generate single path for intermediate and output or log files.
 		
@@ -835,22 +872,28 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		:param contrast: contrast ID to be included in the file path
 		:param log: generate path to logfile if log==True otherwise generate path to output/intermediate file
 		:param path_pattern: explicitly set the path pattern (string)
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
+		if fix:
+			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
 		if not path_pattern: path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, contrast=contrast, **kwargs_out)
 	
-	def expand_path(self, step, extension, if_set=False, **kwargs):
+	def expand_path(self, step, extension, if_set=False, fix=None, **kwargs):
 		"""
 		Generate multiple paths for intermediate and output files corresponding to different contrast IDs
 		
 		:param step:  Snakemake rule name (string) for which the paths are generated
 		:param extension: file extension for the generated file path
 		:param if_set: dict entry of a contrast used to filter for which to expand over; expand over all contrast if False
+		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		:param **kwargs: replacement strings for optional wildcards, e.g. batch, flowcell, lane (see description)
 		:returns: list of paths
 		"""
+		if fix:
+			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
 		input_choices = set(self.input_choice)
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		expand_input_choices = list(input_choices & set(kwargs_out))
