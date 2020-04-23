@@ -676,7 +676,10 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		if fix:
-			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
+			fixed_wildcards = self._get_wildcard_fix_values(fix)
+			if sample == "{sample}" and "sample" in fixed_wildcards:
+				sample = fixed_wildcards["sample"]
+			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "sample"}, **kwargs}
 		path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, sample=sample, **kwargs_out)
@@ -690,7 +693,10 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
 		"""
 		if fix:
-			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
+			fixed_wildcards = self._get_wildcard_fix_values(fix)
+			if sample == "{sample}" and "sample" in fixed_wildcards:
+				sample = fixed_wildcards["sample"]
+			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "sample"}, **kwargs}
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildc_placeh_outdir.items()}
 		return self.out_dir_pattern.format(step=step, sample=sample, **kwargs_out)
 		
@@ -709,7 +715,8 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:returns: list of paths
 		"""
 		if fix:
-			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
+			fixed_wildcards = self._get_wildcard_fix_values(fix)
+			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "sample"}, **kwargs}
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		paths = []
 		for sample in self.sample_ids:
@@ -740,7 +747,10 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		if fix:
-			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
+			fixed_wildcards = self._get_wildcard_fix_values(fix)
+			if sample == "{sample}" and "sample" in fixed_wildcards:
+				sample = fixed_wildcards["sample"]
+			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "sample"}, **kwargs}
 		loc = Path(self.out_dir_name(step, sample, **kwargs))
 		if entry != "nopath":
 			index = entry
@@ -876,7 +886,10 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		:param **kwargs: if used specify replacement for {batch}, {flowcell}, {lane}, etc. ...
 		"""
 		if fix:
-			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
+			fixed_wildcards = self._get_wildcard_fix_values(fix)
+			if contrast == "{contrast}" and "contrast" in fixed_wildcards:
+				contrast = fixed_wildcards["contrast"]
+			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "contrast"}, **kwargs}
 		if not path_pattern: path_pattern = self.log_path_pattern if log else self.out_path_pattern
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		return path_pattern.format(step=step, extension=extension, contrast=contrast, **kwargs_out)
@@ -888,12 +901,13 @@ class DEPipelinePathHandler(PipelinePathHandler):
 		:param step:  Snakemake rule name (string) for which the paths are generated
 		:param extension: file extension for the generated file path
 		:param if_set: dict entry of a contrast used to filter for which to expand over; expand over all contrast if False
-		:param fix: fix some wildcards; e.g. fix=["sample"] has the same effect as passing sample="all_samples", fix="all" fixes all wildcards
+		:param fix: fix some wildcards; e.g. fix=["contrast"] has the same effect as passing contrast="all", fix="all" fixes all wildcards
 		:param **kwargs: replacement strings for optional wildcards, e.g. batch, flowcell, lane (see description)
 		:returns: list of paths
 		"""
 		if fix:
-			kwargs = {**self._get_wildcard_fix_values(fix), **kwargs}
+			fixed_wildcards = self._get_wildcard_fix_values(fix)
+			kwargs = {**{k: v for k, v in fixed_wildcards.items() if k != "contrast"}, **kwargs}
 		input_choices = set(self.input_choice)
 		kwargs_out = {key: kwargs[key] if key in kwargs else val for key, val in self.opt_wildcard_placeholders.items()}
 		expand_input_choices = list(input_choices & set(kwargs_out))
