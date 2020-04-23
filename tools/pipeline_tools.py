@@ -310,7 +310,8 @@ class PipelinePathHandler:
 		
 		match_obj = re.match(match_pattern, filename)
 		if not match_obj:	
-			warn(f"File: {filename} not matched by: {match_pattern}.")
+			warn(f"Skipping file in working dir: '{filename}', because not matching match pattern: '{match_pattern}' ..will not be tracked.")
+			found = False
 		else:
 			matches = match_obj.groups()
 			assert len(matches)==len(wildcards)
@@ -319,8 +320,9 @@ class PipelinePathHandler:
 				if not wildc in seen:
 					wildcard_values[wildc].append(matches[index])
 					seen.add(wildc)
+			found = True
 				
-		return wildcard_values
+		return (found, wildcard_values)
 		
 
 	def _collect_generated_files(self, path_pattern=None):
@@ -332,8 +334,9 @@ class PipelinePathHandler:
 		table_cols = {w:[] for w in wildcards}
 		table_cols["filename"] = []
 		for inp in input_files:
-			table_cols["filename"].append(inp)
-			self._get_wildcard_values_from_file_path(inp, path_pattern, wildc_val=table_cols)
+			found, _ = self._get_wildcard_values_from_file_path(inp, path_pattern, wildc_val=table_cols)
+			if found:
+				table_cols["filename"].append(inp)
 		assert all([len(val)==len(table_cols["filename"]) for val in table_cols.values()])
 
 		return table_cols
@@ -395,9 +398,9 @@ class PipelinePathHandler:
 		:returns: a dict of wildcard names to values
 		"""
 		if in_path_pattern:
-			return self._get_wildcard_values_from_file_path(filepath, self.in_path_pattern)
+			return self._get_wildcard_values_from_file_path(filepath, self.in_path_pattern)[1]
 		else:
-			return self._get_wildcard_values_from_file_path(filepath, self.out_path_pattern)
+			return self._get_wildcard_values_from_file_path(filepath, self.out_path_pattern)[1]
 
 	@staticmethod
 	def get_r_repr(data, to_type=None, round_float=None):
@@ -537,7 +540,7 @@ class PipelinePathHandler:
 							source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
 							search_pat = str(Path(search_pat).parent)
 							
-						get_wc = self._get_wildcard_values_from_file_path
+						get_wc = self._get_wildcard_values_from_file_path[1]
 						target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
 					else:
 						source = [self.file_path(**arg_dct)]
@@ -1060,7 +1063,7 @@ class CovariateFileTool(PipelinePathHandler):
 		"""
 		files = self._get_mapping_input(step, extension, wildcards={})
 		md5   = [self._md5(f) for f in files]
-		group = [self._get_wildcard_values_from_file_path(f,self.in_path_pattern)["sample"][0] for f in files]
+		group = [self._get_wildcard_values_from_file_path(f,self.in_path_pattern)[1]["sample"][0] for f in files]
 		
 		replicate, num_g = [], {}
 		for g in group:
