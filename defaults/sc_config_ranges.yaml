@@ -3,11 +3,6 @@ pipeline_param:
   out_path_pattern: \S+
   log_path_pattern: \S+
   in_path_pattern: \S+
-  
-  mapping_results:
-    - __opt__: [salmon-transcript_counts, star-gene_counts]
-  QC_results:
-    - __opt__: [fastqc, dupradar, infer_experiment, rna_seqc, qualimap_rnaseq, qualimap_bamqc, preseq_c_curve, preseq_lc_extrap]
 
 #---------------------------------------- organism annotation
 organism_defaults:
@@ -15,26 +10,10 @@ organism_defaults:
 
 #---------------------------------------- parameters for rules
 rule_options:
-  star: 
+  cellranger_count:
     cmd_opt: .*
-    trim: {__opt__: [true, false]}
-  star_index: 
+  velocyto_run:
     cmd_opt: .*
-  salmon_index:
-    cmd_opt: .*
-  salmon: 
-    cmd_opt: .*
-    trim: {__opt__: [true, false]}
-  rna_seqc:
-    cmd_opt: .*
-
-#---------------------------------------- parameters for the report
-report:
-  multiqc:
-    title: .+
-    subtitle: .*
-    intro_text: .*
-    custom_logo: .*
         
 #---------------------------------------- configuration for export
 export:

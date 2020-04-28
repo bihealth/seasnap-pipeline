@@ -6,6 +6,7 @@ pipeline_param:
   in_path_pattern: ../input/{sample}/{sample}.{mate}
 
   test_config: true
+  report_snippets: ""
 
 #---------------------------------------- organism annotation
 organism_defaults: null
@@ -18,7 +19,7 @@ rule_options:
     cmd_opt: "--samtools-memory 4000 -@ 4"
 
 #---------------------------------------- parameters for the jupyter notebook
-report:
+jupyter_notebook:
   snippet_parameters: {}
   defaults: {}
   report_snippets: []
