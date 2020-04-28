@@ -1296,46 +1296,40 @@ class ReportTool(PipelinePathHandler):
 	entry_name_wildcard   = "{{ENTRY_NAME}}", "{{ENTRY_ID}}"
 
 	def __init__(self, pph, profile="DE"):
-		#if type(config) is dict:
-		#	config_dict = config
-		#elif isinstance(config, str):
-		#	with open(config, "r") as stream:
-		#		try:
-		#			config_dict = yaml.safe_load(stream)
-		#		except yaml.YAMLError as exc:
-		#			print(exc)
-		#else:
-		#	raise TypeError("Wrong type of argument config: must be dict or str.")
 		self.path_handler = pph
 		config_dict       = self.path_handler.snakemake_workflow.config
-			
-		if config_dict["pipeline_param"]["report_snippets"]:
-			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
-		else:
-			self.report_snippet_base_dir = Path(sys.path[0]) / "report"
-		
-		
+
 		self.use_results = self._make_use_results_dict(config_dict)
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
 		
-		# define substitutions for report generation
-		# self.substitutions = {"__contrasts__": self.path_handler.get_contrast_id_dict}
-
-		# define profiles (different kinds of reports)
+		# define profiles (different types of reports)
 		if profile == "DE":
 			# main report of DE pipeline
 			self.start_template = "report_main_template.Rmd"
-			self.req_fields = ["step", "extension", "contrast"]
-			self.id_dict_for_analysis = self._DE_id_dict_from_path
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report" / "Rmd" / "DE_report"
 			self.report_snippet_building_plan = config_dict["report"]["report_snippets"]
 			self.report_snippet_defaults      = config_dict["report"]["defaults"]
+			self.id_dict_for_analysis = self._DE_id_dict_from_path
+			self.req_fields = ["step", "extension", "contrast"]
 		elif profile == "circRNA":
 			# report for circRNA analysis
 			self.start_template = "circRNA_report_main_template.Rmd"
-			self.req_fields = ["step", "extension", "sample"]
-			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report" / "Rmd" / "circRNA_analysis"
 			self.report_snippet_building_plan = config_dict["circRNA_report"]["report_snippets"]
 			self.report_snippet_defaults      = config_dict["circRNA_report"]["defaults"]
+			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.req_fields = ["step", "extension", "sample"]
+		elif profile == "sc_analysis":
+			# report for circRNA analysis
+			self.start_template = "sc_analysis_main_template.ipynb"
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report" / "ipynb" / "sc_analysis"
+			self.report_snippet_building_plan = config_dict["jupyter_notebook"]["report_snippets"]
+			self.report_snippet_defaults      = config_dict["jupyter_notebook"]["defaults"]
+			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.req_fields = ["step", "extension", "sample"]
+
+		if config_dict["pipeline_param"]["report_snippets"]:
+			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
 
 		self._id_cache = {}
 	
