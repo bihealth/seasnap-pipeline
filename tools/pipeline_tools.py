@@ -275,16 +275,21 @@ class PipelinePathHandler:
 			raise ValueError(f"Wrong argument for 'fix': {fix}.")
 
 		
-	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True):
+	def _get_wildcard_values_from_input(self, input_pattern, unix_style=True, verbose=False):
 		""" go through files in input path and get values matching the wildcards """
 		
 		glob_pattern =       re.sub("{[^}./]+}",   "*", input_pattern)
 		wildcards    =   re.findall("{([^}./]+)}",      input_pattern)
 		input_files  = iglob(glob_pattern + ("*" if glob_pattern[-1]!="*" else ""), recursive=True)
+
+		if verbose:
+			print("\ninput files:\n{}".format("\n".join(input_files)))
 			
 		wildcard_values = {w:[] for w in wildcards}
 		for inp in input_files:
-			self._get_wildcard_values_from_file_path(inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style)
+			self._get_wildcard_values_from_file_path(
+				inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style, verbose=verbose
+			)
 		return wildcard_values
 		
 	def _wildc_replace(self, matchobj):
@@ -297,7 +302,7 @@ class PipelinePathHandler:
 		else:
 			return "([^}./]+)"
 		
-	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True):
+	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True, verbose=False):
 		""" get values matching wildcards from given file path """
 				
 		match_pattern   =       re.sub("\\\\{([^}./]+)\\\\}", self._wildc_replace, re.escape(input_pattern))
@@ -305,6 +310,9 @@ class PipelinePathHandler:
 		if unix_style:
 			match_pattern = re.sub(r"\\\*\\\*", "[^{}]*",   match_pattern)
 			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*",      "[^{}./]*", match_pattern)
+
+		if verbose:
+			print(f"\nmatch pattern:\n{match_pattern}")
 			
 		wildcard_values = wildc_val if wildc_val else {w:[] for w in wildcards}
 		
@@ -1008,7 +1016,12 @@ class CovariateFileTool(PipelinePathHandler):
 		
 		self.wildcard_constraints = self._prepare_inpathpattern()
 		
-		self.wildcard_values = self._get_wildcard_values_from_input(self.in_path_pattern)
+		self.wildcard_values = self._get_wildcard_values_from_input(self.in_path_pattern, verbose=True)
+		if not self.wildcard_values:
+			raise ValueError(
+				"Error extracting wildcards: no wildcards found, because in_path_pattern could not be matched!\n"
+				"in_path_pattern: {}".format(self.in_path_pattern)
+			)
 
 		self.opt_wildcard_placeholders = {w: "{{{}}}".format(w) for w in set(self.wildcard_values)-set(self.required_wildcards_in)}
 		
