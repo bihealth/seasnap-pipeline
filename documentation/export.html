@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
@@ -145,6 +144,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -189,27 +189,32 @@ summary {
 <pre><code>./sea-snap mapping l export</code></pre>
 <p>which will run the export- instead of the all rule.</p>
 <p>There is a section <code>export:</code> in the config file that defines how files are copied into a new folder structure.</p>
+<p>Alternatively, if <code>export: blueprint:</code> is not None, a file will be written in which source and destination paths are inserted into a command template (<code>export: blueprint: command:</code>) and such a block of commands is included for each source-dest pair.</p>
 <p><strong>Per default this is configured to export files for SODAR</strong></p>
-<p>The folder structure can be uploaded into <code>SODAR's landing zone</code>.</p>
+<p>The blueprint can be used to upload the files into <code>SODAR's landing zone</code>. In the file <code>__SODAR__</code> has to be replaced with the project uuid to upload the results to.</p>
+<p>To automatically replace <code>__SODAR__</code> and dispatch the upload to different threads, you can use the <a href="https://cubi-gitlab.bihealth.org/CUBI/Pipelines/cubi-swiss-army-knife">CUBI SAK</a> tool with the command:</p>
+<pre><code>cubi-sak sea-snap itransfer-results</code></pre>
 <div id="export-configuration" class="section level3">
 <h3>export configuration</h3>
 <p>The config file contains a section <code>export:</code> that looks like this:</p>
 <pre><code>export:
+  blueprint:
+    file: SODAR_export_blueprint.txt
+    command: |
+      imkdir -p $(dirname {dest} )
+      irsync -a -K {src} i:{dest}
   path_pattern:
-    - some/path/{sample}/{GENOME}/%Y_%m_%d/{files:myfiles:out}/{step}/out/{step}.{sample}.{extension}
-    - some/path/{sample}/{GENOME}/%Y_%m_%d/{files:myfiles:log}/{step}/log/{step}.{sample}.{extension}
-    - some/path/to/dir/{files:mydir}/out/
-    - some/path/to/zip/{files:mydir}/compressed.zip
-  myfiles_out:
-    - files: {step:&lt;step&gt;, extension:&lt;extension&gt;}
-    - files: {step:&lt;step&gt;, extension:&lt;extension&gt;}
-  myfiles_log:
-    - files: {step:&lt;step&gt;, extension:&lt;extension&gt;, log:true}
-  mydir:
-    - dir: {step:&lt;step&gt;}
-  myzip:
-    - files: {step:&lt;step&gt;, extension:&lt;extension&gt;}
-      compress: zip</code></pre>
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:out}/{step}/out/{step}.{sample}.{extension}
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:rep}/{step}/report.zip
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:gene_expression_quantification}/{step}/out/{step}.{sample}.{extension}
+  ngs_mapping_out:
+    - files: {step: star, extension: bam}
+  ngs_mapping_rep:
+    - dir: {step: star, log: true}
+      compress: zip
+  gene_expression_quantification:
+    - files: {step: star, extension: gene_counts.tab}
+    - files: {step: salmon, extension: sf}</code></pre>
 <p>SeA-SnaP will go through the list of path patterns under <code>path_patterns:</code> and try to create the files, while compiling the wildcard values from the config ({GENOME}), replacing <a href="https://docs.python.org/3/library/time.html#time.strftime">time formatting</a> (“%Y_%m_%d”) and filling additional wildcards from other entries under <code>export:</code>.</p>
 <p>A special wildcard <code>{files:&lt;A&gt;[:&lt;B&gt;]}</code> is searched. It will be replaced by <code>A</code> and an entry <code>export: A[_B]:</code> is looked up. This entry contains instructions for the path handler to construct file paths based on wildcard values. E.g. if <code>files: {step:star, extension:bam}</code> is included, the path to the <em>bam</em> output files of <em>STAR</em> is constructed and this file is copied to the new location, while the {step} and {extension} wildcards of the destination file path under <code>path_pattern:</code> are also filled in respectively.</p>
 <p>If the wildcard {sample} or {contrast} is in a file path under <code>path_pattern:</code> several file paths are constructed, expanding over samples or contrasts, respectively. They are copied to their destination with the {sample} or {contrast} wildcard filled correspondingly.</p>

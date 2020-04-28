@@ -71,10 +71,15 @@ report:
         
 #---------------------------------------- configuration for export
 export:
+  blueprint:
+    file: SODAR_export_blueprint.txt
+    command: |
+      imkdir -p $(dirname {dest} )
+      irsync -a -K {src} i:{dest}
   path_pattern:
-    - SODAR_export/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:out}/{step}/out/{step}.{sample}.{extension}
-    - SODAR_export/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:rep}/{step}/report.zip
-    - SODAR_export/{sample}/{GENOME}/%Y_%m_%d/{files:gene_expression_quantification}/{step}/out/{step}.{sample}.{extension}
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:out}/{step}/out/{step}.{sample}.{extension}
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:ngs_mapping:rep}/{step}/report.zip
+    - __SODAR__/{sample}/{GENOME}/%Y_%m_%d/{files:gene_expression_quantification}/{step}/out/{step}.{sample}.{extension}
   ngs_mapping_out:
     - files: {step: star, extension: bam}
   ngs_mapping_rep:

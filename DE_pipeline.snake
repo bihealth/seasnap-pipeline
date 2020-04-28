@@ -114,8 +114,15 @@ rule all:
 			:literal:
 		
 		""", output.html, graph = rule_execution, table = summary)
-	
 
+
+rule export:
+	input:
+		get_inputs_all()
+	run:
+		pph.export()
+
+	
 ##-------------------- make TxDb -----------------------------------------------------------------------------
 
 rule TxDb_from_GTF:
@@ -161,13 +168,15 @@ rule import_gene_counts:
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = "TRUE"
+		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
 			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_blacklist"].items())
+		if column_filter == "":
+			column_filter = "TRUE"
 		
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
@@ -214,13 +223,15 @@ rule import_featurecounts:
 	log:
 		out = pph.file_path("import_featurecounts", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = "TRUE"
+		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
 			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_blacklist"].items())
+		if column_filter == "":
+			column_filter = "TRUE"
 								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list  = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
@@ -269,13 +280,15 @@ rule import_sf:
 	log:
 		out = pph.file_path("import_sf", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = "TRUE"
+		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
 			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_blacklist"].items())
+		if column_filter == "":
+			column_filter = "TRUE"
 								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( k, ",".join('"'+l+'"' for l in v) ) for k,v in column_lvl.items()))

@@ -3,15 +3,20 @@
 ## author: J.P.Pett (patrick.pett@bihealth.de)
 
 import sys, os, re, shutil, hashlib, itertools, yaml, pandas as pd
-from collections import namedtuple, Mapping, OrderedDict
+from builtins import isinstance, TypeError
+from collections import namedtuple, Mapping, OrderedDict, Iterable
+from contextlib import contextmanager
 from copy import deepcopy
 from time import strftime
 from warnings import warn
+import warnings
 from pathlib import Path
 from glob import iglob, glob
 #from snakemake.io import glob_wildcards
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
+
+warnings.simplefilter("always")
 
 ##################################################################################################################################
 #---------------------------------------------- base class for handling file paths ----------------------------------------------#
@@ -125,7 +130,7 @@ class PipelinePathHandler:
 			# if string
 			elif isinstance(val, str):
 				if isinstance(base_dict[key], str):
-					if not re.fullmatch(val, base_dict[key]):
+					if not re.fullmatch(val, base_dict[key], re.DOTALL):
 						raise ValueError("Error in config file: value of '{}' ('{}') does not match '{}'!".format(key, base_dict[key], val))
 				else:
 					raise TypeError("Error in config file: value of '{}' should be a string! got: {}".format(key, base_dict[key]))
@@ -213,7 +218,19 @@ class PipelinePathHandler:
 			for chunk in iter(lambda: f.read(4096), b""):
 				hash_md5.update(chunk)
 		return hash_md5.hexdigest()
-		
+
+	@staticmethod
+	def _get_names_values(data):
+		if isinstance(data, Mapping):
+			data_values = list(data.values())
+			data_keys = list(data.keys())
+		elif isinstance(data, Iterable):
+			data_values = list(data)
+			data_keys = None
+		else:
+			raise TypeError(f"Cannot get names and values for type {type(data)}!")
+		return data_keys, data_values
+
 	def _get_wildcard_combinations(self, wildcard_values):
 		""" go through wildcard values and get combinations """
 		
@@ -338,6 +355,59 @@ class PipelinePathHandler:
 			return self._get_wildcard_values_from_file_path(filepath, self.in_path_pattern)
 		else:
 			return self._get_wildcard_values_from_file_path(filepath, self.out_path_pattern)
+
+	@staticmethod
+	def get_r_repr(data, to_type=None, round_float=None):
+		"""
+		Translate python data structure into R representation for vector (i.e. c(...)) or list (i.e. list(...)).
+		If to_type==None, choose c() or list() automatically. Named vector/list is created if data is of type
+		Mapping (e.g. a dictionary).
+
+		:param data: data to convert into R representation
+		:param to_type: "vector" or "list"; if None, choose automatically
+		:param round_float: round floats to N digits; if None do not round
+		:returns: a string with R representation of data
+		"""
+		if not isinstance(data, Iterable):
+			# single value
+			if isinstance(data, bool):
+				return "TRUE" if data else "FALSE"
+			elif isinstance(data, (int, float)):
+				return str(round(data, round_float) if round_float else data)
+			elif data is None:
+				return "NULL"
+		elif isinstance(data, str):
+			# string
+			return '"' + data + '"'
+		else:
+			# other Iterable
+			data_keys, data_values = PipelinePathHandler._get_names_values(data)
+			# auto-determine target type to_type
+			same_type = all(isinstance(i, type(data_values[0])) for i in data_values)
+			no_iter_inside = not isinstance(data_values[0], Iterable) or isinstance(data_values[0], str) if data_values else True
+			use_type = "vector" if same_type and no_iter_inside else "list"
+			if to_type:
+				if to_type == "vector" and to_type != use_type:
+					warn("Cannot use 'vector' for all Iterables, using 'list'!")
+				else:
+					use_type = to_type
+			# set substitute string
+			if use_type == "vector":
+				subs = "c({})"
+			elif use_type == "list":
+				subs = "list({})"
+			else:
+				raise ValueError(f"Wrong value {use_type} for to_type!")
+			# fill values
+			data_values = (
+				PipelinePathHandler.get_r_repr(value, round_float=round_float, to_type=to_type)
+				for value in data_values
+			)
+			if data_keys:
+				return subs.format(", ".join(f'"{k}"={v}' for k, v in zip(data_keys, data_values)))
+			else:
+				return subs.format(", ".join(data_values))
+		raise TypeError(f"No R representation set for {type(data)}!")
 		
 	def log(self, out_log, script, step, extension, **kwargs):
 		"""
@@ -386,60 +456,82 @@ class PipelinePathHandler:
 		export selected results into a separate folder structure (as configured in config file)
 		"""
 		export_spec = self.snakemake_workflow.config["export"]
-		for pattern in export_spec["path_pattern"]:
-			#--- go through path patterns (that specify which location to copy to)
-			pat = strftime(pattern).replace("{GENOME}", self.snakemake_workflow.config["organism"]["genome_version"])
-			wildcards = self._get_wildcard_list(pat)
-			key_wcs   = [wc for wc in wildcards if wc[:6] == "files:"]
-			assert len(key_wcs)==1 # no nested keys for now
-			key = key_wcs[0].split(":")[1:]
-			assert len(key)>0
-			pat = pat.replace("{{{}}}".format(key_wcs[0]), key[0])
-			#--- read specification for fetching files
-			for opt_dct in export_spec["_".join(key)]:
-				#--- read options
-				if "files" in opt_dct: mode = "files"
-				elif "dir" in opt_dct: mode = "dir"
-				else: raise ValueError("Error in export: no mode (files or dir) specfied in config!")
-				compress = opt_dct["compress"] if "compress" in opt_dct else None
-				arg_dct = opt_dct[mode]
-				#--- extract files
-				extra_wcs = set(wildcards) - set(key_wcs) - (set(arg_dct) & set(wildcards))
-				assert len(extra_wcs)<=1 # only either 'sample' (mapping) or 'contrast' (DE) for now
-				if extra_wcs:
-					extra_wc   = list(extra_wcs)[0]
-					wc_in_dct  = {k:v for k,v in arg_dct.items() if k in wildcards}
-					search_pat = self.out_path_pattern if not "log" in arg_dct else self.log_path_pattern
-					
-					if mode == "files":
-						source = self.expand_path(**arg_dct)
-					else:
-						source = self.file_path(**{**arg_dct, "extension": "{extension}"})
-						source = str(Path(source).parent / ("" if compress else "**"))
-						source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
-						search_pat = str(Path(search_pat).parent)
+		blueprint = export_spec["blueprint"]
+		none_context = contextmanager(lambda: iter([None]))()
+		with (open(blueprint["file"], "w") if blueprint and blueprint["file"] else none_context) as bp_out:
+			for pattern in export_spec["path_pattern"]:
+				#--- go through path patterns (that specify which location to copy to)
+				pat = strftime(pattern).replace("{GENOME}", self.snakemake_workflow.config["organism"]["genome_version"])
+				wildcards = self._get_wildcard_list(pat)
+				key_wcs   = [wc for wc in wildcards if wc[:6] == "files:"]
+				assert len(key_wcs)==1 # no nested keys for now
+				key = key_wcs[0].split(":")[1:]
+				assert len(key)>0
+				pat = pat.replace("{{{}}}".format(key_wcs[0]), key[0])
+				#--- read specification for fetching files
+				for opt_dct in export_spec["_".join(key)]:
+					#--- read options
+					if "files" in opt_dct: mode = "files"
+					elif "dir" in opt_dct: mode = "dir"
+					else: raise ValueError("Error in export: no mode (files or dir) specfied in config!")
+					compress = opt_dct["compress"] if "compress" in opt_dct else None
+					arg_dct = opt_dct[mode]
+					#--- extract files
+					extra_wcs = set(wildcards) - set(key_wcs) - (set(arg_dct) & set(wildcards))
+					assert len(extra_wcs)<=1 # only either 'sample' (mapping) or 'contrast' (DE) for now
+					if extra_wcs:
+						extra_wc   = list(extra_wcs)[0]
+						wc_in_dct  = {k:v for k,v in arg_dct.items() if k in wildcards}
+						search_pat = self.out_path_pattern if not "log" in arg_dct else self.log_path_pattern
 						
-					get_wc = self._get_wildcard_values_from_file_path
-					target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
-				else:
-					source = [self.file_path(**arg_dct)]
-					target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
-				#--- copy files
-				assert len(source)==len(target)
-				for i in range(len(source)):
-					if mode == "dir" and not compress: target[i] = str(Path(target[i]) / Path(source[i]).name)
-					Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
-					src, trg = Path(source[i]).resolve(), Path(target[i]).resolve()
-					if not compress:
-						print("copy {} to {}...".format(source[i], target[i]))
-						shutil.copy2(source[i], target[i])
-					elif compress == "zip":
-						print("zip {} into {}...".format(source[i], target[i]))
-						os.system(f"cd {str(src.parent)}; zip -r {str(trg)} {str(src.name)}")
-					elif compress == "tar":
-						print("tar {} into {}...".format(source[i], target[i]))
-						os.system(f"cd {str(src.parent)}; tar -czf {str(trg)} {str(src.name)}")
-					Path(target[i] + ".md5").write_text(self._md5(target[i]))
+						if mode == "files":
+							source = self.expand_path(**arg_dct)
+						else:
+							source = self.file_path(**{**arg_dct, "extension": "{extension}"})
+							source = str(Path(source).parent / ("" if compress else "**"))
+							source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
+							search_pat = str(Path(search_pat).parent)
+							
+						get_wc = self._get_wildcard_values_from_file_path
+						target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
+					else:
+						source = [self.file_path(**arg_dct)]
+						target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
+					#--- copy files or write blueprint
+					assert len(source)==len(target)
+					for i in range(len(source)):
+						if mode == "dir" and not compress: target[i] = str(Path(target[i]) / Path(source[i]).name)
+						f_src, f_trg = Path(source[i]).resolve(), Path(target[i])
+						print("\n...copy {} to {} ...\n".format(source[i], target[i]))
+						if f_src.exists():
+							if compress == "zip":
+								to_zip = str(f_src.with_suffix('.zip'))
+								print(f"compression: create {to_zip} ...")
+								os.system(f"cd {str(f_src.parent)}; zip -r {to_zip} {str(f_src.name)}")
+								source[i], f_src = to_zip, Path(to_zip)
+							elif compress == "tar":
+								to_tar = str(f_src.with_suffix('.tar'))
+								print(f"compression: create {to_tar} ...")
+								os.system(f"cd {str(src.parent)}; tar -czf {to_tar} {str(f_src.name)}")
+								source[i], f_src = to_tar, Path(to_tar)
+							if bp_out:
+								print(blueprint["command"].format(
+									src  = f_src, 
+									dest = target[i]
+								), file=bp_out)
+								#-- create md5 sum
+								md5_path = Path(source[i] + ".md5")
+								if not md5_path.exists(): md5_path.write_text(self._md5(source[i]))
+								print(blueprint["command"].format(
+									src  = md5_path.resolve(), 
+									dest = f_trg.with_suffix(f_trg.suffix+".md5")
+								), file=bp_out)
+							else: 
+								Path(target[i]).parent.mkdir(exist_ok = True, parents = True)
+								shutil.copy2(source[i], target[i])
+								Path(target[i] + ".md5").write_text(self._md5(target[i]))
+						else:
+							warn(f"Source file {str(f_src)} does not exist!")
 		
 		
 ##################################################################################################################################
