@@ -9,6 +9,7 @@ pipeline_param:
   mapping_results:
     - salmon-transcript_counts
     - star-gene_counts
+    - ciri-circRNA
   QC_results:
     - fastqc
     - dupradar
@@ -20,6 +21,7 @@ pipeline_param:
     - preseq_lc_extrap
     
   test_config: true
+  report_snippets: ""
 
 #---------------------------------------- organism annotation
 organism_defaults: null
@@ -37,6 +39,14 @@ rule_options:
     cmd_opt: ""
     trim: yes
   rna_seqc:
+    cmd_opt: ""
+  ciri:
+    cmd_opt: "-low -S 500000"
+  bwa:
+    cmd_opt: "-T 19"
+    trim: yes
+    run_stats: yes
+  bwa_index:
     cmd_opt: ""
 
 #---------------------------------------- parameters for the report
@@ -88,3 +98,10 @@ export:
   gene_expression_quantification:
     - files: {step: star, extension: gene_counts.tab}
     - files: {step: salmon, extension: sf}
+
+
+#---------------------------------------- circRNA report
+circRNA_report:
+  snippet_parameters: {}
+  defaults: {}
+  report_snippets: []

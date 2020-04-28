@@ -731,7 +731,3 @@ rule report:
 		
 		with open(output[0], "w") as f: f.write(report_text)
 
-
-
-
-
