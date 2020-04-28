@@ -33,9 +33,7 @@ test_config = conf_ranges if config["pipeline_param"]["test_config"] else None
 pph = MappingPipelinePathHandler(workflow, test_config)
 
 # link indices
-pph.link_index(step="cellranger_count", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries", subdir="outdir", add_done=True)
-#pph.link_index(step="salmon_index",           sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-#pph.link_index(step="generate_transcriptome", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries", entry=config["organism"]["files"]["transcriptome"])
+pph.link_index(step="cellranger_count", fix="all", subdir="outdir", add_done=True)
 
 # exclude symbols '.' and '/' from wildcards
 wildcard_constraints: 
@@ -44,15 +42,15 @@ wildcard_constraints:
 
 onstart:
 	# draw a dag
-	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", fix="all")
 	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
 	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
 	# info about the pipeline run
-	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", fix="all")
 	os.makedirs(os.path.dirname(info_file), exist_ok=True)
 	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
 	# save merged config
-	config_file = pph.file_path(step="pipeline_report", extension="yaml", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	config_file = pph.file_path(step="pipeline_report", extension="yaml", fix="all")
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
 	# warnings
 	#mapping_choices, qc_choices = (config["pipeline_param"][key] for key in ["mapping_results", "QC_results"])
@@ -66,24 +64,24 @@ def get_inputs_all():
 	inputs = []
 
 	#inputs += pph.expand_path("cellranger_count", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-	inputs += [pph.file_path("velocyto_run", "loom", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")]
+	inputs += [pph.file_path("velocyto_run", "loom", fix="all")]
 
 	return inputs
 
 
-shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")))
+shell("rm -f {}".format(pph.file_path(step="pipeline_report", fix="all")))
 
 rule all:
 	input:
 		get_inputs_all()
 	output:
-		html = pph.file_path(step="pipeline_report", extension="report.html", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		html = pph.file_path(step="pipeline_report", extension="report.html", fix="all")
 	run:
 		loctime = asctime(localtime(time()))
-		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		summary        = pph.file_path("pipeline_report", "summary.csv",        sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		version_info   = pph.file_path("pipeline_report", "version_info.txt",   sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", fix="all")
+		summary        = pph.file_path("pipeline_report", "summary.csv",        fix="all")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt",   fix="all")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     fix="all")
 		dag = rule_execution.split("/")[-1]
 		shell("conda list > {}".format(version_info))
 		shell("conda info > {}".format(conda_info))
@@ -196,3 +194,33 @@ rule velocyto_run:
 
 		script_file = pph.log(log.out, snakemake_format(script), step="velocyto_run", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- jupyter nb -------------------------------------------------------------------------------
+
+rule create_ipynb:
+	""" compile a jupyter notebook for second line analysis """
+	input:
+		get_inputs_all()
+	output:
+		pph.file_path("create_ipynb", "ipynb", fix="all")
+	run:
+		rt = ReportTool(pph, profile="sc_analysis")
+		report_text = rt.generate_report()
+
+		text_sub = dict(file_tab="", config="")
+		for tag, num, path in ((tag, num, path) for tag, paths in rt.use_results.items() for num, path in enumerate(paths)):
+			file_table  = pph.file_path("create_ipynb",  "tsv", fix="all", path_pattern=path)
+			config_file = pph.file_path("pipeline_report", "yaml", fix="all", path_pattern=path)
+			pph.log_generated_files(save_to=file_table, path_pattern=path)
+
+			id_suffix, _ = rt.get_id_suffix(tag, num)
+			text_sub["file_tab"] += (f'file_tab{id_suffix} <- data.frame(read.table("{file_table}", sep="\\t", header=TRUE))\n'
+			                         f'file_tab{id_suffix}$filename <- as.character(file_tab{id_suffix}$filename)\n')
+			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
+
+		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
+		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"R_common"))
+		report_text = report_text.replace("{{LOAD_FILE_TABLE}}", text_sub["file_tab"])
+		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
+
+		with open(output[0], "w") as f: f.write(report_text)

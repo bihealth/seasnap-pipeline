@@ -1342,7 +1342,6 @@ class ReportTool(PipelinePathHandler):
 		if config_dict["report"]["path"]:
 			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + self.snippet_path 
 
-
 		print(str(self.snippet_path))
 
 		self.use_results = self._make_use_results_dict(config_dict)
@@ -1356,17 +1355,30 @@ class ReportTool(PipelinePathHandler):
 		if profile == "DE":
 			# main report of DE pipeline
 			self.start_template = "report_main_template.Rmd"
-			self.req_fields = ["step", "extension", "contrast"]
-			self.id_dict_for_analysis = self._DE_id_dict_from_path
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report" / "Rmd" / "DE_report"
 			self.report_snippet_building_plan = config_dict["report"]["report_snippets"]
 			self.report_snippet_defaults      = config_dict["report"]["defaults"]
+			self.id_dict_for_analysis = self._DE_id_dict_from_path
+			self.req_fields = ["step", "extension", "contrast"]
 		elif profile == "circRNA":
 			# report for circRNA analysis
 			self.start_template = "circRNA_report_main_template.Rmd"
-			self.req_fields = ["step", "extension", "sample"]
-			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report" / "Rmd" / "circRNA_analysis"
 			self.report_snippet_building_plan = config_dict["circRNA_report"]["report_snippets"]
 			self.report_snippet_defaults      = config_dict["circRNA_report"]["defaults"]
+			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.req_fields = ["step", "extension", "sample"]
+		elif profile == "sc_analysis":
+			# report for circRNA analysis
+			self.start_template = "sc_analysis_main_template.ipynb"
+			self.report_snippet_base_dir = Path(sys.path[0]) / "report" / "ipynb" / "sc_analysis"
+			self.report_snippet_building_plan = config_dict["jupyter_notebook"]["report_snippets"]
+			self.report_snippet_defaults      = config_dict["jupyter_notebook"]["defaults"]
+			self.id_dict_for_analysis = self._mapping_id_dict_from_path
+			self.req_fields = ["step", "extension", "sample"]
+
+		if config_dict["pipeline_param"]["report_snippets"]:
+			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
 
 		self._id_cache = {}
 
