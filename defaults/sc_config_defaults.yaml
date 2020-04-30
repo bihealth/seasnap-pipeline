@@ -22,7 +22,12 @@ rule_options:
 jupyter_notebook:
   snippet_parameters: {}
   defaults: {}
-  report_snippets: []
+  report_snippets:
+    - load_matrix.ipynb
+    - filter_and_normalize.ipynb
+    - plot_dim_reduction.ipynb
+    - ranking_and_marker_genes.ipynb
+    - compute_velocities.ipynb
 
 #---------------------------------------- configuration for export
 export:
