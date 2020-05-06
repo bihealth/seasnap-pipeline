@@ -280,7 +280,7 @@ class PipelinePathHandler:
 		
 		glob_pattern =       re.sub("{[^}./]+}",   "*", input_pattern)
 		wildcards    =   re.findall("{([^}./]+)}",      input_pattern)
-		input_files  = iglob(glob_pattern + ("*" if glob_pattern[-1]!="*" else ""), recursive=True)
+		input_files  = glob(glob_pattern + ("*" if glob_pattern[-1]!="*" else ""), recursive=True)
 
 		if verbose:
 			print("\ninput files:\n{}".format("\n".join(input_files)))
@@ -290,6 +290,7 @@ class PipelinePathHandler:
 			self._get_wildcard_values_from_file_path(
 				inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style, verbose=verbose
 			)
+			verbose=False
 		return wildcard_values
 		
 	def _wildc_replace(self, matchobj):
@@ -1017,7 +1018,7 @@ class CovariateFileTool(PipelinePathHandler):
 		self.wildcard_constraints = self._prepare_inpathpattern()
 		
 		self.wildcard_values = self._get_wildcard_values_from_input(self.in_path_pattern, verbose=True)
-		if not self.wildcard_values:
+		if not self.wildcard_values["step"]:
 			raise ValueError(
 				"Error extracting wildcards: no wildcards found, because in_path_pattern could not be matched!\n"
 				"in_path_pattern: {}".format(self.in_path_pattern)
