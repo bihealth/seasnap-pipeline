@@ -1,7 +1,6 @@
 ## A bunch of functions which tmod requires
 library(glue)
 
-
 #' Volcano plots with ggplot
 ggvolcano <- function(lfc, pvals, symbol=NULL, xlim=NULL, ylim=NULL, pval.thr=.05, lfc.thr=1) {
 
