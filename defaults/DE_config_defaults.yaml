@@ -81,6 +81,16 @@ report:
         qval: 0.1
       filter_goseq:
         qval: 0.1
+    tmod:
+      fig_qval_max: 0.01
+      fig_auc_min:  0.55
+      fig_n_max: 35
+      fig_n_min: 10
+      n_evid: 5
+    tmod_contrast:
+      res_auc_thr: 0.65
+      res_pval_thr: 0.01
+
 
   defaults:
     NormalisationQC:
@@ -97,6 +107,7 @@ report:
       - MA_plot.Rmd
       - Result_table.Rmd
       - Goseq_GO_table.Rmd
+      - tmod_contrast.Rmd
       - cluster_profiler: __defaults__
     cluster_profiler:
       - Dot_plot.Rmd
@@ -107,6 +118,66 @@ report:
     - Covariate_table.Rmd
     - NormalisationQC: __defaults__
     - contrast: __defaults__
+#
+#---------------------------------------- configuration for tmod
+
+tmod:
+  tmod_db_path: "./"
+  sort_by: pval 
+#,pval_n,pval_p
+  databases:
+    - name: msigdb_reactome
+      file: msigdb
+      title: "Reactome gene sets (MSigDB)"
+      description:
+        Reactome gene sets
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      taxonID: 9606
+      primaryID: ENTREZID
+      subset: "Category=C2,Subcategory=CP:REACTOME"
+    - name: msigdb_hallmark
+      file: msigdb
+      title: "Hallmark gene sets (MSigDB)"
+      description:
+        Hallmark gene sets
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      taxonID: 9606
+      primaryID: ENTREZID
+      subset: "Category=H"
+    - name: msigdb_mir
+      file: msigdb
+      title: "MIR targets (MSigDB)"
+      description:
+        MIR targets from
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      taxonID: 9606
+      primaryID: ENTREZID
+      subset: "Category=C3,Subcategory=MIR"
+    - name: msigdb_go_bp
+      file: msigdb
+      title: "GO Biological Process (MSigDB)"
+      description:
+        GO Biological Process definitions from
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      taxonID: 9606
+      primaryID: ENTREZID
+      subset: "Category=C5,Subcategory=BP"
+    - name: tmod
+      file: tmod
+      title: "Co-expression gene sets (tmod)"
+      description:
+        Gene sets derived from clustering expression profiles from human blood
+        collected for various immune conditions. These gene sets are included
+        in the tmod package by default. Check tmod documentation for further 
+        information.
+      taxonID: 9606
+      primaryID: SYMBOL
+      annotationDBI: org.Hs.eg.db
+        
 
 #---------------------------------------- configuration for export
 export:
