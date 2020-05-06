@@ -1,0 +1,338 @@
+<!--
+This is the snippet for summary of tmod results.
+January Weiner
+-->
+
+## Gene set enrichment analysis with tmod
+
+
+### Overview
+
+
+```{r tmod_configuration}
+## load the necessary libraries and objects required to run this snippet
+require(tidyverse)
+require(pander)
+require(tmod)
+require(orthomapper)
+require(glue)
+
+## get the file names from file_tab
+#tmod.res.f <- subset(file_tab, step=="tmod_summary" & extension == "rds")$filename
+tmod.dbs.f <- subset(file_tab, step=="tmod_dbs" & extension == "rds")$filename
+map.f      <- subset(file_tab, step == "tmod_dbs" & extension == "mapping.rds")$filename
+annot.f    <- subset(file_tab, step == "annotation" & extension == "rds")$filename
+
+#tmod.res  <- readRDS(tmod.res.f)
+tmod.dbs  <- readRDS(tmod.dbs.f)
+conf.snip <- config$report$snippet_parameters$tmod
+annot     <- readRDS(annot.f)
+
+tmod.mapping <- readRDS(map.f)
+
+# load tmod functions
+r.path <- "{{R_COMMON}}"
+script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
+source(script_f)
+```
+
+
+```{r tmod_summary}
+## create tmod_res with all the results
+contr <- sapply(config$contrasts$contrast_list, `[[`, "title")
+names(contr) <- sapply(config$contrasts$contrast_list, `[[`, "ID")
+
+res.f <- subset(file_tab, step == "tmod" & extension == "rds")$filename
+cnames <- subset(file_tab, step == "tmod" & extension == "rds")$contrast
+
+all_res <- lapply(res.f, readRDS)
+names(all_res) <- cnames
+
+contr <- contr[ names(contr) %in% cnames ]
+
+## put the contrasts in the same order they are in the config file
+all_res <- all_res[names(contr)]
+
+res <- lapply(names(tmod.dbs), function(n) lapply(all_res, `[[`, n))
+names(res) <- names(tmod.dbs)
+
+tmod.res <- list(results=res, contrasts_names=contr)
+rm(res)
+
+
+
+```
+
+
+
+```{r tmod_genelists}
+message(glue("Loading tmod gene lists"))
+
+tmp <- subset(file_tab, step=="tmod" & extension == "gl.rds")
+genelists <- lapply(tmp$filename, readRDS)
+names(genelists) <- tmp$contrast
+
+dbs <- unique(unlist(lapply(genelists, names)))
+
+## genelists holds the ordered lists of genes corresponding to contrasts and 
+## enrichment methods. Each element corresponds to the database and is itself a list 
+## with one element per contrast.
+genelists <- lapply(dbs, function(x) {
+  x <- lapply(genelists, `[[`, x)
+  x[names(contr)]
+})
+names(genelists) <- dbs
+```
+
+
+```{r deseq2_results}
+## Load the deseq2 results. We need them to visualize the data.
+message("Loading deseq2 results")
+tmp <- subset(file_tab, step=="contrasts_full" & extension == "rds")
+tmp2 <- lapply(tmp$filename, readRDS)
+names(tmp2) <- tmp$contrast
+
+.gl <- rownames(tmp2[[1]])
+tmp2 <- lapply(tmp2, function(x) x[ .gl, ])
+
+lfcs <- sapply(tmp2, `[[`, "log2FoldChange")
+pvals <- sapply(tmp2, `[[`, "padj")
+pvals[ is.na(pvals) ] <- 1
+lfcs[ is.na(lfcs) ] <- 0
+rownames(lfcs)  <- .gl
+rownames(pvals) <- .gl
+```
+
+**Table.** Overview of the databases for which gene set enrichment using
+tmod was performed.
+
+```{r tmod_dbs_overview_table}
+dbstat <- function(db) {
+  n <- nrow(db$dbobj$MODULES)
+  data.frame(ID=db$name, Name=db$title, Description=db$description, TaxonID=db$taxonID, N=n)
+}
+
+tab <- lapply(tmod.dbs, dbstat)
+tab <- Reduce(rbind, tab)
+pander(tab, row.names=FALSE, split.tables=Inf)
+```
+
+
+```{r tmod_db_output_templates}
+## we create templates as functions only to indicate which variables 
+## the templates need
+## Note: the `\n` character precedes the ```, because otherwise 
+## knitr gets confused!
+
+template_summary <- function(db_n, db, resU) {
+"
+
+## tmod enrichment analysis results for database `r db$title`.
+
+### Summary
+
+**Database ID:** `r db$name`.
+
+**Description:** `r db$description`.
+
+**Tab. Summary of the results.** Numbers show the number of enrichments
+significant at a given threshold for the given contrast and test type.
+
+\n```{r, results='asis'}
+pval.thr <- c(.05, .01, 1e-3, 1e-5)
+tab <- imap_dfr(resU, ~ {
+  .res   <- .x
+  .cname <- .y
+
+  map_int(pval.thr, ~ sum(.res$adj.P.Val < .x, na.rm=TRUE))
+})
+
+tab <- data.frame(names(resU), t(tab))
+colnames(tab) <- c('Contrast', pval.thr)
+
+pander(tab, row.names=FALSE, split.tables=Inf)
+\n```
+
+"
+}
+
+template_figure <- function(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection) {
+"
+
+### Figure
+
+\n```{r}
+## here, we run tmodDecideTests to figure out which genes belonging to a module go up, which go down
+
+## translate the names of the DESeq2 results to tmod database IDs
+gl <- rownames(lfcs)
+tmod.mapname <- tmod.mapping$dbs[db_n]
+gl.mapped <- tmod.mapping$maps[[tmod.mapname]][gl]
+
+## run tmodDecideTests to get numbers of significantly regulated genes 
+pie.main <- tmodDecideTests(gl.mapped, lfcs, pvals, mset=db$dbobj[ res_selection$sel_ids ] )
+
+## Since we can have multiple tests per database, but only one 'pie' per
+## contrast, we need to recreate the structure of tmod.res
+
+pies <- imap(res, ~ {
+  res.ctr <- .x
+  ctr_name <- .y
+ 
+  map(res.ctr, ~ {
+    pie.main[[ctr_name]]
+  })
+})
+
+## object analogous to resU, it will have the same names
+piesU <- unlist(pies, recursive=FALSE)
+\n```
+
+**Fig.** Panel plot showing results for the database `r db$name`.
+
+\n```{r}
+resU2 <- lapply(resU, function(x) x[ x$ID %in% res_selection$sel_ids,, drop=FALSE ])
+resU2S <- tmodSummary(resU2)
+rowlabs <- tmod_labels(resU2S$ID, resU2S$Title, max.length=35, nlines=2)
+#message(sprintf('Num of results to show: %d', nrow(resU2S)))
+#pander(resU2S)
+\n```
+
+
+\n```{r, fig.width=12,fig.height=4 + ceiling(nrow(resU2S)/3)}
+tmodPanelPlot(resU2, filter.rows.pval=conf.snip$fig_qval_max, 
+                     filter.rows.auc=conf.snip$fig_auc_min, 
+										 pie=piesU, grid='b', row.labels=rowlabs)
+\n```
+"
+}
+
+template_evidence_plots <- function(db_n, db, ids, gl) {
+"
+
+\n```{r}
+n <- length(ids)
+## collapse the top two levels of genelists
+glU <- unlist(gl, recursive=FALSE)
+\n```
+
+### Evidence plots
+
+Figures below show the evidence plots for the top `r n` gene sets. Each row
+corresponds to one gene set. Each column corresponds to one enrichment test
+(contrast + ordering). Each evidence plot shows the existing evidence for the
+enrichment of the given gene set in the given contrast. The curve shows
+the Receiver Operator Characteristic (ROC) curve for a given gene set. The rug
+below the figure represents the ordered list of genes. Genes belonging to a 
+given gene set are highlighted. Colors indicate whether the genes are
+positively or negatively regulated (red or blue, respectively), while color
+brightness indicates whether genes are significantly regulated (at q < 0.05).
+
+
+
+\n```{r fig.width=4*length(glU), fig.height=4*n}
+
+par(mfrow=c(n, length(glU)))
+
+## color the genes
+## names(gl) are the contrast names
+
+gids <- rownames(lfcs)
+tmod.mapname <- tmod.mapping$dbs[db_n]
+gids.mapped <- tmod.mapping$maps[[tmod.mapname]][gids]
+
+gene_colors <- lapply(names(gl), function(.gl) {
+	p <- pvals[,.gl]
+	l <- lfcs[,.gl]
+
+	cols <- ifelse(l < 0, 
+		ifelse(p < .05, 'blue', '#660000'),
+		ifelse(p < .05, 'red', '#000066'))
+	names(cols) <- gids.mapped
+	cols
+})
+names(gene_colors) <- names(gl)
+
+mlabs <- tmod_labels(ids, db$dbobj$MODULES[ids, 'Title' ], max.length=35, nlines=2)
+
+gsymbols <- NULL
+if('SYMBOL' %in% colnames(annot)) {
+	gsymbols <- annot$SYMBOL
+	names(gsymbols) <- annot$PrimaryID
+	gsymbols[is.na(gsymbols)] <- ''
+}
+	
+
+for(id in ids) {
+  for(.c in names(gl)) {
+		for(.s in names(gl[[.c]])) {
+			glabs <- gl[[.c]][[.s]] # gene labels
+			glabs <- glabs[ glabs %in% db$dbobj$MODULES2GENES[[id]] ]
+			if(!is.null(gsymbols)) {
+				gene_labs <- gsymbols[ names(glabs) ]
+			} else {
+				gene_labs <- glabs
+			}
+			names(gene_labs) <- glabs
+
+    	evidencePlot(gl[[.c]][[.s]], 
+				m=id, 
+				mset=db$dbobj, 
+				gene.colors=gene_colors[[.c]],
+				gene.labels=gene_labs,
+				main=sprintf('%s / %s\n%s', contr[.c], .s, mlabs[id]))
+		}
+  }
+}
+
+
+\n```
+
+"
+}
+
+```
+
+```{r tmod_results,results="asis"}
+## Here, we knit the template for each database
+
+for(db_n in names(tmod.res$results)) {
+  res  <- tmod.res$results[[db_n]]
+  db <- tmod.dbs[[ db_n ]]
+  message(glue("generating plots for {db_n}"))
+
+  ## results with the "sort type" level flattened
+  ## so instead of res$contrasts_name$pval$... we have res$contrasts_name.pval$...
+  resU <- unlist(res, recursive=FALSE)
+  summary_t <- template_summary(db_n, db, resU)
+  foo <- knitr::knit_child(text=summary_t, quiet=TRUE)
+  cat(foo)
+
+  # tmod_mod_sel <- function(res, qval.thr=.01, auc.thr=.65, max.n=25, min.n=max.n, res_sum=NULL) {
+  res_selection <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, 
+                                     auc.thr=conf.snip$fig_auc_min,
+                                     max.n=conf.snip$fig_n_max,
+                                     min.n=conf.snip$fig_n_min)
+  if(!is.null(res_selection$note)) {
+    cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+  } else {
+    figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
+    foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
+    cat(foo)
+
+		n <- conf.snip$n_evid
+    .sel <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, auc.thr=conf.snip$fig_auc_min, max.n=n, min.n=n)
+    ids <- .sel$sel_ids
+		gl <- genelists[[db_n]]
+    evidence_plot_t <- template_evidence_plots(db_n, db, ids, gl)
+    foo <- knitr::knit_child(text=evidence_plot_t, quiet=TRUE)
+    cat(foo)
+  }
+}
+```
+
+
+
+
+
+
