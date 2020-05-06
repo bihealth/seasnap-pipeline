@@ -1,7 +1,6 @@
 # Functional analysis
 
 
-
 ```{r Functional_main_template}
 PLOTS_DIR <- file.path(PLOTS_BASE_DIR, "Functional")
 dir.create(PLOTS_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
