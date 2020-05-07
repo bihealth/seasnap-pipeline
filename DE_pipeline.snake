@@ -170,7 +170,8 @@ rule import_gene_counts:
 	input:
 		samples = config["experiment"]["covariate_file"]["star"]
 	output:
-		pph.file_path("import_gene_counts", "rds", contrast = "all")
+		rds=pph.file_path("import_gene_counts", "rds", contrast = "all"),
+		xlsx=pph.file_path("import_gene_counts", "xlsx", contrast = "all")
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
@@ -190,11 +191,17 @@ rule import_gene_counts:
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
+    library(writexl)
 		
 		{R_SESSION_INFO}
+
+    #----- variables
+    sample_f  <- "{input.samples}"
+    output_xlsx <- "{output.xlsx}"
+    output_rds  <- "{output.rds}"
 		
 		#----- import data
-		sample_df <- read.table("{input.samples}", header=TRUE)
+		sample_df <- read.table(sample_f, header=TRUE)
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
@@ -214,7 +221,11 @@ rule import_gene_counts:
 		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = {DESIGN})
 		
 		#----- save as rds
-		saveRDS(dds, file="{output}")
+		saveRDS(dds, file=output_rds)
+
+    #----- export counts as XLSX
+    colnames(count_dat) <- sample_df$label
+    write_xlsx(count_dat, path=output_xlsx)
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
