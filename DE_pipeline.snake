@@ -191,6 +191,7 @@ rule import_gene_counts:
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
+    library(writexl)
 		
 		{R_SESSION_INFO}
 
@@ -200,7 +201,6 @@ rule import_gene_counts:
 		
 		#----- import data
 		sample_df <- read.table(sample_f, header=TRUE)
-		sample_df  <- sample_df[{column_filter},]
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
