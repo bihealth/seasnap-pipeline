@@ -1,6 +1,6 @@
 organism:
   name: mouse
-  genus: "Mus Musculus"
+  genus: "Mus musculus"
   taxon: 10090
 
   genome_version: GRCm38

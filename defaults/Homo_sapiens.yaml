@@ -1,6 +1,6 @@
 organism:
   name: human
-  genus: "Homo Sapiens"
+  genus: "Homo sapiens"
   taxon: 9606
 
   genome_version: GRCh38
