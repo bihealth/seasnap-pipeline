@@ -1120,9 +1120,10 @@ class CovariateFileTool(PipelinePathHandler):
 class SampleInfoTool(PipelinePathHandler):
 	""" Tool to generate a sample info file before running the pipeline; use same config as for MappingPipelinePathHandler """
 	
-	allowed_wildcards          = MappingPipelinePathHandler.allowed_wildcards
+	allowed_wildcards          = MappingPipelinePathHandler.allowed_wildcards + ["lib_type"]
 	required_wildcards_out_log = MappingPipelinePathHandler.required_wildcards_out_log
 	required_wildcards_in      = MappingPipelinePathHandler.required_wildcards_in
+	wildcard_fix_values = MappingPipelinePathHandler.wildcard_fix_values
 	
 	allowed_read_extensions    = [".fastq", ".fastq.gz"]
 	
@@ -1202,14 +1203,22 @@ class SampleInfoTool(PipelinePathHandler):
 			if comb.sample not in sample_info:
 				sample_info[comb.sample] = {"stranded":library_default, "read_extension":comb.read_extension}
 				sample_info[comb.sample]["paired_end_extensions"] = [getattr(comb, "mate", "")]
-			elif hasattr(comb, "mate"):
-				paired_end_ext     = getattr(comb, "mate", "")
-				paired_end_ext_lst = sample_info[comb.sample]["paired_end_extensions"]
-				if paired_end_ext_lst == [""]:
-					raise ValueError("Error compiling sample information: sample {} has names with and without paired end extensions".format(comb.sample))
-				if paired_end_ext not in paired_end_ext_lst:
-					paired_end_ext_lst.append(paired_end_ext)
-					paired_end_ext_lst.sort()
+				sample_info[comb.sample]["lib_types"] = {comb.lib_type: None} if hasattr(comb, "lib_type") else {}
+			else:
+				if hasattr(comb, "mate"):
+					paired_end_ext     = getattr(comb, "mate", "")
+					paired_end_ext_lst = sample_info[comb.sample]["paired_end_extensions"]
+					if paired_end_ext_lst == [""]:
+						raise ValueError("Error compiling sample information: sample {} has names with and without paired end extensions".format(comb.sample))
+					if paired_end_ext not in paired_end_ext_lst:
+						paired_end_ext_lst.append(paired_end_ext)
+						paired_end_ext_lst.sort()
+				if hasattr(comb, "lib_type"):
+					lib_types = sample_info[comb.sample]["lib_types"]
+					if lib_types == {}:
+						raise ValueError("Error compiling sample information: sample {} has names with and without library type information".format(comb.lib_type))
+					if comb.lib_type not in lib_types:
+						lib_types[comb.lib_type] = None
 		if add:
 			# add missing fields
 			self._add_info_fields(sample_info)
@@ -1256,34 +1265,75 @@ class SampleInfoTool(PipelinePathHandler):
 		tab = pd.read_csv(filename, sep="\t", index_col=False)
 		tab.dropna(axis="columns", how="all", inplace=True)
 		parse_conf = Path(os.path.realpath(__file__)).parent / Path("ISAtab_parse_conf.yaml")
+		print(f"isatab parse config file: {str(parse_conf)}")
 		with open(str(parse_conf), "r") as stream:
 			try:
 				parse_conf = yaml.safe_load(stream)
 			except yaml.YAMLError as exc:
 				print(exc)
 		
-		def find_column(key):
+		def find_columns(key):
 			if not parse_conf[key]["columns"]: return None
-			for col in tab.columns:
-				for col_regex in parse_conf[key]["columns"]:
-					if re.match(col_regex, col): return col
-		def map_value(key, value):
-			if "as_is" in parse_conf[key] and parse_conf[key]["as_is"]: return value
-			value = str(value).lower()
+			cols = []
+			for col_regex in parse_conf[key]["columns"]:
+				for col in tab.columns:
+					if re.match(col_regex, col):
+						cols.append(col)
+			return cols
+
+		def map_value(key, value, col):
+			if "as_is" in parse_conf[key] and parse_conf[key]["as_is"]:
+				return value
+			value = str(value)
 			for val_regex, val_repl in parse_conf[key]["value"].items():
-				if re.fullmatch(val_regex, value): 
-					return re.sub(val_regex, val_repl, value) if isinstance(val_repl, str) else val_repl
-		
+				if re.fullmatch(val_regex, value):
+					if isinstance(val_repl, str):
+						return re.sub(val_regex, val_repl, value)
+					elif isinstance(val_repl, dict):
+						repl_dict = {}
+						for k_repl, v_repl in val_repl.items():
+							add_key = re.sub(val_regex, k_repl, value)
+							if add_key == add_key and add_key != 'nan':
+								col_mode = False
+								if r"\col_mode: " in v_repl:
+									v_repl = v_repl.replace(r"\col_mode: ", "")
+									col_mode = True
+
+								if col_mode:
+									opts = {k: v for pair in v_repl.split(",") for k, v in [pair.split(":")]}
+									repl_dict.update({add_key: opts[col]})
+								else:
+									repl_dict.update({add_key: re.sub(val_regex, v_repl, value)})
+						return list(repl_dict.items())
+					else:
+						return val_repl
+
 		sample_info_cols = {}
 		for key in parse_conf:
-			column = find_column(key)
-			print(f"key: {key} | column: {column}")
-			if column is not None: 
-				sample_info_cols[key] = [map_value(key, val) for val in tab[column]]
+			add = parse_conf[key]["add"] if "add" in parse_conf[key] else False
+			columns = find_columns(key)
+			print(f"key: {key} | column: {str(columns)}")
+			if columns is not None:
+				for col in columns:
+					if key not in sample_info_cols:
+						sample_info_cols[key] = [map_value(key, val, col) for val in tab[col]]
+					elif add:
+						for sic, val in zip(sample_info_cols[key], tab[col]):
+							if isinstance(sic, list):
+								sic.extend(map_value(key, val, col))
+							else:
+								raise ValueError(
+									f"Error in ISAtab_parse_conf.yaml: cannot 'add', because {sic} is not a list!"
+								)
 		
-		self.sample_info = {sample_info_cols["id"][i]: 
-		                   	{key: val[i] for key,val in sample_info_cols.items() if key != "id"} 
-		                   for i in range(len(sample_info_cols["id"]))}
+		self.sample_info = {
+			sample_id: {
+				key: val[i]
+				for key, val in sample_info_cols.items()
+				if key != "id"
+			}
+			for i, sample_id in enumerate(sample_info_cols["id"])
+		}
 			
 		
 ##################################################################################################################################
