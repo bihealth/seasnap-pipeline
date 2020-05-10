@@ -20,12 +20,13 @@ SNAKEFILE = workflow.snakefile
 SCRIPTDIR = str(SNAKEDIR / "external_scripts")
 
 # assemble config
+config_file_name = config["file_name"] if "file_name" in config else "sc_config.yaml"
 configfile: str(SNAKEDIR / "defaults" / "sc_config_defaults.yaml")
-configfile: "sc_config.yaml"
+configfile: config_file_name
 configfile: "sample_info.yaml"
 if config["organism_defaults"]:
 	configfile: str(SNAKEDIR / "defaults" / config["organism_defaults"])
-	configfile: "sc_config.yaml"
+	configfile: config_file_name
 
 # create path handler
 conf_ranges = str(SNAKEDIR / "defaults" / "sc_config_ranges.yaml")
@@ -63,8 +64,11 @@ onstart:
 def get_inputs_all():
 	inputs = []
 
-	#inputs += pph.expand_path("cellranger_count", "done", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
-	inputs += [pph.file_path("velocyto_run", "loom", fix="all")]
+	results = config["pipeline_param"]["produce_results"]
+	if "velocyto" in results:
+		inputs += [pph.file_path("velocyto_run", "loom", fix="all")]
+	elif "cellranger" in results:
+		inputs += pph.file_path(step="cellranger_aggr", extension="done")
 
 	return inputs
 
@@ -126,37 +130,101 @@ rule cellranger_count:
     """ run cellranger count """
 	input:
 		reads = lambda wildcards: pph.get_fastq_pairs(wildcards, mate="*"),
-		transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
+		transcriptome = config["organism"]["files"]["cellranger_transcriptome"],
+		feature_ref = config["pipeline_param"]["feature_ref"]
 	output:
 		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/outdir"),
 		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
+		done = touch(pph.file_path(step="cellranger_count", extension="done"))
 	log:
 		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["cellranger_count"]["cmd_opt"]
 	run:
-		dirnames = ",".join(os.path.dirname(p) for p in input.reads)
-		basenames = ",".join(os.path.basename(p) for p in input.reads)
+		# using feature barcodes ?
+		feature_ref = str(Path(input.feature_ref).resolve()) if input.feature_ref else ""
+
+		# create libraries file
+		lib_file_content = ["fastqs, sample, library_type"]
+		prefixes = [p for p, t in config["sample_info"][wildcards.sample]["lib_types"]]
+		pref_dup = len(prefixes) != len(set(prefixes))
+		for lpref, ltype in config["sample_info"][wildcards.sample]["lib_types"]:
+			for lp in lpref.split(","):
+				if pref_dup and ltype != "Gene Expression":  # in some cases same prefix is annotated in ISA tab
+					lib_file_content.append(f"{Path(output.links).resolve()}, tag_{lp}, {ltype}")
+				else:
+					lib_file_content.append(f"{Path(output.links).resolve()}, {lp}, {ltype}")
+		pref_dup = "true" if pref_dup else "false"
+		lib_file_content = "\n".join(lib_file_content)
 
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
-		cellranger --version
+		cellranger --version || true
 
-		#----- collect input links
+		#----- collect fastq input links
 		mkdir {output.links}
-		ln -s {input.reads} {output.links}
+		ln -sf $(readlink -f {input.reads}) {output.links}
+		if {pref_dup}; then
+		  for f in {output.links}/*; do
+		    cp -av "$f" "$(dirname $f)/tag_$(basename $f)"
+		  done
+		fi
 
 		#----- Cellranger counting
-		cellranger count \
-		  --id={output.outdir} \
-		  --fastqs={output.links} \
-		  --sample='' \
-		  --transcriptome={input.transcriptome} \
-		  {params.options}
+		mkdir -p {output.outdir}; cd {output.outdir}; ls -lh
+		#-- write libraries file
+		cat << 'EOF' > "libraries.csv"
+		{lib_file_content}
+		EOF
+		#-- link feature barcodes if present
+		feature_ref="{feature_ref}"
+		if [ "$feature_ref" ]; then
+		  ln -sf $feature_ref "feature_ref.csv"
+		  feature_ref="--feature-ref=feature_ref.csv"
+		fi
+		#-- run cellranger count
+		cellranger count --id="outdir" --libraries="libraries.csv" $feature_ref --transcriptome={input.transcriptome} {params.options}
+		cd -
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="cellranger_count", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+rule cellranger_aggr:
+	input:
+		pph.expand_path(step="cellranger_count", extension="done", fix="mate")
+	output:
+		outdir = directory(pph.out_dir_name(step="cellranger_aggr")+"/outdir"),
+		done = touch(pph.file_path(step="cellranger_aggr", extension="done"))
+	log:
+		out = pph.file_path(step = "cellranger_aggr", extension="output.log", log=True)
+	run:
+		aggr_csv_content = ["library_id, molecule_h5"]
+		for count_results in input:
+			mol_info = Path(count_results).parent / "outdir" / "outdir" / "outs" / "molecule_info.h5"
+			sample_name = pph.wildcard_values_from(count_results, False)["sample"][0]
+			aggr_csv_content.append(f"{sample_name}, {str(mol_info.resolve())}")
+		aggr_csv_content = "\n".join(aggr_csv_content)
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		cellranger --version || true
+
+		#----- Cellranger counting
+		mkdir -p {output.outdir}; cd {output.outdir}
+		#-- write libraries file
+		cat << 'EOF' > "output_aggr.csv"
+		{aggr_csv_content}
+		EOF
+		#-- run cellranger aggr
+		cellranger aggr --id="cellranger_dir" --csv="output_aggr.csv"
+		cd -
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="cellranger_aggr", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
 ##-------------------- Velocyto -------------------------------------------------------------------------------
@@ -165,17 +233,17 @@ rule velocyto_run:
     """ run velocyto on 10X Chromium samples """
 	input:
 		gtf = config["organism"]["files"]["cellranger_gtf"],
-		mask = config["organism"]["files"]["velocyto_mask_gtf"],
-		cellranger_done = pph.file_path(step="cellranger_count", extension="done")
+		cellranger_done = pph.file_path(step="cellranger_aggr", extension="done")
 	output:
 		pph.file_path(step="velocyto_run", extension="loom")
 	log:
 		out = pph.file_path(step="velocyto_run", extension="output.log", log=True)
 	params:
 	    cellranger_outdir = pph.out_dir_name(step="cellranger_count")+"/outdir",
+	    mask = config["organism"]["files"]["velocyto_mask_gtf"],
 	    options = config["rule_options"]["velocyto_run"]["cmd_opt"]
 	run:	
-		mask = f"-m {input.mask}" if input.mask else ""
+		mask = f"-m {params.mask}" if params.mask else ""
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux

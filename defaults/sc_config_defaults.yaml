@@ -8,6 +8,12 @@ pipeline_param:
   test_config: true
   report_snippets: ""
 
+  feature_ref: BDtags_feature_ref.csv
+
+  # adjust which results are produced
+  produce_results:
+    - cellranger
+    - velocyto
 #---------------------------------------- organism annotation
 organism_defaults: null
 
