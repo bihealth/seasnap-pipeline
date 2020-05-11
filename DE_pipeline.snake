@@ -197,6 +197,7 @@ rule import_gene_counts:
 		
 		#----- import data
 		sample_df <- read.table(sample_f, header=TRUE)
+		sample_df  <- sample_df[{column_filter},]
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
@@ -256,6 +257,7 @@ rule import_featurecounts:
 		
 		#----- import data
 		sample_df <- read.table("{input.samples}", header=TRUE)
+		sample_df  <- sample_df[{column_filter},]
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
