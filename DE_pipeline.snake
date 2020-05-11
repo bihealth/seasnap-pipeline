@@ -675,62 +675,6 @@ rule contrasts_full:
 
 
 
-## ------------------------ annotation ---------------------------
-
-rule annotation:
-	""" Adding annotation information """
-	input:
-		# we use dds as this is the most reliable source of the primary IDs
-		dds       = pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
-	output:
-		res = pph.file_path(step = "annotation", extension = "rds", contrast="all"),
-		csv = pph.file_path(step = "annotation", extension = "csv", contrast="all")
-	log:
-		out = pph.file_path(step = "annotation", extension = "output.log", log=True, contrast="all")
-	run:
-		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
-		script = textwrap.dedent(r"""
-			library(AnnotationDbi)
-			{R_SESSION_INFO}
-
-			res.file <- "{output.res}"
-			res.csv  <- "{output.csv}"
-			script.d <- "{SCRIPTDIR}"
-			conf.f   <- "{config_file}"
-      dds      <- "{input.dds}"
-			 
-			# ----------------------------------------
-			# No Snakemake wildcards beyond this point
-			# ----------------------------------------
-			library(orthomapper)
-
-			config <- yaml::yaml.load_file(conf.f)
-
-			gene_ids <- rownames(readRDS(dds))
-
-			res <- data.frame(PrimaryID=gene_ids, stringsAsFactors=FALSE)
-			res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
-
-			annot <- orthomapper::entrez_annotate(res$ENSEMBL, taxon=config$organism$taxon,
-				keytype="ENSEMBL", column=c("SYMBOL", "ENTREZID", "REFSEQ", "GENENAME"))
-
-		  if(!all(annot[,1] == res$ensembl)) 
-				stop("object returned by entrez_annotate() does not match query")
-
-			## no need to duplicate columns
-			res <- cbind(res, annot[, -1, drop=FALSE])
-
-			write.csv(res, row.names=FALSE, file=res.csv)
-	    saveRDS(res, file=res.file)
-		""")
-
-		script_file = pph.log(log.out, snakemake_format(script), step="annotation", extension="R", contrast="all", **wildcards)
-		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
-
-
-
-
-
 ## ------------------------ preparation of the tmod databases ---------------------------
 
 rule tmod_dbs:
