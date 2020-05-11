@@ -22,12 +22,13 @@ SNAKEFILE = workflow.snakefile
 SCRIPTDIR = str(SNAKEDIR / "external_scripts")
 
 # assemble config
+config_file_name = config["file_name"] if "file_name" in config else "mapping_config.yaml"
 configfile: str(SNAKEDIR / "defaults" / "mapping_config_defaults.yaml")
-configfile: "mapping_config.yaml"
+configfile: config_file_name
 configfile: "sample_info.yaml"
 if config["organism_defaults"]:
 	configfile: str(SNAKEDIR / "defaults" / config["organism_defaults"])
-	configfile: "mapping_config.yaml"
+	configfile: config_file_name
 
 # create path handler
 conf_ranges = str(SNAKEDIR / "defaults" / "mapping_config_ranges.yaml")
