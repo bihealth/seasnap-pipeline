@@ -16,6 +16,7 @@ require(pander)
 require(tmod)
 require(orthomapper)
 require(glue)
+require(purrr)
 
 ## get the file names from file_tab
 #tmod.res.f <- subset(file_tab, step=="tmod_summary" & extension == "rds")$filename
