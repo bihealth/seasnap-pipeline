@@ -1,0 +1,29 @@
+#REQUIRE {{fctann-ora.rds-{{ENTRY_ID}}}}
+
+#### Generic over-representation enrichment map {.tabset .tabset-pills}
+
+```{r fctann_oramap_{{ENTRY_ID}}, results="asis"}
+library(clusterProfiler)
+library(enrichplot)
+
+for (ora in ORA) {
+    cat(sprintf("\n##### %s - %s {.tabset}\n", ora$geneset, ora$method))
+    for (theCategory in names(ora$results)) {
+        cat(sprintf("\n###### %s {-}\n", theCategory))
+        cp_res_df <- as.data.frame(ora$results[[theCategory]])
+        if (is.null(cp_res_df) || nrow(cp_res_df)<1) {
+            msg <- NULL
+            msg <- c(msg, sprintf("\n\nNo gene list from %s, category %s is statistically significantly enriched at %f (adjusted P value)",
+                                                                              ora$geneset, theCategory, ora$params$pvalueCutoff))
+            msg <- c(msg, sprintf("\nAdditional limits placed on gene lists:"))
+            msg <- c(msg, sprintf("- q value cutoff: %f ([Storey and Tibshirani (2003). _PNAS_ **100**(16):9440-5](https://www.pnas.org/content/100/16/9440))", ora$params$qvalueCutoff))
+            msg <- c(msg, sprintf("- min gene list size: %d", ora$params$minGSSize))
+            msg <- c(msg, sprintf("- max gene list size: %d", ora$params$maxGSSize))
+            cat(msg, "\n", sep="\n")
+        } else {
+            try({print(emapplot(ora$results[[theCategory]])); cat("\n")})
+        }
+    }
+}
+```
+

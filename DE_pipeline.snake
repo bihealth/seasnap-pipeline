@@ -61,10 +61,11 @@ def get_inputs_all():
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	
 	#functional annotation
-	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
-	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
+	inputs.append(pph.expand_path(step = "goseq",  extension = "go.rds",   if_set = dict(goseq=True) ))
+	inputs.append(pph.expand_path(step = "goseq",  extension = "kegg.rds", if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
-	
+	inputs.append(pph.expand_path(step = "fctann", extension = "ora.rds",  if_set = dict(fctann=dict()) ))
+	inputs.append(pph.expand_path(step = "fctann", extension = "gsea.rds", if_set = dict(fctann=dict()) ))
 	
 	return inputs
 
@@ -421,7 +422,8 @@ rule contrast:
 		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
 	output:
 		rds = pph.file_path("contrast", "rds"),
-		csv = pph.file_path("contrast", "csv")
+		csv = pph.file_path("contrast", "csv"),
+		contrast_yaml = pph.file_path("contrast", "contrast.yaml")
 	log:
 		out           = pph.file_path("contrast", "output.log",  log=True),
 		contrast_yaml = pph.file_path("contrast", "contrast.yaml", log=True)
@@ -432,6 +434,7 @@ rule contrast:
 	run:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		os.symlink("../report/" + os.path.basename(log.contrast_yaml), output.contrast_yaml)
 		
 		# variants of contrast definition
 		contrast_column, contrast_ref = "group", ""
@@ -508,14 +511,152 @@ rule contrast:
 
 ##-------------------- functional annotation ----------------------------------------------------------------
 
+rule fctann:
+	""" functional analysis for multiple tests, annotations & algorithms"""
+	input:
+		res = pph.file_path("contrast", "rds")
+	output:
+		ora           = pph.file_path(step = "fctann", extension = "ora.rds"),
+		gsea          = pph.file_path(step = "fctann", extension = "gsea.rds"),
+		ora_tsv       = pph.file_path(step = "fctann", extension = "ora.tsv"),
+		gsea_tsv      = pph.file_path(step = "fctann", extension = "gsea.tsv"),
+		genes         = pph.file_path(step = "fctann", extension = "genes.rds"),
+		contrast_yaml = pph.file_path(step = "fctann", extension = "contrast.yaml")
+	log:
+		out           = pph.file_path(step = "fctann", extension = "output.log",    log=True),
+		contrast_yaml = pph.file_path(step = "fctann", extension = "contrast.yaml", log=True)
+	params:
+		annot_pkg = config["organism"]["R"]["annotations"],
+		fromID    = "GENCODE",
+		toID      = "ENTREZID",
+		scripts   = str(SNAKEDIR / "tools" / "fctann_scripts.R")
+	run:
+		contrast = pph.get_contrast(wildcards.contrast)
+		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		os.symlink("../report/" + os.path.basename(log.contrast_yaml), output.contrast_yaml)
+		
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(yaml)
+		library(clusterProfiler)
+		library(AnnotationDbi)
+		library(magrittr)
+		
+		{R_SESSION_INFO}
+
+		#----- preparation: read helpers scripts file & contrast config
+		source("{params.scripts}")
+		config <- read_yaml("{log.contrast_yaml}")
+
+		#----- read contrast results & remap gene ids
+		res <- readRDS("{input.res}")
+		res <- formatResultsForFctAnn(res,
+		                              fromID="{params.fromID}", toID="{params.toID}",
+		                              annotation={params.annot_pkg}::{params.annot_pkg},
+		                              multiVals=config[["fctann"]][["mapping"]][["multiVals"]])
+
+		#----- order the results by P values (& by abs(lfc) to break ties)
+		res <- res[order(res[["pvalue"]], -abs(res[["log2FoldChange"]])),]
+
+		#----- prepare the gene lists (does not depend on geneset or algorithm)
+		geneList_ora  <- res[["{params.toID}"]][res[["padj"]] < config[["max_p_adj"]]]
+		universe      <- res[["{params.toID}"]]
+		geneList_gsea <- nrow(res):1
+		names(geneList_gsea) <- as.character(res[["{params.toID}"]])
+
+		#----- run the tests for all gene sets & all statistics
+		oraTests  <- NULL
+		gseaTests <- NULL
+		oraTbl    <- NULL
+		gseaTbl   <- NULL
+		for (gsname in names(config[["fctann"]][["geneset"]])) {{
+			#----- create the TERM2GENE & TERM2NAME tables for clusterProfiler
+			if (gsname == "GO") {{
+				geneset <- goAnnotToTable(gl=res[["{params.toID}"]], keytype="{params.toID}",
+				                          annotation={params.annot_pkg}::{params.annot_pkg},
+				                          category=config[["fctann"]][["geneset"]][["GO"]][["category"]])
+			}}
+			if (gsname == "MSigDb") {{
+				geneset <- msigdbAnnotToTable(gl=res[["{params.toID}"]], keytype="{params.toID}",
+				                              annotation={params.annot_pkg}::{params.annot_pkg},
+				                              category=config[["fctann"]][["geneset"]][["MSigDb"]][["category"]])
+			}}
+			if (gsname == "user") {{
+				geneset <- userAnnotToTable(gene2term=config[["fctann"]][["geneset"]][["user"]][["gene2term"]], 
+                                                            gene2name=config[["fctann"]][["geneset"]][["user"]][["gene2name"]],
+                                                            fromID=config[["fctann"]][["geneset"]][["user"]][["ID"]], toID="{params.toID}",
+				                            annotation={params.annot_pkg}::{params.annot_pkg},
+				                            category=config[["fctann"]][["geneset"]][["user"]][["category"]])
+			}}
+
+			for (theStat in names(config[["fctann"]][["statistic"]])) {{
+				for (theMethod in names(config[["fctann"]][["statistic"]][[theStat]])) {{
+					p <- config[["fctann"]][["statistic"]][[theStat]][[theMethod]]
+					theTest <- data.frame()
+					#----- run statistical test
+					if (theStat=="ORA" && theMethod == "clusterProfiler") {{
+						theTest <- enricher(gene=geneList_ora, universe=universe,
+					        	            pvalueCutoff=p$pvalueCutoff, pAdjustMethod=p$pAdjustMethod, qvalueCutoff=p$qvalueCutoff,
+					                	    minGSSize=p$minGSSize, maxGSSize=p$maxGSSize,
+						                    TERM2GENE=geneset[["TERM2GENE"]], TERM2NAME=geneset[["TERM2NAME"]])
+					}}
+					if (theStat=="GSEA" && theMethod == "clusterProfiler") {{
+						theTest <- GSEA(geneList=geneList_gsea,
+						                pvalueCutoff=p$pvalueCutoff, pAdjustMethod=p$pAdjustMethod, 
+						                minGSSize=p$minGSSize, maxGSSize=p$maxGSSize,
+						                TERM2GENE=geneset[["TERM2GENE"]], TERM2NAME=geneset[["TERM2NAME"]])
+					}}
+					if (is(theTest, "enrichResult") || is(theTest, "gseaResult")) {{
+						#----- add missing information to results object
+						theTest@organism <- species({params.annot_pkg}::{params.annot_pkg})
+						theTest@keytype  <- "{params.toID}"
+						theTest <- setReadable(theTest, OrgDb="{params.annot_pkg}", keyType="{params.toID}")
+						#----- split results by category
+						l <- NULL
+						for (theCategory in config[["fctann"]][["geneset"]][[gsname]][["category"]]) {{
+							termsInCategory <- geneset[["TERM2NAME"]][["TERM"]][geneset[["TERM2NAME"]][["CATEGORY"]]==theCategory]
+							tmp <- theTest
+							tmp@result <- as.data.frame(tmp) %>% dplyr::filter(ID %in% termsInCategory)
+							rownames(tmp@result) <- as.character(tmp@result[["ID"]])
+							l <- c(l, list(tmp))
+						}}
+						names(l) <- config[["fctann"]][["geneset"]][[gsname]][["category"]]
+						#----- aggregate final results lists
+						if (is(theTest, "enrichResult")) {{
+							oraTests <- c(oraTests, list(list(raw=theTest, results=l, params=p, method=theMethod, geneset=gsname)))
+							theTest   <- as.data.frame(theTest)
+							if (nrow(theTest) > 0) oraTbl <- rbind(oraTbl, data.frame(geneset=gsname, method=theMethod, theTest, stringsAsFactors=FALSE))
+						}}
+						if (is(theTest, "gseaResult")) {{
+							gseaTests <- c(gseaTests, list(list(raw=theTest, results=l, params=p, method=theMethod, geneset=gsname)))
+							theTest   <- as.data.frame(theTest)
+							if (nrow(theTest) > 0) gseaTbl <- rbind(gseaTbl, data.frame(geneset=gsname, method=theMethod, theTest, stringsAsFactors=FALSE))
+						}}
+					}}
+				}}
+			}}
+		}}
+
+		#----- save results
+		saveRDS(oraTests,  file="{output.ora}")
+		saveRDS(gseaTests, file="{output.gsea}")
+		write.table(oraTbl,  file="{output.ora_tsv}",  sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+		write.table(gseaTbl, file="{output.gsea_tsv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+		saveRDS(res, file="{output.genes}")
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="fctann", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
 rule goseq:
 	""" over-representation analysis (ORA) with goseq producing GO and KEGG lists """
 	input:
 		txdb = pph.file_path("TxDb_from_GTF", "sqlite", contrast = "all"),
 		res  = pph.file_path("contrast", "rds")
 	output:
-		go   = pph.file_path(step = "goseq", extension = "go.rds"),
-		kegg = pph.file_path(step = "goseq", extension = "kegg.rds")
+		go            = pph.file_path(step = "goseq", extension = "go.rds"),
+		kegg          = pph.file_path(step = "goseq", extension = "kegg.rds"),
+		contrast_yaml = pph.file_path(step = "goseq", extension = "contrast.yaml")
 	log:
 		out           = pph.file_path(step = "goseq", extension = "output.log",    log=True),
 		contrast_yaml = pph.file_path(step = "goseq", extension = "contrast.yaml", log=True)
@@ -525,6 +666,7 @@ rule goseq:
 	run:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		os.symlink("../report/" + os.path.basename(log.contrast_yaml), output.contrast_yaml)
 		
 		fdr_threshold = contrast["ORA"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
@@ -583,8 +725,9 @@ rule cluster_profiler:
 	input:
 		res  = pph.file_path("contrast", "rds")
 	output:
-		rds = pph.file_path(step = "cluster_profiler", extension = "rds"),
-		csv = directory(pph.file_path(step = "cluster_profiler", extension = "csv"))
+		rds           = pph.file_path(step = "cluster_profiler", extension = "rds"),
+		csv           = directory(pph.file_path(step = "cluster_profiler", extension = "csv")),
+		contrast_yaml = pph.file_path(step = "cluster_profiler", extension = "contrast.yaml")
 	log:
 		out           = pph.file_path(step = "cluster_profiler", extension = "output.log",    log=True),
 		contrast_yaml = pph.file_path(step = "cluster_profiler", extension = "contrast.yaml", log=True)
@@ -595,6 +738,7 @@ rule cluster_profiler:
 	run:
 		contrast = pph.get_contrast(wildcards.contrast)
 		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+		os.symlink("../report/" + os.path.basename(log.contrast_yaml), output.contrast_yaml)
 		
 		fdr_threshold = contrast["ORA"]["fdr_threshold"]
 		AnnotationDbi_prefix = ".".join(params.annot_pkg.split(".")[:-1])
@@ -730,4 +874,6 @@ rule report:
 		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
 		
 		with open(output[0], "w") as f: f.write(report_text)
+
+
 

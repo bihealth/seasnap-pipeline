@@ -1,0 +1,29 @@
+#REQUIRE {{fctann-gsea.rds-{{ENTRY_ID}}}}
+
+#### Generic gene-set enrichment plot {.tabset .tabset-pills}
+
+```{r fctann_gseadot_{{ENTRY_ID}}, results="asis"}
+library(clusterProfiler)
+library(enrichplot)
+
+for (gsea in GSEA) {
+    cat(sprintf("\n##### %s - %s {.tabset}\n", gsea$geneset, gsea$method))
+    for (theCategory in names(gsea$results)) {
+        cat(sprintf("\n###### %s {-}\n", theCategory))
+        cp_res_df <- as.data.frame(gsea$results[[theCategory]])
+        if (is.null(cp_res_df) || nrow(cp_res_df)<1) {
+            msg <- NULL
+            msg <- c(msg, sprintf("\n\nNo gene list from %s, category %s is statistically significantly enriched at %f (adjusted P value)",
+                                                        gsea$geneset, theCategory, gsea$params$pvalueCutoff))
+            msg <- c(msg, sprintf("\nAdditional limits placed on gene lists:"))
+            msg <- c(msg, sprintf("- q value cutoff: %f ([Storey and Tibshirani (2003). _PNAS_ **100**(16):9440-5](https://www.pnas.org/content/100/16/9440))", gsea$params$qvalueCutoff))
+            msg <- c(msg, sprintf("- min gene list size: %d", gsea$params$minGSSize))
+            msg <- c(msg, sprintf("- max gene list size: %d", gsea$params$maxGSSize))
+            cat(msg, "\n", sep="\n")
+        } else {
+            try({print(dotplot(gsea$results[[theCategory]], showCategory=20)); cat("\n")})
+        }
+    }
+}
+```
+

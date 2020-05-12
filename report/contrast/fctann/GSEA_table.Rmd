@@ -1,0 +1,73 @@
+#REQUIRE {{fctann-gsea.rds-{{ENTRY_ID}}}}
+
+#### Generic gene-set enrichment analysis {.tabset .tabset-pills}
+
+The gene-set enrichment results for contrast {{ENTRY_NAME}} are shown in the table below.
+They were computed under the following conditions:
+
+The differential expression results were mapped to `r CONTRAST_CONFIG$fctann$mapping$toID`. 
+When multiple genes correspond to a single `r CONTRAST_CONFIG$fctann$mapping$toID` id,
+the gene with `r CONTRAST_CONFIG$fctann$mapping$multiVals` was selected. 
+The number of unique `r CONTRAST_CONFIG$fctann$mapping$toID` ids is `r nrow(MAPPED)`
+
+```{r fctann_gseatable_{{ENTRY_ID}}, results="asis"}
+library(DT)
+
+for (gsea in GSEA){
+    cat(sprintf("\n##### %s - %s {.tabset}\n", gsea$geneset, gsea$method))
+    for (theCategory in names(gsea$results)) {
+        cat(sprintf("\n###### %s {-}\n", theCategory))
+        cp_res_df <- as.data.frame(gsea$results[[theCategory]])
+        if (is.null(cp_res_df) || nrow(cp_res_df)<1) {
+            msg <- NULL
+            msg <- c(msg, sprintf("\n\nNo gene list from %s, category %s is statistically significantly enriched at %f (adjusted P value)",
+                                  gsea$geneset, theCategory, gsea$params$pvalueCutoff))
+            msg <- c(msg, sprintf("\nAdditional limits placed on gene lists:"))
+            msg <- c(msg, sprintf("- q value cutoff: %f ([Storey and Tibshirani (2003). _PNAS_ **100**(16):9440-5](https://www.pnas.org/content/100/16/9440))", gsea$params$qvalueCutoff))
+            msg <- c(msg, sprintf("- min gene list size: %d", gsea$params$minGSSize))
+            msg <- c(msg, sprintf("- max gene list size: %d", gsea$params$maxGSSize))
+            cat(msg, "\n", sep="\n")
+        } else {
+            rownames(cp_res_df) <- NULL
+            try({
+                x <- datatable(
+                    cp_res_df %>% dplyr::select(-leading_edge), # Remove leading edge for formatting reasons TODO: fix that, damn it!
+                    rownames=FALSE
+#                     rownames=FALSE,
+#                     extensions="Buttons",
+#                     options=list(
+#                         dom='Bfrtip',
+#                         processing=FALSE,
+#                         buttons=list(
+#                             list(
+#                                 extend="csv",
+#                                 text="Download",
+#                                 filename=sprintf("gsea_%s.tsv", theCategory),
+#                                 exportOptions=list(
+#                                     modifier=list(
+#                                         page="all"
+#                                     ),
+#                                     orthogonal="export"
+#                                 )
+#                             )
+#                         ),
+#                         columnDefs=list(
+#                             list(
+#                                 targets=c(0, 1, 10),
+#                                 render=DT::JS("$.fn.dataTable.render.ellipsis( 10, true )")
+#                             )
+#                         )
+#                     ),
+#                     plugins="ellipsis"
+                ) %>% 
+                    formatRound(c("enrichmentScore", "NES"), digits=2) %>%
+                    formatRound(c("pvalue", "p.adjust", "qvalues"), digits=4)
+                y <- htmltools::as.tags(x)
+                cat(paste(sapply(y, function(z) ifelse(is.null(z), "", as.character(z))), collapse="\n"))
+                cat("\n")
+            })
+        }
+    }
+}
+```
+

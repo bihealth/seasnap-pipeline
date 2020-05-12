@@ -85,10 +85,20 @@ report:
       - Result_table.Rmd
       - Goseq_GO_table.Rmd
       - cluster_profiler: __defaults__
+      - fctann: __defaults__
     cluster_profiler:
       - Dot_plot.Rmd
       - EnrichmentMap_plot.Rmd
       - Upset_plot.Rmd
+    fctann:
+      - Ora_table.Rmd
+      - Ora_dot.Rmd
+      - Ora_map.Rmd
+      - Ora_upset.Rmd
+      - GSEA_table.Rmd
+      - GSEA_dot.Rmd
+      - GSEA_map.Rmd
+      - GSEA_upset.Rmd
 
   report_snippets:
     - Covariate_table.Rmd
@@ -112,6 +122,7 @@ export:
     - files: {step: goseq, extension: go.rds}
     - files: {step: goseq, extension: kegg.rds}
     - files: {step: cluster_profiler, extension: rds}
+    - files: {step: fctann, extension: rds}
   functional_analysis_csv:
     - files: {step: cluster_profiler, extension: csv}
       compress: zip

@@ -1,0 +1,25 @@
+#REQUIRE {{fctann-genes.rds-{{ENTRY_ID}}}}
+
+### Generic functional annotation results
+
+```{r fctannsetup_{{ENTRY_ID}}}
+require(magrittr)
+
+#----- load cluster profiler results
+MAPPED <- readRDS(subset(file_tab, step=="fctann" & extension=="genes.rds"  & contrast=="{{ENTRY_ID}}")$filename)
+
+CONTRAST_CONFIG <- yaml::read_yaml(subset(file_tab, step=="fctann" & extension=="contrast.yaml"  & contrast=="{{ENTRY_ID}}")$filename)
+
+PLOTS_DIR  <- file.path(PLOTS_BASE_DIR, "fctann")
+dir.create(PLOTS_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
+
+fn <- subset(file_tab, step=="fctann" & extension=="ora.rds" & contrast=="{{ENTRY_ID}}")$filename
+if (file.exists(fn)) ORA  <- readRDS(fn)
+fn <- subset(file_tab, step=="fctann" & extension=="gsea.rds"   & contrast=="{{ENTRY_ID}}")$filename
+if (file.exists(fn)) GSEA <- readRDS(fn)
+```
+
+#HSTART
+#### {{ENTRY_NAME}}
+#HEND
+#>--------------------------------------------INSERT--------------------------------------------<#
