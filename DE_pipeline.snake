@@ -173,10 +173,10 @@ rule import_gene_counts:
 	run:
 		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter += "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_blacklist"].items())
 		if column_filter == "":
 			column_filter = "TRUE"
@@ -239,10 +239,10 @@ rule import_featurecounts:
 	run:
 		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter += "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_blacklist"].items())
 		if column_filter == "":
 			column_filter = "TRUE"
