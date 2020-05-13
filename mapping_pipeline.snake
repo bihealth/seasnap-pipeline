@@ -176,7 +176,7 @@ rule fastqc:
 	params:
 		outdir  = pph.out_dir_name(step="fastqc")
 	threads:
-		lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
+		2
 	run:
 		reads = " ".join(input)
 		
@@ -240,7 +240,7 @@ rule star:
 		outdir = pph.out_dir_name(step="star"),
 		options = config["rule_options"]["star"]["cmd_opt"],
 		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False
-	threads: 8
+	threads: 16
 	run:
 		# prepare read input
 		reads = ",".join(input.reads1)
@@ -465,7 +465,7 @@ rule dupradar:
 		#----- dupradar
 		Rscript --vanilla {SCRIPTDIR}/dupradar.R {input.bam} {wildcards.sample} {input.gtf} {protocol} {paired} {threads} $(dirname {output})
 		""")
-		
+		o
 		script_file = pph.log(log.out, snakemake_format(script), step="dupradar", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
@@ -509,7 +509,7 @@ rule preseq_lc_extrap:
 		preseq
 		
 		#----- infer experiment
-		preseq lc_extrap -v {paired} -B {input.bam} -o {output}
+		preseq lc_extrap -v {paired} -B {input.bam} -o {output} -l 10000000
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="preseq_lc_extrap", extension="sh", **wildcards)
@@ -531,7 +531,7 @@ rule preseq_c_curve:
 		preseq
 		
 		#----- infer experiment
-		preseq c_curve -v {paired} -B {input.bam} -o {output}
+		preseq c_curve -v {paired} -B {input.bam} -o {output} -l 10000000
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="preseq_c_curve", extension="sh", **wildcards)
@@ -549,7 +549,7 @@ rule qualimap_rnaseq:
 	log:
 		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
 	resources:
-		mem_mb = 4000
+		mem_mb = 8000
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		paired   = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
@@ -575,7 +575,7 @@ rule qualimap_bamqc:
 	log:
 		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
 	resources:
-		mem_mb = 4000
+		mem_mb = 8000
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		
