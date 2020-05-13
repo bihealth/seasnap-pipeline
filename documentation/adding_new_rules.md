@@ -24,6 +24,9 @@ The following figure shows a rule template on the right, where `<name>` has to b
 The pipeline path handlers defined in `tools/` provide a generic interface for rules to exchange input- and output-files, while their folder structure can be configured independently in the config file.
 Thus, it is important to use the path handler methods to define inputs and outputs of new rules, but in order to add new rules to the pipeline you will only need 1-3 methods of the path handler in most cases, which are described below.
 
+Also, do not forget to add the input of your rule to the output of another rule (rule `all` if there is no other logical downstream rule), so that Snakemake will execute the new rule, when the pipeline is run.
+To add the output of your rule as an input to the `all` rule, edit the function `get_inputs_all()`.
+
 ---
 
 **1) file_path(step, extension, log=False, ...)**

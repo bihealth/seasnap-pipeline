@@ -18,11 +18,12 @@ SNAKEFILE = workflow.snakefile
 SCRIPTDIR = str(SNAKEDIR / "external_scripts")
 
 # assemble config
+config_file_name = config["file_name"] if "file_name" in config else "DE_config.yaml"
 configfile: str(SNAKEDIR / "defaults" / "DE_config_defaults.yaml")
-configfile: "DE_config.yaml"
+configfile: config_file_name
 if config["organism_defaults"]:
 	configfile: str(SNAKEDIR / "defaults" / config["organism_defaults"])
-	configfile: "DE_config.yaml"
+	configfile: config_file_name
 
 # create path handler
 conf_ranges = str(SNAKEDIR / "defaults" / "DE_config_ranges.yaml")
@@ -63,6 +64,7 @@ def get_inputs_all():
 	#functional annotation
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
+	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	
 	
@@ -164,17 +166,20 @@ rule import_gene_counts:
 	input:
 		samples = config["experiment"]["covariate_file"]["star"]
 	output:
-		pph.file_path("import_gene_counts", "rds", contrast = "all")
+		rds=pph.file_path("import_gene_counts", "rds", contrast = "all"),
+		xlsx=pph.file_path("import_gene_counts", "xlsx", contrast = "all")
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = "TRUE"
+		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_blacklist"].items())
+		if column_filter == "":
+			column_filter = "TRUE"
 		
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
@@ -182,17 +187,24 @@ rule import_gene_counts:
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
+    library(writexl)
 		
 		{R_SESSION_INFO}
+
+    #----- variables
+    sample_f  <- "{input.samples}"
+    output_xlsx <- "{output.xlsx}"
+    output_rds  <- "{output.rds}"
 		
 		#----- import data
-		sample_df <- read.table("{input.samples}", header=TRUE)
+		sample_df <- read.table(sample_f, header=TRUE)
+		sample_df  <- sample_df[{column_filter},]
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
 		#----- merge count files from star
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", 
-		                                                                        col.names=c("ID", samples[i]), check.names=FALSE)))
+		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
 		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
 		
 		#----- change levels
@@ -206,7 +218,11 @@ rule import_gene_counts:
 		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = {DESIGN})
 		
 		#----- save as rds
-		saveRDS(dds, file="{output}")
+		saveRDS(dds, file=output_rds)
+
+    #----- export counts as XLSX
+    colnames(count_dat) <- sample_df$label
+    write_xlsx(count_dat, path=output_xlsx)
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
@@ -221,13 +237,15 @@ rule import_featurecounts:
 	log:
 		out = pph.file_path("import_featurecounts", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = "TRUE"
+		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(samples${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
 								for k,v in config["filters"]["experiment_blacklist"].items())
+		if column_filter == "":
+			column_filter = "TRUE"
 								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list  = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
@@ -240,12 +258,13 @@ rule import_featurecounts:
 		
 		#----- import data
 		sample_df <- read.table("{input.samples}", header=TRUE)
+		sample_df  <- sample_df[{column_filter},]
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
 		#----- merge count files
-                read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"), 
-                                                     col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
+		read_fc <- function(fn, sn) read.csv(fn, comment="#", sep="\t", colClasses=c("character", rep("NULL", 5), "numeric"),
+		                                             col.names=c("ID", rep("dummy", 5), sn), check.names=FALSE)
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read_fc(files[i], samples[i])))
 		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
 		
@@ -276,13 +295,15 @@ rule import_sf:
 	log:
 		out = pph.file_path("import_sf", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = "TRUE"
+		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
-			column_filter  = "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
+			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
 			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_blacklist"].items())
+		if column_filter == "":
+			column_filter = "TRUE"
 								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( k, ",".join('"'+l+'"' for l in v) ) for k,v in column_lvl.items()))
@@ -312,8 +333,9 @@ rule import_sf:
 		for (col in names(level_cols)) {{
 			sample_df[,col] <- factor(sample_df[,col], levels = level_cols[[col]])
 		}}
-		
+
 		#----- import txi in DESeq2
+		rownames(sample_df) <- sample_df$label
 		dds <- DESeqDataSetFromTximport(txi, colData = sample_df, design = {DESIGN})
 		
 		#----- save as rds
@@ -334,10 +356,11 @@ rule DESeq2:
 		dict(step = "import_sf",            extension = "rds", contrast = "all")
 		])
 	output:
-		dds       = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
-		rld_blind = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
-		rld_model = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
-		rld_csv   = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
+		dds           = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
+		rld_blind     = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
+		rld_model     = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
+		rld_blind_csv = pph.file_path("DESeq2", "rld.blind.csv", contrast = "all"),
+		rld_model_csv = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
 	log:
 		out = pph.file_path("DESeq2", "output.log", contrast = "all", log=True)
 	params:
@@ -384,12 +407,22 @@ rule DESeq2:
 		writeLines(resultsNames(dds), "{params.coef_names}")
 		write.table(data.frame(
 			gene_id=rownames(rld_model),
-			assays(rld_model),
+			assay(rld_model),
 			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
 			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
 			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-			              column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-			), file="{output.rld_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+			check.names=FALSE
+			), file="{output.rld_model_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+		write.table(data.frame(
+			gene_id=rownames(rld_blind),
+			assay(rld_blind),
+			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+			check.names=FALSE
+			), file="{output.rld_blind_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="DESeq2", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -486,6 +519,63 @@ rule contrast:
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="contrast", extension="R", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
+## ------------------------ annotation ---------------------------
+## Annotation rule produces a table with mapping between the Primary IDs
+## (ENSEMBL usually) and other potentially useful IDs as well as gene
+## descriptions.
+
+rule annotation:
+	""" Adding annotation information """
+	input:
+		# we use dds as this is the most reliable source of the primary IDs
+		dds       = pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
+	output:
+		res = pph.file_path(step = "annotation", extension = "rds", contrast="all"),
+		csv = pph.file_path(step = "annotation", extension = "csv", contrast="all")
+	log:
+		out = pph.file_path(step = "annotation", extension = "output.log", log=True, contrast="all")
+	run:
+		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
+		script = textwrap.dedent(r"""
+			library(AnnotationDbi)
+			{R_SESSION_INFO}
+
+			res.file <- "{output.res}"
+			res.csv  <- "{output.csv}"
+			script.d <- "{SCRIPTDIR}"
+			conf.f   <- "{config_file}"
+      dds      <- "{input.dds}"
+			 
+			# ----------------------------------------
+			# No Snakemake wildcards beyond this point
+			# ----------------------------------------
+			library(orthomapper)
+
+			config <- yaml::yaml.load_file(conf.f)
+
+			gene_ids <- rownames(readRDS(dds))
+
+			res <- data.frame(PrimaryID=gene_ids, stringsAsFactors=FALSE)
+			res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
+
+			annot <- orthomapper::entrez_annotate(res$ENSEMBL, taxon=config$organism$taxon,
+				keytype="ENSEMBL", column=c("SYMBOL", "ENTREZID", "REFSEQ", "GENENAME"))
+
+		  if(!all(annot[,1] == res$ensembl)) 
+				stop("object returned by entrez_annotate() does not match query")
+
+			## no need to duplicate columns
+			res <- cbind(res, annot[, -1, drop=FALSE])
+
+			write.csv(res, row.names=FALSE, file=res.csv)
+	    saveRDS(res, file=res.file)
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="annotation", extension="R", contrast="all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
+
 
 
 ##-------------------- functional annotation ----------------------------------------------------------------
@@ -641,6 +731,7 @@ rule cluster_profiler:
 		tests <- list()
 		
 		#----- run tests
+<<<<<<< HEAD
     tests_to_run <- intersect(c("MSigDb", "GO", "KEGG", "KEGG_modules"), names(test_annotations))
     tests <- lapply(tests_to_run, function(test) {{
 			dir.create(paste0("{output.csv}/", test), recursive=TRUE)
@@ -670,6 +761,38 @@ rule cluster_profiler:
       return(cat_tests)
 		}})
     names(tests) <- tests_to_run
+=======
+		totest <- intersect(c("MSigDb", "GO", "KEGG", "KEGG_modules"), names(test_annotations))
+
+		tests <- lapply(totest, function(test) {{
+			dir.create(paste0("{output.csv}/", test), recursive=TRUE)
+			categories <- test_annotations[[test]]$categories
+			#cat_tests <- vector("list", length(categories))
+			cat_tests <- lapply(categories, function(cat) {{
+				if (test == "MSigDb") msigdb_gs <- msigdbr(species = "{params.genus}", category = cat) %>% dplyr::select(gs_name, entrez_gene)
+				if (test_annotations[[test]]$type == "gsea"){{
+					em <- switch(test,
+					MSigDb        =GSEA(geneList_gsea, TERM2GENE = msigdb_gs),
+					GO            =gseGO(geneList = geneList_gsea, OrgDb = {params.annot_pkg}, ont = cat, pAdjustMethod = "BH"{go_pval}),
+					KEGG          =gseKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG$org{kegg_pval}),
+					KEGG_modules  =gseMKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG_modules$org{keggm_pval}))
+				}} else {{
+					em <- switch(test,
+					MSigDb         =enricher(geneList_ora, TERM2GENE = msigdb_gs),
+					GO             =enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg}, 
+					                         ont = cat, pAdjustMethod = "BH"{go_pval}{go_qval}),
+					KEGG           =enrichKEGG(gene = geneList_ora, organism = test_annotations$KEGG$org{kegg_pval}{kegg_qval}),
+					KEGG_modules   =enrichMKEGG(gene = geneList_ora, organism = test_annotations$KEGG_modules$org{keggm_pval}{keggm_qval}))
+				}}
+				write.table(data.frame(em), file=paste0("{output.csv}/",test,"/{params.csv_basename}",cat,".csv"), 
+					    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+				return(em)
+			}})
+			names(cat_tests) <- categories
+			return(cat_tests)
+		}})
+		names(tests) <- totest
+>>>>>>> 0d3a9a534cbf976f543b00571c39749f853c2c71
 		
 		#----- save as rds
 		saveRDS(tests, file="{output.rds}")
@@ -712,8 +835,4 @@ rule report:
 		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
 		
 		with open(output[0], "w") as f: f.write(report_text)
-
-
-
-
 
