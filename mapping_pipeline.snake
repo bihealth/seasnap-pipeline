@@ -184,10 +184,7 @@ rule fastqc:
 		outdir  = pph.out_dir_name(step="fastqc")
 	threads:
 		2
-<<<<<<< HEAD
-=======
 		# lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
->>>>>>> 0d3a9a534cbf976f543b00571c39749f853c2c71
 	run:
 		reads = " ".join(input)
 		
@@ -687,11 +684,7 @@ rule qualimap_rnaseq:
 	log:
 		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
 	resources:
-<<<<<<< HEAD
-		mem_mb = 8000
-=======
 		mem_mb = 24000
->>>>>>> 0d3a9a534cbf976f543b00571c39749f853c2c71
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		paired   = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
@@ -722,11 +715,7 @@ rule qualimap_bamqc:
 	log:
 		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
 	resources:
-<<<<<<< HEAD
-		mem_mb = 8000
-=======
 		mem_mb = 24000
->>>>>>> 0d3a9a534cbf976f543b00571c39749f853c2c71
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		

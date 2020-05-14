@@ -731,7 +731,6 @@ rule cluster_profiler:
 		tests <- list()
 		
 		#----- run tests
-<<<<<<< HEAD
     tests_to_run <- intersect(c("MSigDb", "GO", "KEGG", "KEGG_modules"), names(test_annotations))
     tests <- lapply(tests_to_run, function(test) {{
 			dir.create(paste0("{output.csv}/", test), recursive=TRUE)
@@ -761,38 +760,6 @@ rule cluster_profiler:
       return(cat_tests)
 		}})
     names(tests) <- tests_to_run
-=======
-		totest <- intersect(c("MSigDb", "GO", "KEGG", "KEGG_modules"), names(test_annotations))
-
-		tests <- lapply(totest, function(test) {{
-			dir.create(paste0("{output.csv}/", test), recursive=TRUE)
-			categories <- test_annotations[[test]]$categories
-			#cat_tests <- vector("list", length(categories))
-			cat_tests <- lapply(categories, function(cat) {{
-				if (test == "MSigDb") msigdb_gs <- msigdbr(species = "{params.genus}", category = cat) %>% dplyr::select(gs_name, entrez_gene)
-				if (test_annotations[[test]]$type == "gsea"){{
-					em <- switch(test,
-					MSigDb        =GSEA(geneList_gsea, TERM2GENE = msigdb_gs),
-					GO            =gseGO(geneList = geneList_gsea, OrgDb = {params.annot_pkg}, ont = cat, pAdjustMethod = "BH"{go_pval}),
-					KEGG          =gseKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG$org{kegg_pval}),
-					KEGG_modules  =gseMKEGG(geneList = geneList_gsea, organism = test_annotations$KEGG_modules$org{keggm_pval}))
-				}} else {{
-					em <- switch(test,
-					MSigDb         =enricher(geneList_ora, TERM2GENE = msigdb_gs),
-					GO             =enrichGO(gene = geneList_ora, universe = names(geneList_gsea), OrgDb = {params.annot_pkg}, 
-					                         ont = cat, pAdjustMethod = "BH"{go_pval}{go_qval}),
-					KEGG           =enrichKEGG(gene = geneList_ora, organism = test_annotations$KEGG$org{kegg_pval}{kegg_qval}),
-					KEGG_modules   =enrichMKEGG(gene = geneList_ora, organism = test_annotations$KEGG_modules$org{keggm_pval}{keggm_qval}))
-				}}
-				write.table(data.frame(em), file=paste0("{output.csv}/",test,"/{params.csv_basename}",cat,".csv"), 
-					    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
-				return(em)
-			}})
-			names(cat_tests) <- categories
-			return(cat_tests)
-		}})
-		names(tests) <- totest
->>>>>>> 0d3a9a534cbf976f543b00571c39749f853c2c71
 		
 		#----- save as rds
 		saveRDS(tests, file="{output.rds}")
