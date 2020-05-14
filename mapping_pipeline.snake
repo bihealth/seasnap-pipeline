@@ -184,7 +184,6 @@ rule fastqc:
 		outdir  = pph.out_dir_name(step="fastqc")
 	threads:
 		2
-		# lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
 	run:
 		reads = " ".join(input)
 		
@@ -613,7 +612,6 @@ rule dupradar:
 		#----- dupradar
 		Rscript --vanilla {SCRIPTDIR}/dupradar.R $bam {wildcards.sample} $gtf {protocol} {paired} {threads} $(dirname $out)
 		""")
-		
 		script_file = pph.log(log.out, snakemake_format(script), step="dupradar", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
