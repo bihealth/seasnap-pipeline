@@ -613,7 +613,7 @@ rule dupradar:
 		#----- dupradar
 		Rscript --vanilla {SCRIPTDIR}/dupradar.R $bam {wildcards.sample} $gtf {protocol} {paired} {threads} $(dirname $out)
 		""")
-		
+
 		script_file = pph.log(log.out, snakemake_format(script), step="dupradar", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
