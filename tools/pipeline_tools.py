@@ -334,7 +334,6 @@ class PipelinePathHandler:
 
 		return (found, wildcard_values)
 
-
 	def _collect_generated_files(self, path_pattern=None):
 		if not path_pattern: path_pattern = self.out_path_pattern
 
@@ -351,7 +350,7 @@ class PipelinePathHandler:
 
 		return table_cols
 
-	def _choose_input(self, wildcards, choice_name, options):
+	def _choose_input(self, wildcards, choice_name, options, func):
 		""" called by wrapper choose_input() """
 		if wildcards and hasattr(wildcards, choice_name):
 			input_from = getattr(wildcards, choice_name)
@@ -362,16 +361,30 @@ class PipelinePathHandler:
 			elif isinstance(inp_choice, list):
 				input_from = inp_choice[0]
 			else:
-				raise TypeError("Error choosing input: {} is not a valid type for input choice! "
-						"(input_choice in config for {})".format(type(inp_choice), choice_name))
+				raise TypeError(
+					"Error choosing input: {} is not a valid type for input choice! "
+					"(input_choice in config for {})".format(type(inp_choice), choice_name)
+				)
 		else:
-			raise KeyError("Error choosing input: no wildcard '{}' passed and no input choice for '{}' "
-					"specified in config!".format(choice_name, choice_name))
-
+			raise KeyError(
+				"Error choosing input: no wildcard '{}' passed and no input choice for '{}' "
+				"specified in config!".format(choice_name, choice_name)
+			)
+					
 		for inp in options:
+			inp = {**dict(wildcards.items()), **inp}
 			if input_from == inp["step"]:
-				return self.file_path(**inp)
-		raise ValueError("Error choosing input: no valid mapping input type specified! (got: {})".format(input_from))
+				if func == "file_path":
+					return self.file_path(**inp)
+				elif func == "out_dir_name":
+					return self.out_dir_name(**inp)
+				elif callable(func):
+					return func(**inp)
+				else:
+					raise ValueError("Error choosing input: wrong func argument: {}".format(str(func)))
+		raise ValueError(
+			"Error choosing input: no valid mapping input type specified! (got: {})".format(input_from)
+			)
 
 	def load_config_from_path(self, path, path_handler=None):
 		if not path_handler:
@@ -385,9 +398,9 @@ class PipelinePathHandler:
 		return config_dict
 
 	#-------------------------------------------- methods used in snakemake file --------------------------------------------#
-
-	def choose_input(self, choice_name, options):
-		""" 
+		
+	def choose_input(self, choice_name, options, func="file_path"):
+		"""
 		choose rule to import from based on wildcard or config
 		
 		One option is that a wildcard with name choice_name is passed, giving the name of a rule that should be imported from.
@@ -407,8 +420,8 @@ class PipelinePathHandler:
 		:param wildcards:  wildcards object from snakemake
 		:returns: a function that is used by snakemake to obtain the input file path
 		"""
-		return lambda wildcards: self._choose_input(wildcards, choice_name, options)
-
+		return lambda wildcards: self._choose_input(wildcards, choice_name, options, func=func)
+		
 	def wildcard_values_from(self, filepath, in_path_pattern=True):
 		"""
 		Parse a file path and return a dict of wildcard names to values.
@@ -474,6 +487,15 @@ class PipelinePathHandler:
 			else:
 				return subs.format(", ".join(data_values))
 		raise TypeError(f"No R representation set for {type(data)}!")
+
+	def file_path(self, *args, **kwargs):
+		pass
+
+	def out_dir_name(self, *args, **kwargs):
+		pass
+
+	def expand_path(self, *args, **kwargs):
+		pass
 
 	def log(self, out_log, script, step, extension, fix=None, **kwargs):
 		"""
