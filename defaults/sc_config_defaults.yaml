@@ -14,6 +14,11 @@ pipeline_param:
   produce_results:
     - cellranger
     - velocyto
+
+  input_choice:
+    velocyto:
+      - cellranger_count
+      - cellranger_aggr
 #---------------------------------------- organism annotation
 organism_defaults: null
 

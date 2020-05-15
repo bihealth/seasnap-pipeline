@@ -53,11 +53,6 @@ onstart:
 	# save merged config
 	config_file = pph.file_path(step="pipeline_report", extension="yaml", fix="all")
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
-	# warnings
-	#mapping_choices, qc_choices = (config["pipeline_param"][key] for key in ["mapping_results", "QC_results"])
-	#for qc_step in ["dupradar", "infer_experiment", "rna_seqc", "qualimap", "qc"]:
-	#	if qc_step in qc_choices and "star-gene_counts" not in mapping_choices:
-	#		logger.warning("{}: cannot run, because 'star-gene_counts' was not selected as mapping output".format(qc_step))
 
 ##-------------------- starting point ----------------------------------------------------------------------
 
@@ -66,9 +61,14 @@ def get_inputs_all():
 
 	results = config["pipeline_param"]["produce_results"]
 	if "velocyto" in results:
-		inputs += [pph.file_path("velocyto_run", "loom", fix="all")]
+		if config["pipeline_param"]["input_choice"]["velocyto"][0] == "cellranger_aggr":
+			inputs += [pph.file_path("velocyto_run", "loom", fix="all")]
+		else:
+			inputs += pph.expand_path(step="velocyto_run", extension="loom", fix="!sample")
+	elif "cellranger-aggr" in results:
+		inputs += [pph.file_path(step="cellranger_aggr", extension="done", fix="all")]
 	elif "cellranger" in results:
-		inputs += pph.file_path(step="cellranger_aggr", extension="done")
+		inputs += pph.expand_path(step="cellranger_count", extension="done", fix="!sample")
 
 	return inputs
 
@@ -150,7 +150,10 @@ rule cellranger_count:
 		pref_dup = len(prefixes) != len(set(prefixes))
 		for lpref, ltype in config["sample_info"][wildcards.sample]["lib_types"]:
 			for lp in lpref.split(","):
-				if pref_dup and ltype != "Gene Expression":  # in some cases same prefix is annotated in ISA tab
+				# in some cases the same prefix is annotated in ISA tab for feature and GEX
+				# in this case use the trick of duplicating links to fastqs and
+				# adding tag_ to the prefix
+				if pref_dup and ltype != "Gene Expression":
 					lib_file_content.append(f"{Path(output.links).resolve()}, tag_{lp}, {ltype}")
 				else:
 					lib_file_content.append(f"{Path(output.links).resolve()}, {lp}, {ltype}")
@@ -165,6 +168,8 @@ rule cellranger_count:
 		#----- collect fastq input links
 		mkdir {output.links}
 		ln -sf $(readlink -f {input.reads}) {output.links}
+		# if names are the same for feature and GEX fastqs,
+		# duplicate links with different name:
 		if {pref_dup}; then
 		  for f in {output.links}/*; do
 		    cp -av "$f" "$(dirname $f)/tag_$(basename $f)"
@@ -230,20 +235,34 @@ rule cellranger_aggr:
 ##-------------------- Velocyto -------------------------------------------------------------------------------
 
 rule velocyto_run:
-    """ run velocyto on 10X Chromium samples """
+	""" run velocyto on 10X Chromium samples """
 	input:
 		gtf = config["organism"]["files"]["cellranger_gtf"],
-		cellranger_done = pph.file_path(step="cellranger_aggr", extension="done")
+		cellranger_done = pph.choose_input(
+			choice_name = "velocyto",
+			options = [
+				dict(step = "cellranger_aggr",  extension = "done"),
+				dict(step = "cellranger_count", extension = "done")
+			]
+		)
 	output:
 		pph.file_path(step="velocyto_run", extension="loom")
 	log:
 		out = pph.file_path(step="velocyto_run", extension="output.log", log=True)
 	params:
-	    cellranger_outdir = pph.out_dir_name(step="cellranger_count")+"/outdir",
-	    mask = config["organism"]["files"]["velocyto_mask_gtf"],
-	    options = config["rule_options"]["velocyto_run"]["cmd_opt"]
+		cellranger_outdir = pph.choose_input(
+			choice_name = "velocyto",
+			func = lambda **kw: pph.out_dir_name(**kw)+"/outdir/outdir/outs",
+			options = [
+				dict(step = "cellranger_aggr"),
+				dict(step = "cellranger_count")
+			]
+		),
+		mask = config["organism"]["files"]["velocyto_mask_gtf"],
+		options = config["rule_options"]["velocyto_run"]["cmd_opt"]
 	run:	
 		mask = f"-m {params.mask}" if params.mask else ""
+
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
@@ -254,7 +273,7 @@ rule velocyto_run:
 		#{params.cellranger_outdir} \
 		#{input.gtf} \
 		#{params.options}
-		velocyto run -b {params.cellranger_outdir}/filtered_feature_bc_matrix/barcodes.tsv {mask} -o $(dirname {output}) {params.options} {params.cellranger_outdir}/possorted_genome_bam.bam {input.gtf}
+		velocyto run -b {params.cellranger_outdir}/filtered_feature_bc_matrix/barcodes.tsv.gz {mask} -o $(dirname {output}) {params.options} {params.cellranger_outdir}/possorted_genome_bam.bam {input.gtf}
 
 		#----- move results
 		mv $(dirname {output})/*.loom {output}
