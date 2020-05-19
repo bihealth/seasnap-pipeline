@@ -181,8 +181,7 @@ rule fastqc:
 		out  = pph.file_path(step="fastqc", extension="output.log", log=True)
 	params:
 		outdir  = pph.out_dir_name(step="fastqc")
-	threads:
-		lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
+	threads: 2
 	run:
 		reads = " ".join(input)
 		
