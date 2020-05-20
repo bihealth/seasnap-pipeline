@@ -332,7 +332,7 @@ rule bwa_index:
 		#----- prepare
 		set -eux
 		rm -fr $(dirname {output.index})/*
-
+                mkdir -p $(dirname {output.index})/index
 		#----- run bwa index
 		bwa index -p {db_prefix} {params.options} {input.genome}
 		""")
@@ -353,7 +353,7 @@ rule bwa:
 		out = pph.file_path(step="bwa", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["bwa"]["cmd_opt"],
-		index_dir = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries"),
+		index_dir = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")+"/index",
 		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False,
 		run_stats = "true" if config["rule_options"]["bwa"]["run_stats"] else "false"
 	threads: 8
@@ -385,10 +385,10 @@ rule bwa:
 		bwa mem {params.options} -t {threads} {db_prefix} {reads} 1> {output.sam}
 		
 		#----- compute statistics
-		if {run_stats}; then
+		if {params.run_stats}; then
 		  samtools stats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.bamstats.txt
 		  samtools flagstat {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.flagstat.log
-		  samtools idxstats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.idxstats.log
+#		  samtools idxstats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.idxstats.log
 		fi
 		""")
 
