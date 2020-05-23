@@ -7,6 +7,7 @@ require(pander)
 require(DT)
 require(purrr)
 require(dplyr)
+require(tmod)
 
 # ---- get wildcards
 c_id       <- "{{ENTRY_ID}}"
@@ -17,6 +18,15 @@ tmod_res.f <- "{{tmod-rds-{{ENTRY_ID}}}}"
 r.path <- "{{R_COMMON}}"
 script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
 source(script_f)
+
+tmod.dbs.f <- subset(file_tab, step=="tmod_dbs" & extension == "rds")$filename
+map.f      <- subset(file_tab, step == "tmod_dbs" & extension == "mapping.rds")$filename
+annot.f    <- subset(file_tab, step == "annotation" & extension == "rds")$filename
+
+#tmod.res  <- readRDS(tmod.res.f)
+tmod.dbs  <- readRDS(tmod.dbs.f)
+annot     <- readRDS(annot.f)
+
 
 snip.par     <- config$report$snippet_parameters$tmod_contrast
 res_auc_thr  <- snip.par$res_auc_thr
@@ -40,7 +50,7 @@ tmod_res <- readRDS(tmod_res.f)
 **Table.** Summary of the results for contrast `r c_name` shows number of
 significant gene sets at various significance levels and for AUC > 0.65.
 
-```{r, results="asis"}
+```{r tmod_summary_table{{ENTRY_ID}}, results="asis"}
 pval.thr <- c(.01, .001, 1e-4, 1e-6)
 
 tmp <- purrr::imap_dfr(tmod_res, ~ {
@@ -83,11 +93,11 @@ datatable(mytab, extensions=c('Buttons','FixedColumns'), rownames=FALSE, escape=
 
 "
 
-cat("\n##### {- .tabset}\n")
+cat("\n##### {.tabset}\n")
 
 for(db in names(resU)) {
   mytab <- tmod_filter_format_res(resU[[db]], pval.thr=res_pval_thr, AUC.thr=res_auc_thr)
-  cat(sprintf("\n###### %s {-}\n", db))
+  cat(sprintf("\n###### %s\n", db))
   if(!is.null(resU[[db]]) && nrow(mytab) > 0) {
     out <- knitr::knit_child(text=template, quiet=TRUE)
     cat(out)
@@ -96,12 +106,42 @@ for(db in names(resU)) {
   }
 
 }
+cat("\n##### {-}\n")
 ```
 
+**Fig. Upset plot.**
 
 
+```{r tmod_upset_plot_{{ENTRY_ID}},fig.width=14,fig.height=9,results="asis"}
 
+cat("\n##### {.tabset}\n")
 
+template <- '
+\n```{r, results="asis"}
+    par(mar=rep(1, 4))
+    cat(sprintf("\n###### %s\n", paste0(db, ".", .resn)))
+    .res <- tmod_res[[db]][[.resn]]
+    .res <- .res[ order(.res$P.Value), ]
+    .res <- .res[ .res$adj.P.Val < .01 & .res$AUC > .6, ]
+    if(nrow(.res) > 20) .res <- .res[1:20, ]
+    if(nrow(.res) < 2) {
+      cat("<br>Too few results to generate upset plot.<br><br>\n")
+    } else {
+      upset(.res$ID, mset=tmod.dbs[[db]]$dbobj, min.overlap=2, group.cutoff=.1, min.group=2, labels=.res$Title, max.comb=2, value="j")
+    }
+\n```
+
+'
+for(db in names(tmod_res)) {
+  for(.resn in names(tmod_res[[db]])) {
+    out <- knitr::knit_child(text=template, quiet=TRUE)
+    cat(out)
+  }
+}
+
+cat("\n##### {-}\n")
+
+```
 
 
 

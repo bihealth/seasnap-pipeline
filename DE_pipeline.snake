@@ -68,7 +68,7 @@ def get_inputs_all():
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
-	inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all"))
+	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
 	inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
 	
 	return inputs

@@ -1,6 +1,53 @@
 ## A bunch of functions which tmod requires
 library(glue)
 
+
+#' Volcano plots with ggplot
+ggvolcano <- function(lfc, pvals, symbol=NULL, xlim=NULL, ylim=NULL, pval.thr=.05, lfc.thr=1) {
+
+  require(tidyverse)
+  require(ggplot2)
+
+  p.t <- pval.thr
+  l.t <- lfc.thr
+
+  foo <- data.frame(log2FoldChange=lfc, padj=pvals)
+  foo <- foo %>% replace_na(list(padj=1, lfc=0))
+
+  if(is.null(xlim)) xlim <- range(foo$log2FoldChange)
+  if(is.null(ylim)) ylim <- range(foo$padj)
+
+  if(!is.null(symbol)) {
+    foo$Symbol <- symbol
+  } else {
+    foo$Symbol <- 1:nrow(foo)
+  }
+
+  foo$color <- ifelse(foo$log2FoldChange < 0, "#3333cc33", "#cc333333")
+  foo$color[ foo$padj > p.t | abs(foo$log2FoldChange) < l.t ] <- "#33333333"
+  foo$labels <- ""
+  foo <- foo %>% arrange(sign(log2FoldChange), padj)
+  foo$labels[1:20] <- foo$Symbol[1:20]
+  foo <- foo %>% arrange(-sign(log2FoldChange), padj)
+  foo$labels[1:20] <- foo$Symbol[1:20]
+
+  log10rev_trans <-
+    scales::trans_new("log10rev", function(x) -log10(x), function(x) 10^-x, scales::log_breaks(10), domain = c(1e-150, Inf))
+
+  ggplot(foo, aes(x=log2FoldChange, y=padj, col=padj < 0.05 & abs(log2FoldChange) > 1 )) +
+    geom_point(size=2, col=foo$color) +
+    theme_minimal() +
+    theme(legend.position="none") + 
+    ylim(ylim[1], ylim[2]) +
+    xlim(xlim[1], xlim[2]) +
+    scale_y_continuous(trans=log10rev_trans) +
+    ggrepel::geom_label_repel(aes(label=labels), col=gsub("..$", "", foo$color)) +
+    xlab("Log 2 Fold Change") + ylab("FDR")
+
+
+}
+
+
 #' Filter and format tmod results for showing with DT::datatable()
 tmod_filter_format_res <- function(res, pval.thr=.05, AUC.thr=.65) {
 
