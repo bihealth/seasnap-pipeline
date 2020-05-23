@@ -7,6 +7,6 @@ A MA plot of the contrast {{ENTRY_NAME}}.
 res <- readRDS(subset(file_tab, step=="contrast" & extension=="rds" & contrast==CONTRAST_ID)$filename)
 
 #----- MA plot
-plotMA(res, ylim=c(-2,2))
+DESeq2::plotMA(res, ylim=c(-2,2))
 ```
 
