@@ -6,6 +6,8 @@ require(tidyverse)
 require(pander)
 require(DT)
 require(tmod)
+require(purrr)
+require(dplyr)
 
 # ---- get wildcards
 c_id       <- "{{ENTRY_ID}}"
@@ -51,7 +53,7 @@ significant gene sets at various significance levels and for AUC > 0.65.
 ```{r tmod_summary_table{{ENTRY_ID}}, results="asis"}
 pval.thr <- c(.01, .001, 1e-4, 1e-6)
 
-tmp <- imap_dfr(tmod_res, ~ {
+tmp <- purrr::imap_dfr(tmod_res, ~ {
   .r <- .x
   .rn <- .y
   ret <- t(sapply(.r, function(.s) {
