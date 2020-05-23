@@ -6,14 +6,14 @@ organism:
   genome_version: GRCm38
   
   files:
-    genome: /fast/projects/cubit/18.12/static_data/reference/GRCm38/p4.chr_scaff/GRCm38.p4.genome.chr_scaff.fa
+    genome: /fast/projects/cubit/18.12/static_data/reference/GRCm38/p5.chr_scaff/GRCm38.p5.genome.chr_scaff.fa
     transcriptome: ""
     gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.gtf
     
     bed: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.bed
     seqc_gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.no_genes.protein_coding.rRNA.gtf
     
-  star_index: null
+  star_index: /fast/projects/cubit/18.12/static_data/precomputed/STAR/2.7.3a/GENCODE/M12/GRCm38/p5.chr_scaff/150/
   salmon_index: null
   bwa_index: null
     
