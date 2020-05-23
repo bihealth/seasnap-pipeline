@@ -111,7 +111,6 @@ cat("\n##### {-}\n")
 
 **Fig. Upset plot.**
 
-
 ```{r tmod_upset_plot_{{ENTRY_ID}},fig.width=14,fig.height=9,results="asis"}
 
 cat("\n##### {.tabset}\n")
