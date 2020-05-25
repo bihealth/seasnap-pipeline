@@ -616,7 +616,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		self.data_paths = self.snakemake_workflow.config["organism"]
 		
 		# test if all sample IDs can be found in input path
-		if not set(self.sample_ids).issubset(set(self.wildcard_values["sample"])):
+		if test_config and not set(self.sample_ids).issubset(set(self.wildcard_values["sample"])):
 			raise ValueError("Error in config file: not all specified samples could be found using given input path pattern")
 		
 		# write log with parsed values to file for debugging
@@ -687,7 +687,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 				seen.add(kwargs_id_tup)
 				if mate_key:
 					mate_lst = self.samples[wildcards.sample][mate_key]
-					if len(mate_lst)>mate: kwargs_filled["mate"] = mate_lst[mate]
+					kwargs_filled["mate"] = mate_lst[mate] if len(mate_lst) > mate else mate_lst[0]
 					pattern  = self.in_path_pattern.format(sample = wildcards.sample, **kwargs_filled)
 					pattern += self.samples[wildcards.sample]["read_extension"]
 				else:

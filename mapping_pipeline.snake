@@ -77,10 +77,10 @@ def get_inputs_all():
 	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", fix="!sample")
 	if "ciri-circRNA" in mapping_choices:
-		inputs += pph.expand_path("bwa", "sam", fix="!sample")
+		inputs += pph.expand_path("bwa", "bam", fix="!sample")
 		inputs += pph.expand_path("ciri", "tsv", fix="!sample")
 	elif "bwa-gene_counts" in mapping_choices:
-		inputs += pph.expand_path("bwa", "sam", fix="!sample")
+		inputs += pph.expand_path("bwa", "bam", fix="!sample")
 
 	# QC results
 	qc_choices = config["pipeline_param"]["QC_results"]
@@ -337,7 +337,8 @@ rule bwa_index:
 		rm -fr $(dirname {output.index})/*
 
 		#----- run bwa index
-		bwa index -p {db_prefix} {params.options} {input.genome}
+		ln -s {input.genome} {db_prefix}
+		bwa index {params.options} {db_prefix}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bwa_index", extension="sh", **wildcards)
@@ -351,12 +352,13 @@ rule bwa:
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unpaired
 	output:
-		sam = pph.file_path(step="bwa", extension="sam")
+		bam = pph.file_path(step="bwa", extension="bam")
 	log:
 		out = pph.file_path(step="bwa", extension="output.log", log=True)
 	params:
+		sam = pph.file_path(step="bwa", extension="sam"),
 		options = config["rule_options"]["bwa"]["cmd_opt"],
-		index_dir = pph.out_dir_name(step = "bwa_index", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries"),
+		index_dir = pph.out_dir_name(step = "bwa_index", fix="all") + "/index",
 		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False,
 		run_stats = "true" if config["rule_options"]["bwa"]["run_stats"] else "false"
 	threads: 8
@@ -382,16 +384,24 @@ rule bwa:
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
-		rm -fr $(dirname {output.sam})/*
+		rm -fr $(dirname {output.bam})/*
 
 		#----- run bwa mem
-		bwa mem {params.options} -t {threads} {db_prefix} {reads} 1> {output.sam}
+		bwa mem {params.options} -t {threads} {db_prefix} {reads} 1> {params.sam}
+
+		#----- convert to bam
+		#samtools sort -@ {threads} -O bam -o {output.bam} {params.sam}
+		samtools view -bS {params.sam} > {output.bam}
+		rm {params.sam}
+
+		#----- build index
+		#samtools index {output.bam}
 		
 		#----- compute statistics
-		if {run_stats}; then
-		  samtools stats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.bamstats.txt
-		  samtools flagstat {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.flagstat.log
-		  samtools idxstats {output.sam} > $(dirname {log.out})/bwa.{wildcards.sample}.idxstats.log
+		if {params.run_stats}; then
+		  samtools stats {output.bam} > $(dirname {output.bam})/bwa.{wildcards.sample}.bamstats.txt
+		  samtools flagstat {output.bam} > $(dirname {output.bam})/bwa.{wildcards.sample}.flagstat.log
+		  #samtools idxstats {output.bam} > $(dirname {output.bam})/bwa.{wildcards.sample}.idxstats.log
 		fi
 		""")
 
@@ -403,7 +413,7 @@ rule bwa:
 rule ciri:
 	input:
 		index_present = pph.file_path(step="bwa_index", extension="done", sample = "all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries"),
-		sam = pph.file_path(step="bwa", extension="sam"),
+		bam = pph.file_path(step="bwa", extension="bam"),
 		gtf = config["organism"]["files"]["gtf"],
 		genome = config["organism"]["files"]["genome"]
 	output:
@@ -411,6 +421,7 @@ rule ciri:
 	log:
 		out = pph.file_path(step="ciri", extension="output.log", log=True)
 	params:
+		sam = pph.file_path(step="ciri", extension="sam"),
 		options = config["rule_options"]["ciri"]["cmd_opt"]
 	threads: 8
 	run:
@@ -423,7 +434,9 @@ rule ciri:
 		perl {SCRIPTDIR}/CIRI2.pl --help
 
 		#----- run ciri
-		perl {SCRIPTDIR}/CIRI2.pl -I {input.sam} -O {output} -F {input.genome} -A {input.gtf} -T {samtools_threads} {params.options} -G {log.out}
+		samtools view -h -o {params.sam} {input.bam}
+		perl {SCRIPTDIR}/CIRI2.pl -I {params.sam} -O {output} -F {input.genome} -A {input.gtf} -T {samtools_threads} {params.options} -G {log.out}
+		rm {params.sam}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="ciri", extension="sh", **wildcards)
