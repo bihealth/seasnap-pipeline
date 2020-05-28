@@ -797,15 +797,15 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		if index:
 			ind = Path(index)
 			loc.parent.mkdir(exist_ok=True, parents=True)
-			if not loc.is_dir():
+			if not loc.exists():
 				# create
-				loc.symlink_to(ind.resolve(), target_is_directory=True)
+				loc.symlink_to(ind.resolve())
 				if add_done:
 					Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
 			elif not loc.samefile(index):
 				# update
 				loc.unlink()
-				loc.symlink_to(ind.resolve(), target_is_directory=True)
+				loc.symlink_to(ind.resolve())
 				if add_done:
 					Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
 
