@@ -1123,6 +1123,7 @@ class SampleInfoTool(PipelinePathHandler):
 	allowed_wildcards          = MappingPipelinePathHandler.allowed_wildcards
 	required_wildcards_out_log = MappingPipelinePathHandler.required_wildcards_out_log
 	required_wildcards_in      = MappingPipelinePathHandler.required_wildcards_in
+	wildcard_fix_values        = MappingPipelinePathHandler.wildcard_fix_values
 	
 	allowed_read_extensions    = [".fastq", ".fastq.gz"]
 	
