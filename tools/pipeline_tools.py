@@ -245,9 +245,13 @@ class PipelinePathHandler:
 
 	def _prepare_inpathpattern(self):
 		""" read and remove wildcard constraints from in_path_pattern """
+		print("[DEBUG] in_path_pattern = {}".format(self.in_path_pattern), file=sys.stderr)
+		print("[DEBUG] wildcard_fix_values = {}".format(self.wildcard_fix_values), file=sys.stderr)
 		wildcards = re.findall("{([^{}]+)}", self.in_path_pattern)
+		print("[DEBUG] wildcards = {}".format(wildcards), file=sys.stderr)
 		wildcard_constraints = {}
 		for wildcard in wildcards:
+			print("[DEBUG] processing wildcard {}".format(wildcard), file=sys.stderr)
 			comp = wildcard.split(",")
 			if len(comp)>1:
 				wildcard_constraints[comp[0]] = comp[1] + "|" + self.wildcard_fix_values[comp[0]]
@@ -1109,6 +1113,7 @@ class SampleInfoTool(PipelinePathHandler):
 	allowed_wildcards          = MappingPipelinePathHandler.allowed_wildcards
 	required_wildcards_out_log = MappingPipelinePathHandler.required_wildcards_out_log
 	required_wildcards_in      = MappingPipelinePathHandler.required_wildcards_in
+	wildcard_fix_values        = MappingPipelinePathHandler.wildcard_fix_values
 	
 	allowed_read_extensions    = [".fastq", ".fastq.gz"]
 	
