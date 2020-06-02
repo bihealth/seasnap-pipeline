@@ -283,9 +283,13 @@ rule import_sf:
 	run:
 		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
+			if column_filter != "":
+				column_filter += "&"
 			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_whitelist"].items())
 		if config["filters"]["experiment_blacklist"]:
+			if column_filter != "":
+				column_filter += "&"
 			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
 								for k,v in config["filters"]["experiment_blacklist"].items())
 		if column_filter == "":

@@ -36,7 +36,7 @@ pph = MappingPipelinePathHandler(workflow, test_config)
 
 # link indices
 pph.link_index(step="star_index", fix="all")
-pph.link_index(step="bwa_index", fix="all", add_done=True, subdir="index")
+# pph.link_index(step="bwa_index", fix="all", add_done=True, subdir="index")
 pph.link_index(step="salmon_index", fix="all")
 pph.link_index(step="generate_transcriptome", fix="all", entry=config["organism"]["files"]["transcriptome"])
 
@@ -693,7 +693,7 @@ rule qualimap_rnaseq:
 		set -eux
 		
 		#----- set tmpdir
-		export TMPDIR=$(mktemp -d)
+		export TMPDIR=$(mktemp -d -p $HOME/scratch/tmp)
 		trap "rm -rf $TMPDIR" EXIT
 		export JAVA_OPTS="-Djava.io.tmpdir=$TMPDIR"
 		
