@@ -841,7 +841,9 @@ rule multiqc:
 	run:
 		# compile multiqc config
 		multiqc_dict = config["report"]["multiqc"]
-		multiqc_dict["extra_fn_clean_exts"] = [dict(type="regex_keep", pattern="|".join(pph.sample_ids))]
+		multiqc_dict["extra_fn_clean_exts"] = [dict(type="regex_keep", pattern="|".join(
+			sorted(pph.sample_ids, key=len, reverse=True)
+		))]
 		if multiqc_dict["custom_logo"]: multiqc_dict["custom_logo"] = str(SNAKEDIR / multiqc_dict["custom_logo"])
 		with open(log.multiqc_config, "w") as f: yaml.dump(multiqc_dict, f, default_flow_style=False)
 		
