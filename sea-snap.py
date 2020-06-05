@@ -59,6 +59,9 @@ def generate_sample_info(args):
 	config_files = args.config_files
 	
 	sit = SampleInfoTool(*config_files)
+
+	if args.add_ext:
+		sit.allowed_read_extensions += args.add_ext
 	
 	# fill info
 	if args.get_from=="parse_dir":
@@ -213,6 +216,7 @@ parser_sample_info = subparsers.add_parser('sample_info', help="generate sample 
 """Generate sample info (yaml) file for the mapping pipeline.""")
 parser_sample_info.add_argument('--library_default', '-l', default="unstranded", choices=["unstranded","forward","reverse"], help="default strandedness for all samples")
 parser_sample_info.add_argument('--config_files',    '-c', nargs='+', default=["mapping_config.yaml"], help="config files to be loaded")
+parser_sample_info.add_argument('--add_ext',         '-a', nargs='+', default=[], help="custom extension for fastq files")
 parser_sample_info.add_argument('--output',          '-o', default="sample_info", help="name of sample info file")
 parser_sample_info.add_argument('--input',           '-i', default="sample_info.tsv", dest="input_file", help="import from this file; only needed if --from is used")
 parser_sample_info.add_argument('--sep',             '-s', default="\t", help='separator for importing or exporting tables with --from tsv or --to tsv (default "\\t")')

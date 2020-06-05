@@ -1125,7 +1125,7 @@ class SampleInfoTool(PipelinePathHandler):
 	required_wildcards_in      = MappingPipelinePathHandler.required_wildcards_in
 	wildcard_fix_values        = MappingPipelinePathHandler.wildcard_fix_values
 	
-	allowed_read_extensions    = [".fastq", ".fastq.gz"]
+	allowed_read_extensions    = [".fastq", ".fastq.gz", ".fq", ".fq.gz"]
 	
 	def __init__(self, config_yaml, *add_yaml):
 		with open(config_yaml, "r") as stream:
@@ -1195,7 +1195,17 @@ class SampleInfoTool(PipelinePathHandler):
 		:param library_default:  options: ["unstranded", "forward", "reverse"]
 		"""
 		wildcard_values = self._get_wildcard_values_from_read_input()
-		wildcard_combs  = [comb for comb in self._get_wildcard_combinations(wildcard_values) if comb.read_extension in self.allowed_read_extensions]
+		if not wildcard_values["sample"]:
+			raise ValueError(
+				"Error extracting wildcards: in_path_pattern did not match any file path!\n"
+				f"in_path_pattern: {self.in_path_pattern}\n"
+				)
+		wildcard_combs = [comb for comb in self._get_wildcard_combinations(wildcard_values) if comb.read_extension in self.allowed_read_extensions]
+		if not wildcard_combs:
+			raise ValueError(
+				"Error extracting wildcards: read extension not matched!\n"
+				f"list of allowed extensions: {self.allowed_read_extensions}"
+				)
 		print("\nextracted combinations:\n{}".format("\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
 		
 		sample_info = {}
