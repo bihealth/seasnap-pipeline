@@ -135,7 +135,7 @@ rule cellranger_count:
 		transcriptome = config["organism"]["files"]["cellranger_transcriptome"],
 		feature_ref = config["pipeline_param"]["feature_ref"]
 	output:
-		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/outdir"),
+		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/cellranger_wd"),
 		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
 		done = touch(pph.file_path(step="cellranger_count", extension="done"))
 	log:
@@ -191,7 +191,7 @@ rule cellranger_count:
 		  feature_ref="--feature-ref=feature_ref.csv"
 		fi
 		#-- run cellranger count
-		cellranger count --id="outdir" --libraries="libraries.csv" $feature_ref --transcriptome={input.transcriptome} {params.options}
+		cellranger count --id="{wildcards.sample}" --libraries="libraries.csv" $feature_ref --transcriptome={input.transcriptome} {params.options}
 		cd -
 		""")
 
@@ -203,15 +203,15 @@ rule cellranger_aggr:
 	input:
 		pph.expand_path(step="cellranger_count", extension="done", fix="mate")
 	output:
-		outdir = directory(pph.out_dir_name(step="cellranger_aggr")+"/outdir"),
+		outdir = directory(pph.out_dir_name(step="cellranger_aggr")+"/cellranger_wd"),
 		done = touch(pph.file_path(step="cellranger_aggr", extension="done"))
 	log:
 		out = pph.file_path(step = "cellranger_aggr", extension="output.log", log=True)
 	run:
 		aggr_csv_content = ["library_id, molecule_h5"]
 		for count_results in input:
-			mol_info = Path(count_results).parent / "outdir" / "outdir" / "outs" / "molecule_info.h5"
 			sample_name = pph.wildcard_values_from(count_results, False)["sample"][0]
+			mol_info = Path(count_results).parent / "cellranger_wd" / sample_name / "outs" / "molecule_info.h5"
 			aggr_csv_content.append(f"{sample_name}, {str(mol_info.resolve())}")
 		aggr_csv_content = "\n".join(aggr_csv_content)
 
@@ -254,7 +254,7 @@ rule velocyto_run:
 	params:
 		cellranger_outdir = pph.choose_input(
 			choice_name = "velocyto",
-			func = lambda **kw: pph.out_dir_name(**kw)+"/outdir/outdir/outs",
+			func = lambda **kw: os.path.join(pph.out_dir_name(**kw),"cellranger_wd",kw["sample"],"outs"),
 			options = [
 				dict(step = "cellranger_aggr"),
 				dict(step = "cellranger_count")
