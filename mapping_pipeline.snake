@@ -184,7 +184,10 @@ rule fastqc:
 		outdir  = pph.out_dir_name(step="fastqc")
 	threads:
 		2
+<<<<<<< HEAD
 		# lambda wildcards, input: len(pph.get_fastq_pairs(wildcards))
+=======
+>>>>>>> 0949c785eaa60c543103b15c10cea1dbfd2e61a8
 	run:
 		reads = " ".join(input)
 		
