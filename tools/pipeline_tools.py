@@ -611,16 +611,16 @@ class PipelinePathHandler:
 						search_pat = self.out_path_pattern if "log" not in arg_dct else self.log_path_pattern
 
 						if mode == "files":
-							source = self.expand_path(**arg_dct)
+							sourcef = self.expand_path(**arg_dct)
 						else:
-							source = self.file_path(**{**arg_dct, "extension": "{extension}"})
+							sourcef = self.file_path(**{**arg_dct, "extension": "{extension}"})
 							if compress and not compress_list:
-								list_dir = Path(source).parent / ""
+								list_dir = Path(sourcef).parent / ""
 								if suffix: list_dir = list_dir / suffix
-								source = glob(str(list_dir).replace(f"{{{extra_wc}}}", "*"))
+								sourcef = glob(str(list_dir).replace(f"{{{extra_wc}}}", "*"))
 							else:
 								source_tmp = []
-								list_dir = Path(source).parent
+								list_dir = Path(sourcef).parent
 								if suffix: list_dir = list_dir / suffix
 								dirs = glob(str(list_dir).replace(f"{{{extra_wc}}}", "*"))
 								for d in dirs:
@@ -632,32 +632,32 @@ class PipelinePathHandler:
 											)
 										else:
 											source_tmp.append(f)
-								source = source_tmp
+								sourcef = source_tmp
 							search_pat = str(Path(search_pat).parent)
 
 						get_wc = self._get_wildcard_values_from_file_path
 						target = [
 							pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[1][extra_wc][0]})
-							for src in source
+							for src in sourcef
 							]
 					else:
-						source = [self.file_path(**arg_dct)]
+						sourcef = [self.file_path(**arg_dct)]
 						target = [pat.format(**{k: v for k, v in arg_dct.items() if k in wildcards})]
 					# --- copy files or write blueprint
-					assert len(source) == len(target)
-					for i in range(len(source)):
+					assert len(sourcef) == len(target)
+					for i in range(len(sourcef)):
 						if mode == "dir" and (not compress or compress_list):
-							target[i] = str(Path(target[i]) / Path(source[i]).name)
-						f_src, f_trg = Path(source[i]).resolve(), Path(target[i])
+							target[i] = str(Path(target[i]) / Path(sourcef[i]).name)
+						f_src, f_trg = Path(sourcef[i]).resolve(), Path(target[i])
 						if f_src.exists() and f_src.suffix != ".md5":
-							print("\n...copy {} to {} ...\n".format(source[i], target[i]))
+							print("\n...copy {} to {} ...\n".format(sourcef[i], target[i]))
 							if not compress_list or f_src.name in compress_list:
 								if compress == "zip":
 									to_zip = str(f_src.with_suffix('.zip'))
 									if not Path(to_zip).exists() or self._is_older(to_zip, f_src):
 										print(f"compression: create {to_zip} ...")
 										os.system(f"cd {str(f_src.parent)}; zip -r {to_zip} {str(f_src.name)}")
-									source[i], f_src = to_zip, Path(to_zip)
+									sourcef[i], f_src = to_zip, Path(to_zip)
 									if mode == "dir" and compress_list:
 										zip_trg = f_trg.with_suffix(f_trg.suffix + '.zip')
 										target[i], f_trg = str(zip_trg), zip_trg
@@ -666,7 +666,7 @@ class PipelinePathHandler:
 									if not Path(to_tar).exists() or self._is_older(to_tar, f_src):
 										print(f"compression: create {to_tar} ...")
 										os.system(f"cd {str(f_src.parent)}; tar -czf {to_tar} {tar_excl} {str(f_src.name)}")
-									source[i], f_src = to_tar, Path(to_tar)
+									sourcef[i], f_src = to_tar, Path(to_tar)
 									if mode == "dir" and compress_list:
 										tar_trg = f_trg.with_suffix(f_trg.suffix + '.tar.gz')
 										target[i], f_trg = str(tar_trg), tar_trg
@@ -676,16 +676,16 @@ class PipelinePathHandler:
 									dest=target[i]
 									), file=bp_out)
 								# -- create md5 sum
-								md5_path = Path(source[i] + ".md5")
-								if not md5_path.exists() or self._is_older(md5_path, source[i]):
-									md5_path.write_text(self._md5(source[i]))
+								md5_path = Path(sourcef[i] + ".md5")
+								if not md5_path.exists() or self._is_older(md5_path, sourcef[i]):
+									md5_path.write_text(self._md5(sourcef[i]))
 								print(blueprint["command"].format(
 									src=md5_path.resolve(),
 									dest=f_trg.with_suffix(f_trg.suffix + ".md5")
 									), file=bp_out)
 							else:
 								Path(target[i]).parent.mkdir(exist_ok=True, parents=True)
-								shutil.copy2(source[i], target[i])
+								shutil.copy2(sourcef[i], target[i])
 								Path(target[i] + ".md5").write_text(self._md5(target[i]))
 						elif not f_src.exists():
 							warn(f"Source file {str(f_src)} does not exist!")
