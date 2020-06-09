@@ -569,7 +569,7 @@ class PipelinePathHandler:
 							elif compress == "tar":
 								to_tar = str(f_src.with_suffix('.tar'))
 								print(f"compression: create {to_tar} ...")
-								os.system(f"cd {str(src.parent)}; tar -czf {to_tar} {str(f_src.name)}")
+								os.system(f"cd {str(f_src.parent)}; tar -czf {to_tar} {str(f_src.name)}")
 								source[i], f_src = to_tar, Path(to_tar)
 							if bp_out:
 								print(blueprint["command"].format(
@@ -1012,15 +1012,19 @@ class CovariateFileTool(PipelinePathHandler):
 					config_dict = {**config_dict, **yaml.safe_load(stream)}
 				except yaml.YAMLError as exc:
 					print(exc)
-					
+
+		if "in_path_pattern" not in config_dict["pipeline_param"] or not config_dict["pipeline_param"]["in_path_pattern"]:
+			raise ValueError("in_path_pattern needs to be set in the config file.")
+
 		self.in_path_pattern = config_dict["pipeline_param"]["in_path_pattern"]
 		
 		self.wildcard_constraints = self._prepare_inpathpattern()
 		
 		self.wildcard_values = self._get_wildcard_values_from_input(self.in_path_pattern, verbose=True)
+
 		if not self.wildcard_values["step"]:
 			raise ValueError(
-				"Error extracting wildcards: no wildcards found, because in_path_pattern could not be matched!\n"
+				"Error extracting wildcards: no wildcards found, because in_path_pattern did not match any files!\n"
 				"in_path_pattern: {}".format(self.in_path_pattern)
 			)
 
@@ -1051,9 +1055,14 @@ class CovariateFileTool(PipelinePathHandler):
 		:returns: a list with paths to specified input files
 		"""
 		wildcard_combs = self._get_wildcard_combinations(self.wildcard_values, step, extension)
-		print("\nextracted combinations:\n{}".format("\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
-		
-		wildcard_placeholders = {"sample":"{sample}", **self.opt_wildcard_placeholders}
+
+		if not wildcard_combs:
+			raise ValueError(f"No files found with combination of wildcards 'step': '{step}', 'extension': '{extension}'")
+		print("\nextracted combinations:\n{}".format(
+			"\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
+
+		wildcard_placeholders = {"sample": "{sample}", **self.opt_wildcard_placeholders}
+
 		kwargs_out = {key: getattr(wildcards, key, val) for key, val in wildcard_placeholders.items()}
 		pattern_list = []
 		seen = set()

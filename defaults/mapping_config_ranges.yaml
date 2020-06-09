@@ -13,6 +13,11 @@ pipeline_param:
 organism_defaults:
   __opt__: [null, \S*]
 
+organism:
+  files:
+    genome: \S+
+    gtf: \S+
+
 #---------------------------------------- parameters for rules
 rule_options:
   star: 
