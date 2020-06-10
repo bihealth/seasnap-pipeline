@@ -560,7 +560,7 @@ rule annotation:
 			res <- data.frame(PrimaryID=gene_ids, stringsAsFactors=FALSE)
 			res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
 
-			annot <- orthomapper::entrez_annotate(res$ENSEMBL, taxon=config$organism$taxon,
+			annot <- orthomapper::entrez_annotate(res$ENSEMBL, taxon=as.numeric(config$organism$taxon),
 				keytype="ENSEMBL", column=c("SYMBOL", "ENTREZID", "REFSEQ", "GENENAME"))
 
 		  if(!all(annot[,1] == res$ensembl)) 
