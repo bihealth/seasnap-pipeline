@@ -24,7 +24,7 @@ organism:
     genome: \S+
     gtf: \S+
   R:
-    annotations: [a-z.]+
+    annotations: "[A-Za-z.]+"
 
 #---------------------------------------- information about experiment
 experiment:
