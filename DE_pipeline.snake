@@ -65,8 +65,8 @@ def get_inputs_all():
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
 	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
+	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
-	
 	
 	return inputs
 
@@ -166,8 +166,7 @@ rule import_gene_counts:
 	input:
 		samples = config["experiment"]["covariate_file"]["star"]
 	output:
-		rds=pph.file_path("import_gene_counts", "rds", contrast = "all"),
-		xlsx=pph.file_path("import_gene_counts", "xlsx", contrast = "all")
+		rds=pph.file_path("import_gene_counts", "rds", contrast = "all")
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
@@ -187,13 +186,11 @@ rule import_gene_counts:
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
-    library(writexl)
 		
 		{R_SESSION_INFO}
 
     #----- variables
     sample_f  <- "{input.samples}"
-    output_xlsx <- "{output.xlsx}"
     output_rds  <- "{output.rds}"
 		
 		#----- import data
@@ -220,10 +217,6 @@ rule import_gene_counts:
 		
 		#----- save as rds
 		saveRDS(dds, file=output_rds)
-
-    #----- export counts as XLSX
-    colnames(count_dat) <- sample_df$label
-    write_xlsx(count_dat, path=output_xlsx)
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
@@ -345,6 +338,41 @@ rule import_sf:
 		script_file = pph.log(log.out, snakemake_format(script), step="import_sf", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
+##-------------------- export_raw_counts -------------------------------------------------------------------------------
+
+rule export_raw_counts:
+	""" export DESeq2 raw counts from the DESeq2 object as XLSX"""
+	input:
+		rds = pph.choose_input(choice_name = "mapping", options = [
+		dict(step = "import_gene_counts",   extension = "rds", contrast = "all"),
+		dict(step = "import_featurecounts", extension = "rds", contrast = "all"),
+		dict(step = "import_sf",            extension = "rds", contrast = "all")
+		])
+	output:
+		xlsx = pph.file_path("export_raw_counts", "xlsx", contrast = "all")
+	log:
+		out = pph.file_path("export_raw_counts", "output.log", contrast = "all", log=True)
+	run:
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(DESeq2)
+		library(writexl)
+
+		{R_SESSION_INFO}
+
+		#----- variables
+		output_xlsx <- "{output.xlsx}"
+		input_rds   <- "{input.rds}"
+
+		#----- read RDS object, extract count data, save as XLSX
+		dds <- readRDS(input_rds)
+		count_dat <- as.data.frame(assay(dds))
+		col_dat <- colData(dds)
+		colnames(count_dat) <- col_dat$label
+    write_xlsx(count_dat, path=output_xlsx)
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="export_raw_counts", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- DESeq2 -------------------------------------------------------------------------------
 
