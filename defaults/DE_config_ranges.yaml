@@ -17,6 +17,15 @@ pipeline_param:
 organism_defaults:
   __opt__: [null, \S*]
 
+organism:
+  genus: "[A-Z][a-z]+ [a-z]+"
+  taxon: \d+
+  files:
+    genome: \S+
+    gtf: \S+
+  R:
+    annotations: [a-z.]+
+
 #---------------------------------------- information about experiment
 experiment:
   covariate_file:

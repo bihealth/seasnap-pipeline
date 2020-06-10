@@ -86,25 +86,37 @@ def generate_covariate_file(args):
 	"""
 	generate a covariate file before running the DE pipeline
 	"""
-	step         = args.step
+	steps        = [args.step] if args.step else ["star", "salmon", "feature_counts"]
 	extension    = args.extension
 	config_files = args.config_files
 
-	cft = CovariateFileTool(*config_files)
+	for step in steps:
+		if not extension:
+			default_ext = dict(star="gene_counts.tab", salmon="sf", feature_counts="feature_counts")
+			if step in default_ext:
+				extension = default_ext[step]
+			else:
+				raise ValueError(
+					f"Cannot choose a default extension for step '{step}', "
+					"please set the extension on the command line."
+					)
+		print(f"\nSearch files with step '{step}' and extension '{extension}'...")
 
-	# fill 5 mandatory columns
-	cft.update_covariate_data(step, extension)
+		cft = CovariateFileTool(*config_files)
 
-	# add custom columns
-	if args.add_cols:
-		for col in args.add_cols:
-			col_name = col[0]
-			col_dict = {item.split(":")[0] : "".join(item.split(":")[1:]).split(",") for item in col[1:]}
-			cft.add_column(col_name, col_dict)
+		# fill 5 mandatory columns
+		cft.update_covariate_data(step, extension)
 
-	# write to file
-	cft.write_covariate_file(args.output)
-	print("\ncovariate file {} auto-generated. EDIT BEFORE RUNNING PIPELINE!".format(args.output))
+		# add custom columns
+		if args.add_cols:
+			for col in args.add_cols:
+				col_name = col[0]
+				col_dict = {item.split(":")[0] : "".join(item.split(":")[1:]).split(",") for item in col[1:]}
+				cft.add_column(col_name, col_dict)
+
+		# write to file
+		cft.write_covariate_file(args.output)
+		print("\ncovariate file {} auto-generated. EDIT BEFORE RUNNING PIPELINE!".format(args.output))
 
 def show_matrix(args):
 	"""
@@ -232,8 +244,8 @@ Additional columns can be added with --col NAME LEVELS,
 where NAME is the column name and LEVELS can be specified in two ways:
 1) by group:level pairs, e.g. gr1:lvl1 gr2:lvl1 gr3:lvl2
 2) by level:groups list, e.g. lvl1:gr1,gr2 lvl2:gr3""")
-parser_covariate_file.add_argument('step', help="name of the rule to collect outputs from (e.g. 'salmon')")
-parser_covariate_file.add_argument('extension', help="name of the output file extension (e.g. 'sf')")
+parser_covariate_file.add_argument('step', nargs='?', help="name of the rule to collect outputs from (e.g. 'salmon', 'star' or 'feature_counts')")
+parser_covariate_file.add_argument('extension', nargs='?', help="name of the output file extension (e.g. 'sf', 'gene_counts.tab' or 'feature_counts')")
 parser_covariate_file.add_argument('--config_files', nargs='+', default=["DE_config.yaml"], help="config files to be loaded")
 parser_covariate_file.add_argument('--output', default="covariate_file.txt", help="name of covariate file")
 parser_covariate_file.add_argument('--col', nargs='+',   action='append', dest='add_cols', help="add a column, use e.g.: --col NAME gr1:lvl1 gr2:lvl1 gr3:lvl2 ...")
