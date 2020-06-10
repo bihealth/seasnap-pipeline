@@ -205,7 +205,8 @@ rule import_gene_counts:
 		#----- merge count files from star
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", 
 		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
-		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list); rownames(count_dat) <- count_dat$ID
+		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list) 
+    rownames(count_dat) <- count_dat$ID
 		
 		#----- change levels
 		level_cols <- {level_list}
