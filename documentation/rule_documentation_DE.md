@@ -1,6 +1,7 @@
 This is the documentation for the rules. Rather then give specific file
-names (or patterns) as input and output, the goal is to describe *what* is
-needed as input and output, and what type of data is produced..
+names (or patterns) as input and output, the goal is to describe *how* the
+rule is working (what is the logic behind the code) and *what* is
+needed as input and output, what type of data is produced etc.
 
 [[_TOC_]]
 
@@ -17,28 +18,41 @@ needed as input and output, and what type of data is produced..
 
  * **Requirements:** `GenomicFeatures`
 
-# rule: `import_gene_counts`
+ * **Context:** run once (contrast `all`)
 
- * **Short description:** Import STAR counts from the files listed in the
-   covariate file. Produces raw counts as XLSX file and a DESeq2 object
-   saved as RDS data.
+# rule: `import_gene_counts`, `import_featurecounts`, `import_sf`
+
+ * **Short description:** Import STAR / feature count / Salmon counts from
+   the files listed in the covariate file. Produces a DESeq2 object saved
+   as RDS data.
+
+ * **Input:** Files defined in the covariate file, containing the gene
+   or transcript counts produced by the respective method. Furthermore, it
+   a model is required.
+ 
+ * **Output:** a DESeq2 object 
+
+ * **Requirements:** `DESeq2`
+
+ * **Context:** run once (contrast `all`)
+
+# rule: `export_raw_counts`
+
+ * **Short description:** Save the collected raw counts as XLSX for
+   external usage.
+
+ * **Input:** DESeq2 object created by one of the import rules.
+
+ * **Output:** An Excel (XLSX) file with raw counts.
 
  * **Requirements:** `DESeq2`, `writexl`
 
-# rule: `import_featurecounts`
-
- * **Short description:** Import feature counts from the files listed in the
-   covariate file. Produces raw counts as XLSX file and a DESeq2 object
-   saved as RDS data.
-
- * **Requirements:** `DESeq2`, `writexl`
+ * **Context:** run once (contrast `all`)
 
 # rule: `annotation`
 
  * **Short description:** use the PrimaryID of the project to add annotation from
 organism genome annotation databases such as org.Hs.eg.db.
-
- * **Context:** run once 
 
  * **Input:** PrimaryID, read from rownames of the `DESeq2/out/deseq2.rds` object
 
@@ -47,7 +61,36 @@ SYMBOL, ENTREZID, REFSEQ and GENENAME: `annotation/out/annotation.{rds,csv}`.
 
  * **Requirements:** orthomapper
 
- * **Depends on rules:** `DESeq2`
+ * **Context:** run once (contrast `all`)
+
+# rule: `goseq`
+ 
+ * **Short description:** run basic gene set enrichment analysis (ORA /
+   hypergeometric test) on KEGG and GO gene sets.
+
+ * **Output:** Two RDS files, one for KEGG, one for GO, with the results
+   of the analysis.
+
+ * **Context:** run once for each contrast
+
+# rule: `cluster_profiler`
+
+ * **Short description:** run clusterProfiler using predefined sets of
+   genes (see cluster profiler configuration).
+
+ * **Output:** 
+   * an RDS file. The object stored is a list with one element for each
+     type of test to run; these elements are lists which one element for
+     each gene set to run.
+   * a directory (`cluster_profiler.csv/`) which contains the results of
+     the tests.
+
+ * **Depends on rules:** `contrast`
+
+ * **Requirements:** annotation DBI package, msigdbr, clusterProfiler
+ 
+ * **Context:** run once for each contrast
+
 
 # rule: `tmod_dbs`
 
@@ -82,12 +125,14 @@ SYMBOL, ENTREZID, REFSEQ and GENENAME: `annotation/out/annotation.{rds,csv}`.
    full list of *all* results for all genes, as this is required for a
    reasonable gene set enrichment analysis.
 
- * **Context:** run once for each contrast
-
  * **Input:** contrast definitions, `DESeq2/out/deseq2.rds` file.
+
  * **Output:** DataFrame object with results for each gene.
 
  * **Depends on rules:** `DESeq2`
+
+ * **Context:** run once for each contrast
+
 
 # rule: `tmod`
 
