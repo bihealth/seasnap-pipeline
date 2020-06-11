@@ -53,6 +53,19 @@ contrasts:
       type: none
     ORA:
       fdr_threshold: 0.1
+    cluster_profiler:
+      MSigDb:
+        categories: [H, C2]
+        type: gsea
+      GO:
+        ontologies: [BP, MF]
+        type: ora
+        pval: 0.1
+      KEGG:
+        type: ora
+        kegg_organism_code: hsa
+
+  
   #contrast_list: null
 
 #---------------------------------------- report parameters

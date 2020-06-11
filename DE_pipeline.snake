@@ -761,6 +761,7 @@ rule cluster_profiler:
 		
 		#----- run tests
     tests_to_run <- intersect(c("MSigDb", "GO", "KEGG", "KEGG_modules"), names(test_annotations))
+		dir.create("{output.csv}", recursive=TRUE)
     tests <- lapply(tests_to_run, function(test) {{
 			dir.create(paste0("{output.csv}/", test), recursive=TRUE)
 			categories <- test_annotations[[test]]$categories
