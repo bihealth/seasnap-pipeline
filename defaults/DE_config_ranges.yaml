@@ -19,7 +19,8 @@ organism_defaults:
 
 organism:
   genus: "[A-Z][a-z]+ [a-z]+"
-  taxon: \d+
+  taxon:
+    __num__: [0, null]
   files:
     genome: \S+
     gtf: \S+
