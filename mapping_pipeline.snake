@@ -336,6 +336,7 @@ rule bwa_index:
 		rm -fr $(dirname {output.index})/*
 
 		#----- run bwa index
+		mkdir -p $(dirname {db_prefix})
 		ln -s {input.genome} {db_prefix}
 		bwa index {params.options} {db_prefix}
 		""")
