@@ -49,8 +49,8 @@ l.t <- 1
 maxlfc <- max(sapply(cntr, function(x) max(abs(x$log2FoldChange), na.rm=TRUE)))
 xlim <- c(-maxlfc, maxlfc)
 minpval <- min(sapply(cntr, function(x) min(x$padj, na.rm=TRUE)))
-ylim <- c(1, minpval)
 if(minpval < 1e-26) minpval <- 1e-26
+ylim <- c(1, minpval)
 
 ## we use a fast but effective plotting function, nothing fancy
 for(cc in names(contrasts.conf)) {

@@ -265,6 +265,9 @@ csv2tmod <- function(file, gene_sep=";", header=TRUE, stringsAsFactors=FALSE, se
   makeTmod(modules=modules, modules2genes=m2g)
 }
 
+tsv2tmod <- function(file, gene_sep=";", header=TRUE, stringsAsFactors=FALSE, sep="\t", ...) {
+  csv2tmod(file=file, gene_sep=gene_sep, header=header, stringsAsFactors=stringsAsFactors, sep=sep, ...)
+}
 
 #' Convert a by-column CSV to tmod format
 #' 
@@ -364,7 +367,7 @@ tmod_read_file <- function(x, format) {
     RDS=readRDS(x),
     XLSX=not_implemented("Reading XLSX tmod database format"),
     XML=not_implemented("Reading XML tmod database format"),
-    TSV=not_implemented("Reading TSV tmod database format"))
+    TSV=tsv2tmod(x))
 
   return(ret)
 }

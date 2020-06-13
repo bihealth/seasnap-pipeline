@@ -1,3 +1,5 @@
+#REQUIRE {{tmod_pca-rds}}
+
 <!--
 This is the snippet showing the results of tmodPCA
 January Weiner
