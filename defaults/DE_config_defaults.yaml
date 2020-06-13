@@ -126,6 +126,17 @@ tmod:
   sort_by: pval 
 #,pval_n,pval_p
   databases:
+    - name: tmod
+      file: tmod
+      title: "Co-expression gene sets (tmod)"
+      description:
+        Gene sets derived from clustering expression profiles from human blood
+        collected for various immune conditions. These gene sets are included
+        in the tmod package by default. Check tmod documentation for further 
+        information.
+      taxonID: 9606
+      primaryID: SYMBOL
+      annotationDBI: org.Hs.eg.db
     - name: msigdb_reactome
       file: msigdb
       title: "Reactome gene sets (MSigDB)"
@@ -146,6 +157,16 @@ tmod:
       taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=H"
+    - name: msigdb_kegg
+      file: msigdb
+      title: "KEGG pathways (MSigDB)"
+      description:
+        KEGG pathways from 
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      taxonID: 9606
+      primaryID: ENTREZID
+      subset: "Category=C2,Subcategory=CP:KEGG"
     - name: msigdb_mir
       file: msigdb
       title: "MIR targets (MSigDB)"
@@ -166,18 +187,7 @@ tmod:
       taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C5,Subcategory=BP"
-    - name: tmod
-      file: tmod
-      title: "Co-expression gene sets (tmod)"
-      description:
-        Gene sets derived from clustering expression profiles from human blood
-        collected for various immune conditions. These gene sets are included
-        in the tmod package by default. Check tmod documentation for further 
-        information.
-      taxonID: 9606
-      primaryID: SYMBOL
-      annotationDBI: org.Hs.eg.db
-        
+       
 
 #---------------------------------------- configuration for export
 export:
