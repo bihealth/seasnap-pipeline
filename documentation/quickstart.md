@@ -24,46 +24,63 @@
       `sea-snap-dir/defaults/mapping_config_defaults.yaml`
     * organism: take a look at `sea-snap-dir/defaults` to see what organism
       files are available.
+    * Wildcards: the Python/snakemake wildcards are identifiers in curly
+      braces, such as `{this}`.
     * under `pipeline_param`, you should have three wildcard infested paths
       defined. These are somewhat tricky, so here are two examples, each
       with example of the resulting *real* paths:
       
          ```
          ## Example 1.
-         ## Note that '.fastq.gz' in input file is defined elsewhere
+         ## Note that the '.fastq.gz' extension in input file is defined elsewhere
+         ## The files should have extensions '.fastq.gz', '.fastq', '.fq.gz' or '.fq'
+         ## If they don't, see below
 
-         ## example input file:
+         ## example input files:
          ## input/S1254/S1254_R1.fastq.gz
+         ## input/S1254/S1254_R2.fastq.gz
          in_path_pattern: input/{sample}/{sample}_{mate}
+
          ## example output file:
          ## notice how the `{mate}` wildcard got replaced by `all_mates`
          ## mapping/star/out/S1254_all_mates/star.S1254.all_mates.bam
+
+         ## matching out/log path patterns:
          out_path_pattern: mapping/{step}/out/{sample}_{mate}/{step}.{sample}.{mate}.{extension}
          log_path_pattern: mapping/{step}/report/{sample}_{mate}/{step}.{sample}.{mate}.{extension}
+
+         ## Note that the `{sample}` wilcard can be eventually 
+         ## replaced by something like `all_samples.all_mates`
+         ## mapping/multiqc/out/all_samples.all_mates/multiqc.all_samples.all_mates.qc_report.html
 
          ## Example 2.
          ## example input file:
          ## input/1509/1509_R1_001.fastq.gz
          in_path_pattern: input/{sample}/{sample}_R1_001
 
-         ## example output file:
-         ## Note that the `{sample}` wilcard can be replaced by something like `all_samples`
-         ## mapping/multiqc/out/all_samples/multiqc.all_samples.qc_report.html
+         ## matching out/log path patterns (no mates here):
 				 out_path_pattern: mapping/{step}/out/{sample}/{step}.{sample}.{extension}
 				 log_path_pattern: mapping/{step}/report/{sample}/{step}.{sample}.{extension}
          ```
+
     * One important point about the above paths: each output and log file name 
       (the last
       element of the path, i.e. for example '{step}.{sample}.{extension}'
       in the example above) *must* include *all* wildcards used *anywhere*
       in the path.
-     
     * also under `pipeline_param`, you should choose which steps (e.g.
       dupradar, star counts or multiqc) are to be run
     * edit other options and parameters to your taste, but basically you
       ready to go.
 
  4. Generate the file `samples.info` using the command `sea-snap.py sample_info`
+
+    * If you have a custom extension to your read files, then use the
+      `--add_ext` option.
+    * A common problem is that the `in_path_pattern` defined in the
+      `mapping_config.yaml` file does not match the actual file paths. 
+    * After successfully running this step, make sure that the
+      automatically generated `samples.info` file is correct.
 
  5. Run the pipeline with `./sea-snap mapping l` on a local machine or
     `./sea-snap mapping c` on the computing cluster. To run on SLURM nodes,
@@ -84,6 +101,12 @@ have run the mapping pipeline, as this makes it so much easier.
 
 Be warned, DE pipeline is much more tricky to run than the mapping
 pipeline. But you already know it.
+
+## Quick start to the DE pipeline
+
+ 1. Edit the `DE_config.yaml` file. Make sure that the `in_path_pattern`
+    matches files which were produced by the mapping pipeline. Which files
+    are these depends on whether you want to take the count data from STAR, 
 
 
 ## Initial steps

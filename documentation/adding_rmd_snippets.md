@@ -49,33 +49,39 @@ There is also an example for configuring the report [here](config_examples1.md).
 
 ### accessing pipeline results in snippets
 
-**1) files **
+**1) files**
 
-Within Rmd snippets you will need to access the results of the pipeline execution, which are stored in files at paths determined by the given path pattern in the config file.
-There are two ways to get the paths of such files from within a snippet:
+Within Rmd snippets you will need to access the results of the pipeline
+execution, which are stored in files at paths determined by the given path
+pattern in the config file.  There are two ways to get the paths of such
+files from within a snippet:
 
 ```
 file <- {{DESeq2-rds}}
 ```
 
-When the report is generated, wildcards in double-braces `{{...}}` will be filled.
-In this case the pattern `{{<step>-<extension>}}` will be replaced by the path to the '.rds' file produced by the rule 'DESeq2'.
-The final report will then contain the full file path instead of `{{DESeq2-rds}}`.
+When the report is generated, wildcards in double-braces `{{...}}` will be
+filled.  In this case the pattern `{{<step>-<extension>}}` will be replaced
+by the path to the '.rds' file produced by the rule 'DESeq2'.  The final
+report will then contain the full file path instead of `{{DESeq2-rds}}`.
 
 ```
 file <- subset(file_tab, step=="<rule_name>" & extension=="<file_extension>")$filename
 ```
 
 With the report a table of all files produced by the pipeline is written.
-This table is loaded in `report_main_template.Rmd` as a data frame called `file_tab` and is therefore accessible in all snippets.
+This table is loaded in `report_main_template.Rmd` as a data frame called
+`file_tab` and is therefore accessible in all snippets.
 
-The second option is prefereable, since it is easier to adapt after the report was generated.
+The second option is prefereable, since it is easier to adapt after the
+report was generated.
 
 **2) contrast names**
 
-For sub-snippets you will also need the names and IDs of contrasts (as filled into wildcards by Snakemake) to access results.
-Hence, during report generation `{{ENTRY_NAME}}` and `{{ENTRY_ID}}` will be filled by the corresponding contrast name and ID respectively.
-And therefore
+For sub-snippets you will also need the names and IDs of contrasts (as
+filled into wildcards by Snakemake) to access results.  Hence, during
+report generation `{{ENTRY_NAME}}` and `{{ENTRY_ID}}` will be filled by the
+corresponding contrast name and ID respectively.  And therefore
 
 ```
 file <- subset(file_tab, step=="..." & extension=="..." & contrast=="{{ENTRY_ID}}")$filename
@@ -93,22 +99,29 @@ parameter <- config$<key1>$<key2>[$...]
 
 **4) external code**
 
-The R code in `report/R_common/` in the files `basic_funcs.R` and `basic_plots.R` is also loaded at the beginning of the report.
-There you can write functions in R to perform generic computations and plotting that can be used in Rmd snippets.
+The R code in `report/R_common/` in the files `basic_funcs.R` and
+`basic_plots.R` is also loaded at the beginning of the report.  There you
+can write functions in R to perform generic computations and plotting that
+can be used in Rmd snippets.
 
 **5) other**
 
-Also the wildcards `{{WORKING_DIRECTORY}}` and `{{R_COMMON}}` are replaced by paths to the respective folders in the complete document.
-Note, that the working directory of the Rmd report will be set to the working directory of the pipeline.
-Thus, moving the report file is less likely to break paths to the results files.
-If some files are not found, you may change the setting of the working directory in `report_main_template.Rmd` or RStudio, e.g. if you copied the report to your local computer and want to knit it accessing files via sshfs.
+Also the wildcards `{{WORKING_DIRECTORY}}` and `{{R_COMMON}}` are replaced
+by paths to the respective folders in the complete document.  Note, that
+the working directory of the Rmd report will be set to the working
+directory of the pipeline.  Thus, moving the report file is less likely to
+break paths to the results files.  If some files are not found, you may
+change the setting of the working directory in `report_main_template.Rmd`
+or RStudio, e.g. if you copied the report to your local computer and want
+to knit it accessing files via sshfs.
 
 ---
 
 ### conditional inclusion of .Rmd snippets
 
-GO and KEGG enrichment analysis may be performed only for a subset of contrasts.
-Corresponding .Rmd snippets should then be included in the report only if the corresponding results are present.
+GO and KEGG enrichment analysis may be performed only for a subset of
+contrasts.  Corresponding .Rmd snippets should then be included in the
+report only if the corresponding results are present.
 
 To this end, there is a
 
