@@ -45,11 +45,11 @@ onstart:
 	# draw a dag
 	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", contrast="all")
 	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
-	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
+	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng 1> {}".format(SNAKEFILE, dag_file))
 	# info about the pipeline run
 	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", contrast="all")
 	os.makedirs(os.path.dirname(info_file), exist_ok=True)
-	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' 1> {}".format(SNAKEFILE, info_file))
 	# save merged config
 	config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
@@ -64,13 +64,17 @@ def get_inputs_all():
 	#functional annotation
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
-	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
+	#inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
 	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
 	inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
-	
+
+	#time series
+	for ts in config["time_series"]:
+		inputs.append(pph.file_path(step = "rain", extension = "tsv", contrast=ts))
+
 	return inputs
 
 
@@ -171,9 +175,13 @@ rule import_gene_counts:
 	input:
 		samples = config["experiment"]["covariate_file"]["star"]
 	output:
-		rds=pph.file_path("import_gene_counts", "rds", contrast = "all")
+		rds=pph.file_path("import_gene_counts", "rds", contrast = "all"),
+		tsv=pph.file_path("import_gene_counts", "tsv", contrast = "all"),
+		xlsx=pph.file_path("import_gene_counts", "xlsx", contrast = "all")
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
+	params:
+		tpm_xlsx=pph.file_path("import_gene_counts", "tpm_xlsx", contrast = "all")
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		column_filter = ""
@@ -192,15 +200,18 @@ rule import_gene_counts:
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
-    library(writexl)
-		
+		library(writexl)
+
 		{R_SESSION_INFO}
 
-    #----- variables
-    sample_f  <- "{input.samples}"
-    output_rds  <- "{output.rds}"
-		conf.f   <- "{config_file}"
-		
+		#----- variables
+		sample_f  <- "{input.samples}"
+		output_xlsx <- "{output.xlsx}"
+		output_tsv <- "{output.tsv}"
+		output_tpm_xlsx <- "{params.tpm_xlsx}"
+		output_rds  <- "{output.rds}"
+		conf.f <- "{config_file}"
+
 		#----- import data
 		sample_df <- read.table(sample_f, header=TRUE)
 		files     <- as.character(sample_df$filename); print(files)
@@ -210,9 +221,17 @@ rule import_gene_counts:
 		#----- merge count files from star
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", 
 		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
-		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list) 
-    rownames(count_dat) <- count_dat$ID
-		
+		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list)
+		rownames(count_dat) <- count_dat$ID
+
+		#----- if present, merge tpm values (generated from star bam with TPMcalculator) for display along results
+		if ("tpm" %in% colnames(sample_df)) {{
+			tpm_files <- as.character(sample_df$tpm)
+			tpm_df_list <- lapply(1:length(tpm_files), function(i) as.data.frame(read.csv(tpm_files[i], skip=4, sep="\t",
+		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
+			tpm_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), tpm_df_list); rownames(tpm_dat) <- tpm_dat$ID
+		}}
+
 		#----- change levels
 		level_cols <- {level_list}
 		for (col in names(level_cols)) {{
@@ -225,6 +244,15 @@ rule import_gene_counts:
 		
 		#----- save as rds
 		saveRDS(dds, file=output_rds)
+
+		#----- export counts as tables
+		colnames(count_dat) <- sample_df$label
+		write_xlsx(count_dat, path=output_xlsx)
+		write.table(count_dat, file=output_tsv, sep="\t", quote=F)
+		if ("tpm" %in% colnames(sample_df)) {{
+			colnames(tpm_dat) <- sample_df$label
+			write_xlsx(tpm_dat, path=output_tpm_xlsx)
+		}}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
@@ -748,7 +776,7 @@ rule tmod_dbs:
 			annot.f  <- "{input.annotation}"
 			 
 			## ------------------------------
-      ## no wildcards beyond this point
+			## no wildcards beyond this point
 			## ------------------------------
 
 			config <- yaml::yaml.load_file(conf.f)
@@ -799,7 +827,7 @@ rule tmod:
 			res.gl.f <- "{output.tmod_gl}"
 			 
 			## ------------------------------
-      ## no wildcards beyond this point
+			## no wildcards beyond this point
 			## ------------------------------
 			library(DESeq2)
 			library(tmod)
@@ -838,15 +866,15 @@ rule tmod:
 			## for sorting keys, so we need to unlist – one level only
 			res.short <- unlist(res.short, recursive=FALSE)
 
-      ## remove if there were no results
-      res.short <- res.short[!sapply(res.short, is.null)]
+			## remove if there were no results
+			res.short <- res.short[!sapply(res.short, is.null)]
 			write_xlsx(res.short, path=res.xlsx)
-		""")
+			""")
 
-		script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
+			script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
 
-		# run R
-		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+			# run R
+			shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- multivariate tmod ----------------------------------------------------------------
 
@@ -877,7 +905,7 @@ rule tmod_pca:
 			res.pca.f <- "{output.pca}"
 			 
 			## ------------------------------
-      ## no wildcards beyond this point
+			## no wildcards beyond this point
 			## ------------------------------
 			require(DESeq2)
 			require(tmod)
@@ -898,7 +926,7 @@ rule tmod_pca:
 			genes <- rownames(rl)
 			if(is.null(genes)) stop("can't get primary IDs from DESeq2 object!")
 
-		  pca <- prcomp(t(rl), scale.=TRUE)
+			pca <- prcomp(t(rl), scale.=TRUE)
 			saveRDS(pca, file=res.pca.f)
 
 			ncomp <- min(4, ncol(pca$x))
@@ -1131,9 +1159,61 @@ rule cluster_profiler:
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 		
-##-------------------- QC steps -----------------------------------------------------------------------------
+##-------------------- Rain -----------------------------------------------------------------------------
 
-# plots go into report snippets
+rule rain:
+	input:
+		counts = pph.file_path("import_gene_counts", "tsv", contrast="all")
+	output:
+		tsv = pph.file_path("rain", "tsv")
+	log:
+		out = pph.file_path(step = "rain", extension = "output.log", log=True)
+	run:
+		ts_columns = [rep for samp in config["time_series"][wildcards.contrast]["samples"] for rep in samp]
+		r_ts_columns = pph.get_r_repr(ts_columns, to_type = "vector")
+		r_time_points = pph.get_r_repr(config["time_series"][wildcards.contrast]["time_points"], to_type = "vector")
+		r_nr_replicates = pph.get_r_repr([len(samp) for samp in config["time_series"][wildcards.contrast]["samples"]], to_type = "vector")
+
+		script = textwrap.dedent(r"""
+		library("stats")
+		library("siggenes")
+		library("rain")
+		{R_SESSION_INFO}
+
+		#----- prepare matrix
+		counts_file <- data.frame(read.csv("{input.counts}", sep="\t"))
+		ts_columns <- {r_ts_columns}
+		counts_file <- counts_file[,ts_columns]
+
+		#----- run rain
+		distances <- diff({r_time_points})
+		rainresult <- rain(counts_file,
+                   period=24,
+                   deltat=distances[1],
+                   peak.border=c(0.3, 0.7),
+                   verbose=F,
+                   measure.sequence={r_nr_replicates},
+                   na.rm=F)
+
+		pvalues <- rainresult[T,1]
+		qvalues_BH <- p.adjust(pvalues, 'BH')
+
+		#----- write tsv
+		write.table(data.frame(ID=colnames(counts_file),
+                       q_val_BH=qvalues_BH,
+                       p_val=pvalues,
+                       phase=rainresult["phase"],
+                       peak_shape=rainresult["peak.shape"],
+                       period=rainresult["period"]),
+            sep = "\t",
+            quote = F,
+            row.names = F,
+            file = {output.tsv})
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="rain", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
 
 
 ##-------------------- report -------------------------------------------------------------------------------

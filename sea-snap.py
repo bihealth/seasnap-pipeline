@@ -105,7 +105,10 @@ def generate_covariate_file(args):
 		cft = CovariateFileTool(*config_files)
 
 		# fill 5 mandatory columns
-		cft.update_covariate_data(step, extension)
+		if args.tpm:
+			cft.update_covariate_data(step, extension, {"tpm": ("tpm_calculator", "tsv")})
+		else:
+			cft.update_covariate_data(step, extension)
 
 		# add custom columns
 		if args.add_cols:
@@ -249,6 +252,7 @@ parser_covariate_file.add_argument('extension', nargs='?', help="name of the out
 parser_covariate_file.add_argument('--config_files', nargs='+', default=["DE_config.yaml"], help="config files to be loaded")
 parser_covariate_file.add_argument('--output', default="covariate_file.txt", help="name of covariate file")
 parser_covariate_file.add_argument('--col', nargs='+',   action='append', dest='add_cols', help="add a column, use e.g.: --col NAME gr1:lvl1 gr2:lvl1 gr3:lvl2 ...")
+parser_covariate_file.add_argument('--tpm', action='store_true', help="attach TPM column with output of TPMcalculator for display with DE pipeline")
 parser_covariate_file.set_defaults(func=generate_covariate_file)
 
 #--- parser for select_contrast

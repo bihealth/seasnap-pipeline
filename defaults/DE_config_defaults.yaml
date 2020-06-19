@@ -75,6 +75,10 @@ contrasts:
   
   #contrast_list: null
 
+#---------------------------------------- description of time series
+
+time_series: {}
+
 #---------------------------------------- report parameters
 report:
   #merge: null

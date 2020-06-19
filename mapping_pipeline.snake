@@ -312,6 +312,30 @@ rule star:
 		script_file = pph.log(log.out, snakemake_format(script), step="star", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+
+rule tpm_calculator:
+	input:
+		bam = pph.file_path(step="star", extension="unsorted.bam"),
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		pph.file_path(step="tpm_calculator", extension="tsv")
+	log:
+		out = pph.file_path(step="tpm_calculator", extension="output.log", log=True)
+	params:
+		nsrt_bam = pph.file_path(step="tpm_calculator", extension="name_sorted.bam")
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		TPMCalculator -v
+
+		#----- run TPMCalculator
+		TPMCalculator -g {input.gtf} -b {input.bam} > {output}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="tpm_calculator", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
 ##-------------------- bwa ---------------------------------------------------------------------------------
 
 GENOME_FILE_NAME = os.path.basename(config["organism"]["files"]["genome"])

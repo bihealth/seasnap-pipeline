@@ -4,7 +4,8 @@
 
 import sys, os, re, shutil, hashlib, itertools, yaml, pandas as pd
 from builtins import isinstance, TypeError
-from collections import namedtuple, Mapping, OrderedDict, Iterable
+from collections.abc import Mapping, Iterable
+from collections import namedtuple, OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
 from time import strftime
@@ -1076,8 +1077,8 @@ class CovariateFileTool(PipelinePathHandler):
 		
 		
 	#---------------------------------------------------- access methods ----------------------------------------------------#
-		
-	def update_covariate_data(self, step, extension):
+
+	def update_covariate_data(self, step, extension, other = None):
 		""" 
 		fill mandatory columns of the covariate data frame by searching the input path specified in the config file
 		
@@ -1085,6 +1086,10 @@ class CovariateFileTool(PipelinePathHandler):
 		:param extension: file extension of the searched files
 		"""
 		files = self._get_mapping_input(step, extension, wildcards={})
+		extra_files = {}
+		if other is not None:
+			for col, (a_step, a_ext) in other.items():
+				extra_files[col] = self._get_mapping_input(a_step, a_ext, wildcards={})
 		md5   = [self._md5(f) for f in files]
 		group = [self._get_wildcard_values_from_file_path(f,self.in_path_pattern)[1]["sample"][0] for f in files]
 		
@@ -1095,7 +1100,7 @@ class CovariateFileTool(PipelinePathHandler):
 			replicate.append(num_g[g])
 		label = ["{}_{}".format(a,b) for a,b in zip(group, replicate)]
 		
-		self.covariate_data = pd.DataFrame({"filename":files, "md5":md5, "group":group, "replicate":replicate, "label":label})
+		self.covariate_data = pd.DataFrame({"filename":files, "md5":md5, "group":group, "replicate":replicate, "label":label, **extra_files})
 		
 	def add_column(self, name, levels):
 		""" 

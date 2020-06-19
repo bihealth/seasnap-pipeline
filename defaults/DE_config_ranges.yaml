@@ -19,6 +19,7 @@ organism_defaults:
 
 organism:
   genus: "[A-Z][a-z]+ [a-z]+"
+
   taxon:
     __num__: [0, null]
   files:

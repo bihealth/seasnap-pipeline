@@ -1,0 +1,8 @@
+# Time series
+
+Analysis of time series.
+
+#HSTART
+## {{ENTRY_NAME}}
+#HEND
+#>--------------------------------------------INSERT--------------------------------------------<#
