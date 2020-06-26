@@ -621,7 +621,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			raise ValueError("Error in config file: not all specified samples could be found using given input path pattern")
 		
 		# write log with parsed values to file for debugging
-		self._write_log(sample="all")
+		self._write_log()
 		
 		
 	#---------------------------------------------------- helper methods ----------------------------------------------------#
@@ -653,8 +653,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		return per_sample_comb
 		
 	def _write_log(self, **kwargs):
-		filename = self.file_path(step="MappingPipelinePathHandler", extension="log", log=True, batch="all_batches", 
-		                          flowcell="all_flowcells", lane="all_lanes", library="all_libraries", **kwargs)
+		filename = self.file_path(step="MappingPipelinePathHandler", extension="log", log=True, fix="all", **kwargs)
 		os.makedirs(os.path.dirname(filename), exist_ok=True)
 		with open(filename, "w") as f:
 			f.write("pattern input:\n   in path pattern: {}\n   out path pattern: {}\n   log path pattern: {}\n\n"
@@ -810,7 +809,6 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 				if add_done:
 					Path(self.file_path(step, extension="done", sample=sample, **kwargs)).touch()
 
-
 	def log_generated_files(self, save_to="", path_pattern=None, **kwargs):
 		"""
 		Scan all generated output/intermediate files and list them in a file with their corresponding wildcard values.
@@ -819,7 +817,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 		table_cols = self._collect_generated_files(path_pattern=path_pattern)	
 		table = pd.DataFrame(table_cols)
 		if not save_to:
-			save_to = self.file_path(step="MappingPipelinePathHandler", extension="tsv", batch="all_batches", flowcell="all_flowcells", lane="all_lanes", library="all_libraries", path_pattern=path_pattern, **kwargs)
+			save_to = self.file_path(step="MappingPipelinePathHandler", extension="tsv", fix="all", path_pattern=path_pattern, **kwargs)
 		table.to_csv(save_to, sep="\t", index=False)
 
 
@@ -1317,7 +1315,7 @@ class SampleInfoTool(PipelinePathHandler):
 
 class ReportTool(PipelinePathHandler):
 
-	entry_heading_pattern = "#HSTART.*\n(.*{{ENTRY_NAME}}.*)\n.*#HEND"
+	entry_heading_pattern = "#HSTART.*\n([\s\S]*{{ENTRY_NAME}}[\s\S]*)\n.*#HEND"
 	insert_pattern        = "#>.*INSERT.*<#"
 	entry_name_wildcard   = "{{ENTRY_NAME}}", "{{ENTRY_ID}}"
 
@@ -1339,10 +1337,10 @@ class ReportTool(PipelinePathHandler):
 			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
 		else:
 			self.report_snippet_base_dir = Path(sys.path[0]) / "report"
-		
-		
+
 		self.use_results = self._make_use_results_dict(config_dict)
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
+		self.time_series = config_dict["time_series"]
 		
 		# define substitutions for report generation
 		# self.substitutions = {"__contrasts__": self.path_handler.get_contrast_id_dict}
@@ -1457,6 +1455,8 @@ class ReportTool(PipelinePathHandler):
 		""" expand predefined placeholders to entry lists """
 		if entries == "__contrasts__":
 			return list(self._DE_id_dict_from_path(results_path)["contrast"])
+		elif entries == "__timeseries__":
+			return list(self.time_series)
 		elif entries == "__samples__":
 			return list(self._mapping_id_dict_from_path(results_path)["sample"])
 		else:

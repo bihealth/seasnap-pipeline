@@ -1,8 +1,9 @@
 # Time series
 
-Analysis of time series.
-
 #HSTART
-## {{ENTRY_NAME}}
+## `r config$time_series${{ENTRY_NAME}}$name`
+
+time points: ``r paste(config$time_series$circadian_ts_cortex$time_points, collapse=", ")``\
+samples: `r paste(unlist(config$time_series$circadian_ts_cortex$samples), collapse=", ")`
 #HEND
 #>--------------------------------------------INSERT--------------------------------------------<#

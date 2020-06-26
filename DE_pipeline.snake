@@ -66,7 +66,7 @@ def get_inputs_all():
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
 	#inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
-	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
+	#inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
 	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
 	inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
@@ -181,7 +181,8 @@ rule import_gene_counts:
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	params:
-		tpm_xlsx=pph.file_path("import_gene_counts", "tpm_xlsx", contrast = "all")
+		tpm_xlsx=pph.file_path("import_gene_counts", "tpm.xlsx", contrast = "all"),
+		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		column_filter = ""
@@ -201,6 +202,8 @@ rule import_gene_counts:
 		#----- import packages
 		library(DESeq2)
 		library(writexl)
+		library(AnnotationDbi)
+		library({params.annot_pkg})
 
 		{R_SESSION_INFO}
 
@@ -227,7 +230,7 @@ rule import_gene_counts:
 		#----- if present, merge tpm values (generated from star bam with TPMcalculator) for display along results
 		if ("tpm" %in% colnames(sample_df)) {{
 			tpm_files <- as.character(sample_df$tpm)
-			tpm_df_list <- lapply(1:length(tpm_files), function(i) as.data.frame(read.csv(tpm_files[i], skip=4, sep="\t",
+			tpm_df_list <- lapply(1:length(tpm_files), function(i) as.data.frame(read.csv(tpm_files[i], sep="\t",
 		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
 			tpm_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), tpm_df_list); rownames(tpm_dat) <- tpm_dat$ID
 		}}
@@ -250,7 +253,10 @@ rule import_gene_counts:
 		write_xlsx(count_dat, path=output_xlsx)
 		write.table(count_dat, file=output_tsv, sep="\t", quote=F)
 		if ("tpm" %in% colnames(sample_df)) {{
-			colnames(tpm_dat) <- sample_df$label
+			symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", tpm_dat$ID),
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		    tpm_dat <- cbind(symbol, tpm_dat)
+			colnames(tpm_dat) <- c("Symbol", "geneID", as.character(sample_df$label))
 			write_xlsx(tpm_dat, path=output_tpm_xlsx)
 		}}
 		""")
@@ -405,7 +411,7 @@ rule export_raw_counts:
 		count_dat <- as.data.frame(assay(dds))
 		col_dat <- colData(dds)
 		colnames(count_dat) <- col_dat$label
-    write_xlsx(count_dat, path=output_xlsx)
+    	write_xlsx(count_dat, path=output_xlsx)
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="export_raw_counts", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -1168,6 +1174,12 @@ rule rain:
 		tsv = pph.file_path("rain", "tsv")
 	log:
 		out = pph.file_path(step = "rain", extension = "output.log", log=True)
+	params:
+		period = config["rain"]["period"],
+		peak_boarder = config["rain"]["peak_boarder"],
+		min_fold_change = config["rain"]["min_fold_change"],
+		min_mean = config["rain"]["min_mean"],
+		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		ts_columns = [rep for samp in config["time_series"][wildcards.contrast]["samples"] for rep in samp]
 		r_ts_columns = pph.get_r_repr(ts_columns, to_type = "vector")
@@ -1178,19 +1190,32 @@ rule rain:
 		library("stats")
 		library("siggenes")
 		library("rain")
+		library("AnnotationDbi")
+		library("{params.annot_pkg}")
 		{R_SESSION_INFO}
+
+		#----- params
+		period <- {params.period}
+		peak_boarder <- {params.peak_boarder}
+		min_fold_change <- {params.min_fold_change}
+		min_mean <- {params.min_mean}
 
 		#----- prepare matrix
 		counts_file <- data.frame(read.csv("{input.counts}", sep="\t"))
 		ts_columns <- {r_ts_columns}
-		counts_file <- counts_file[,ts_columns]
+		counts_file <- t(counts_file[,ts_columns])
+
+		#----- fold change filter
+		maxima <- apply(counts_file, 2, function(x) max(x, na.rm=T))
+		minima <- apply(counts_file, 2, function(x) min(x, na.rm=T))
+		counts_file <- counts_file[,(maxima+minima)/2 > min_mean & maxima/minima > min_fold_change]
 
 		#----- run rain
 		distances <- diff({r_time_points})
 		rainresult <- rain(counts_file,
-                   period=24,
+                   period=period,
                    deltat=distances[1],
-                   peak.border=c(0.3, 0.7),
+                   peak.border=peak_boarder,
                    verbose=F,
                    measure.sequence={r_nr_replicates},
                    na.rm=F)
@@ -1198,17 +1223,29 @@ rule rain:
 		pvalues <- rainresult[T,1]
 		qvalues_BH <- p.adjust(pvalues, 'BH')
 
+		#----- map Ids
+		symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", colnames(counts_file)),
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", colnames(counts_file)),
+		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+
 		#----- write tsv
-		write.table(data.frame(ID=colnames(counts_file),
-                       q_val_BH=qvalues_BH,
-                       p_val=pvalues,
-                       phase=rainresult["phase"],
-                       peak_shape=rainresult["peak.shape"],
-                       period=rainresult["period"]),
-            sep = "\t",
-            quote = F,
-            row.names = F,
-            file = {output.tsv})
+		write.table(
+			data.frame(
+				ensembl=colnames(counts_file),
+				symbol=symbol,
+				entrez=entrez,
+				q_val_BH=qvalues_BH,
+				p_val=pvalues,
+				phase=rainresult["phase"],
+				peak_shape=rainresult["peak.shape"],
+				period=rainresult["period"]
+				),
+			sep = "\t",
+			quote = F,
+			row.names = F,
+			file = "{output.tsv}"
+		)
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="rain", extension="R", **wildcards)

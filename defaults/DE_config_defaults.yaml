@@ -79,6 +79,12 @@ contrasts:
 
 time_series: {}
 
+rain:
+  period: 24
+  peak_boarder: "c(0.3, 0.7)"
+  min_fold_change: 1.5
+  min_mean: 5
+
 #---------------------------------------- report parameters
 report:
   #merge: null
@@ -92,6 +98,11 @@ report:
         qval: 0.1
       filter_goseq:
         qval: 0.1
+    rain:
+      filter_results:
+        qval: 0.2
+      plot:
+        show_num: 6
     tmod:
       fig_qval_max: 0.01
       fig_auc_min:  0.55
@@ -101,7 +112,6 @@ report:
     tmod_contrast:
       res_auc_thr: 0.65
       res_pval_thr: 0.01
-
 
   defaults:
     NormalisationQC:
@@ -124,11 +134,17 @@ report:
       - Dot_plot.Rmd
       - EnrichmentMap_plot.Rmd
       - Upset_plot.Rmd
+    time_series:
+      - __list__: __timeseries__
+    time_series_list:
+      - Rain_table.Rmd
+
 
   report_snippets:
     - Covariate_table.Rmd
     - NormalisationQC: __defaults__
     - contrast: __defaults__
+    #- time_series: __defaults__
 #
 #---------------------------------------- configuration for tmod
 

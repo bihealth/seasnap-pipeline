@@ -1,34 +1,73 @@
 ### Rain results
 
-Rain finds significantly rhythmic genes (with a circadian period) in timeseries using an non-parametric approach.
+Rain finds significantly rhythmic genes in timeseries using an non-parametric approach.
 
-Results for time series {{ENTRY_NAME}}.
+Results for time series: "{{ENTRY_NAME}}"\
+Period: ``r config$rain$period``
+
+Only results with a q-value < ``r config$report$snippet_parameters$rain$filter_results$qval`` are listed.
 
 ```{r rain_{{ENTRY_ID}}}
-df
-```
-
-```{r table_{{ENTRY_ID}}}
 #----- import packages
 library(DT)
 library(magrittr)
 
 #----- load results
-res <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
-results_table <- as.data.frame(res); ids <- is.element(colnames(results_table), c("entrez", "symbol"))
+res <- read.table(subset(file_tab, step=="rain" & extension=="tsv" & contrast=="{{ENTRY_ID}}")$filename,
+                  sep = "\t", header = TRUE)
+results_table <- as.data.frame(res); ids <- is.element(colnames(results_table), c("ensembl", "entrez", "symbol"))
 results_table <- results_table[,c(which(ids), which(!ids))]
 
 #----- filter results
-results_table <- subset(results_table, padj < config$report$snippet_parameters$contrast$filter_results$qval)
+results_table <- subset(results_table, q_val_BH < config$report$snippet_parameters$rain$filter_results$qval)
+results_table <- results_table[order(results_table$q_val_BH),]
 
 #----- interactive table
 datatable(results_table, extensions=c('Buttons','FixedColumns'), escape=F,
-          options = list(scrollX=TRUE, fixedColumns=list(leftColumns=3), dom='Bfrtip', buttons='csv')) %>%
-  formatRound('baseMean', 3) %>%
-  formatRound('log2FoldChange', 3) %>%
-  formatRound('lfcSE', 3) %>%
-  formatRound('stat', 3) %>%
-  formatRound('pvalue', 4) %>%
-  formatRound('padj', 4)
+          options = list(scrollX=TRUE, fixedColumns=list(leftColumns=2), dom='Bfrtip', buttons='csv')) %>%
+  formatRound('q_val_BH', 4) %>%
+  formatRound('p_val', 4)
 ```
 
+### Top genes
+
+```{r rain_plot}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+period <- config$rain$period
+show_num <- config$report$snippet_parameters$rain$plot$show_num
+x <- config$time_series$time_points
+x <- rep(x, times=sapply(config$time_series$samples, length))
+
+counts_file <- data.frame(read.csv(subset(file_tab, step=="import_gene_counts" & extension=="tsv" & contrast=="all")$filename, sep="\t"))
+ts_columns <- unlist(config$time_series$circadian_ts_cortex$samples)
+counts_file <- t(counts_file[,ts_columns])
+counts_file <- data.frame(counts_file)
+counts_file$x <- x
+
+top_genes <- as.character(results_table[1:show_num, "ensembl"])
+top_symbs <- as.character(results_table[1:show_num, "symbol"])
+counts_file <- counts_file[,c(top_genes, "x")]
+colnames(counts_file) <- c(paste(top_genes, top_symbs), "x")
+
+df_long <- gather(counts_file,  RNA, counts, -x, factor_key = T)
+
+df2_long <- df_long %>%
+  group_by(x,RNA) %>%
+  summarise(mean=mean(counts), se=sd(counts)/sqrt(length(counts)))
+
+df3 <- merge(df_long, df2_long)
+
+ggplot(df3, aes(x=x, color=RNA)) +
+  geom_smooth(aes(y=counts), method = "lm", formula = y ~ sin(2*pi*x/period) + cos(2*pi*x/period), color="grey") +
+  geom_point(aes(y=counts)) +
+  geom_line(aes(y=mean)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.3) +
+  scale_x_continuous(breaks = unique(counts_file$x)) +
+  theme_bw() +
+  facet_wrap(~RNA, scales="free", ncol=2) +
+  xlab("time [h]") + ylab("counts")
+
+```

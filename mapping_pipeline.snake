@@ -74,6 +74,7 @@ def get_inputs_all():
 	if "star-gene_counts" in mapping_choices: 
 		inputs += pph.expand_path("star",           "bam",            fix="!sample")
 		inputs += pph.expand_path("feature_counts", "feature_counts", fix="!sample")
+		inputs += pph.expand_path("tpm_calculator", "tsv",            fix="!sample")
 	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", fix="!sample")
 	if "ciri-circRNA" in mapping_choices:
@@ -315,7 +316,7 @@ rule star:
 
 rule tpm_calculator:
 	input:
-		bam = pph.file_path(step="star", extension="unsorted.bam"),
+		bam = pph.file_path(step="star", extension="bam"),
 		gtf = config["organism"]["files"]["gtf"]
 	output:
 		pph.file_path(step="tpm_calculator", extension="tsv")
@@ -327,10 +328,12 @@ rule tpm_calculator:
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
-		TPMCalculator -v
+		TPMCalculator -version || true
 
 		#----- run TPMCalculator
-		TPMCalculator -g {input.gtf} -b {input.bam} > {output}
+		TPMCalculator -g {input.gtf} -b {input.bam}
+		cut -f1,7 $(basename {input.bam} .bam)_genes.out > {output}
+		mv $(basename {input.bam} .bam)_genes.* $(dirname {output})
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="tpm_calculator", extension="sh", **wildcards)

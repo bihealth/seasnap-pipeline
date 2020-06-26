@@ -141,7 +141,7 @@ covariates_col <- lapply(rlang::set_names(covariates_fac), function(cov) {
   max.col <- subset(palettes, palette == pal.name)$maxcolors[1]
   .pal <- brewer.pal(n=min(max.col, max(3, n.col)), name=pal.name)
   if(max.col < n.col) {
-    warning(sprintf("covariate: %s more levels (%d) thane colors (%d) in palette (%s)",
+    warning(sprintf("covariate: %s more levels (%d) than colors (%d) in palette (%s)",
       cov, n.col, max.col, pal.name))
     .pal <- rep(.pal, ceiling(n.col / max.col))
   }
