@@ -132,8 +132,7 @@ rule cellranger_count:
     """ run cellranger count """
 	input:
 		reads = lambda wildcards: pph.get_fastq_pairs(wildcards, mate="*"),
-		transcriptome = config["organism"]["files"]["cellranger_transcriptome"],
-		feature_ref = config["pipeline_param"]["feature_ref"]
+		transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
 	output:
 		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/cellranger_wd"),
 		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
@@ -141,10 +140,11 @@ rule cellranger_count:
 	log:
 		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
 	params:
-		options = config["rule_options"]["cellranger_count"]["cmd_opt"]
+		options = config["rule_options"]["cellranger_count"]["cmd_opt"],
+		feature_ref = config["pipeline_param"]["feature_ref"]
 	run:
 		# using feature barcodes ?
-		feature_ref = str(Path(input.feature_ref).resolve()) if input.feature_ref else ""
+		feature_ref = str(Path(params.feature_ref).resolve()) if params.feature_ref else ""
 
 		# create libraries file
 		lib_file_content = ["fastqs, sample, library_type"]
