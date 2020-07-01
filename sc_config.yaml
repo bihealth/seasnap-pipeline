@@ -5,29 +5,27 @@ organism_defaults: ### FILL HERE ###  (e.g. Homo_sapiens.yaml)
 organism:
   __options__: [name, genus, taxon, files, star_index, salmon_index, R]
   ### OVERWRITE ###  organism defaults (e.g. gtf, genome and indices)
+  files:
+    cellranger_transcriptome: ""   ### FILL HERE ###  (the transcriptome to use with CellRanger)
+    cellranger_gtf: ""   ### FILL HERE ###  (the gtf to use with CellRanger)
 
 
 #--- general pipeline parameters
 
 pipeline_param:
-  __options__: [out_path_pattern, log_path_pattern, in_path_pattern, mapping_results, QC_results]
+  __options__: [out_path_pattern, log_path_pattern, in_path_pattern, feature_ref]
   
   in_path_pattern: ### FILL HERE ###  (path pattern where fastq files are stored)
+
+  feature_ref: ""  ### FILL HERE ###  (if feature barcoding was used)
 
 
 #--- parameters for rules
 
 rule_options:
-  __options__: [star, star_index, salmon, salmon_index]
+  __options__: [cellranger_count, velocyto_run]
 
 
-#--- report settings
-report:
-  __options__: [multiqc]
-  multiqc:
-    report_header_info: ### UNCOMMENT AND FILL (OPTIONAL) ###
-    #  - Contact E-mail: '<contact@bihealth.de>'
-    #  - Application Type: 'RNA-seq'
-    #  - Project Type: '<type>'
-    #  - Sequencing Platform: '<platform>'
-    #  - Sequencing Setup: '<setup>'
+#--- parameters for the jupyter notebook
+jupyter_notebook:
+  __options__: [snippet_parameters, defaults, report_snippets]
