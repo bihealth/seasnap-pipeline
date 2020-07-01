@@ -303,12 +303,13 @@ rule create_ipynb:
 			pph.log_generated_files(save_to=file_table, path_pattern=path)
 
 			id_suffix, _ = rt.get_id_suffix(tag, num)
-			text_sub["file_tab"] += (f'file_tab{id_suffix} <- data.frame(read.table("{file_table}", sep="\\t", header=TRUE))\n'
-			                         f'file_tab{id_suffix}$filename <- as.character(file_tab{id_suffix}$filename)\n')
-			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
+			text_sub["file_tab"] += f'file_tab{id_suffix} = pd.read_csv("{file_table}", sep="\\t")\n'
+			text_sub["config"]   += (
+				f'with open("{config_file}", "r") as stream:\n'
+				f'\tconfig{id_suffix} = yaml.safe_load(stream)\n'
+			)
 
 		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
-		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"R_common"))
 		report_text = report_text.replace("{{LOAD_FILE_TABLE}}", text_sub["file_tab"])
 		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
 
