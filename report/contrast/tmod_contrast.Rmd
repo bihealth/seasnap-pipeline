@@ -15,7 +15,7 @@ c_name     <- "{{ENTRY_NAME}}"
 tmod_res.f <- "{{tmod-rds-{{ENTRY_ID}}}}"
 
 # load tmod functions
-r.path <- "{{R_COMMON}}"
+r.path <- r_common
 script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
 source(script_f)
 

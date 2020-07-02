@@ -26,7 +26,7 @@ if(packageVersion("tmod") < "0.43")
   stop("tmod version required: at least 0.43. Please install newer tmod from https://github.com/january3/tmod")
 
 # load tmod functions
-r.path <- "{{R_COMMON}}"
+r.path <- r_common
 script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
 source(script_f)
 
