@@ -31,18 +31,18 @@ datatable(results_table, extensions=c('Buttons','FixedColumns'), escape=F,
 
 ### Top genes
 
-```{r rain_plot}
+```{r rain_plot_{{ENTRY_ID}}}
 library(tidyr)
 library(dplyr)
 library(ggplot2)
 
 period <- config$rain$period
 show_num <- config$report$snippet_parameters$rain$plot$show_num
-x <- config$time_series$time_points
-x <- rep(x, times=sapply(config$time_series$samples, length))
+x <- config$time_series${{ENTRY_NAME}}$time_points
+x <- rep(x, times=sapply(config$time_series${{ENTRY_NAME}}$samples, length))
 
 counts_file <- data.frame(read.csv(subset(file_tab, step=="import_gene_counts" & extension=="tsv" & contrast=="all")$filename, sep="\t"))
-ts_columns <- unlist(config$time_series$circadian_ts_cortex$samples)
+ts_columns <- unlist(config$time_series${{ENTRY_NAME}}$samples)
 counts_file <- t(counts_file[,ts_columns])
 counts_file <- data.frame(counts_file)
 counts_file$x <- x
