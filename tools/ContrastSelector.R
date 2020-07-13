@@ -118,7 +118,7 @@ server <- function(input, output) {
            tmp$Denominator[n] <- levels(my_cov$group)[i]
            tmp$Coefficient[n] <- ""
            d <- Z[j,] - Z[i,]
-           if (sum(abs(d)<tol) == length(d)-1) tmp$Coefficient[n] <- result_names[which(abs(d)>tol)]
+           if (sum(abs(d)<1.0e-7) == length(d)-1) tmp$Coefficient[n] <- result_names[which(abs(d)>1.0e-7)]
            if (all(abs(d)<1.0e-7)) d <- "Same model value"
            tmp$Contrast[n]    <- paste("[ ", paste(d, collapse=", "), " ]", sep="")
        }

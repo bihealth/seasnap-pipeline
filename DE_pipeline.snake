@@ -1295,4 +1295,53 @@ rule report_html:
 	run:
 		shell("Rscript --vanilla -e 'rmarkdown::render(\"{input.rmd}\", output_file=\"{output.html}\")' &>> '{log.out}'")
 
+## ----------------------- contrast summary table -------------------------
 
+rule contrast_summary:
+	""" generate a summary table with contrast results """
+	input:
+		rds_list = pph.expand_path(step="contrast", extension="rds")
+	output:
+		xlsx = pph.file_path(step="contrast_summary", extension="xlsx", contrast="all"),
+		tsv = pph.file_path(step="contrast_summary", extension="tsv", contrast="all")
+	log:
+		out = pph.file_path(step = "contrast_summary", extension = "output.log", contrast="all", log=True)
+	run:
+		rds_list = pph.get_r_repr(input.rds_list, to_type="list")
+		contrast_ids = pph.get_r_repr(pph.contrast_ids)
+
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(DESeq2)
+		library(writexl)
+		library(data.table)
+
+		{R_SESSION_INFO}
+
+		#----- variables
+		input_rds_list <- {rds_list}
+		names(input_rds_list) <- {contrast_ids}
+		output_xlsx <- "{output.xlsx}"
+		output_tsv  <- "{output.tsv}"
+
+		#----- merge contrast results in table
+		merge_contrast_cols <- function(data_frame, rds_index){{
+			print(paste("merge", rds_index))
+			rds_file <- input_rds_list[[rds_index]]
+			add_cols <- as.data.frame(readRDS(rds_file))[,c("log2FoldChange", "padj", "symbol")]
+			colnames(add_cols) <- c(paste(c("LFC", "padj"), rds_index, sep="_"), "symbol")
+			add_cols$gene <- rownames(add_cols)
+			add_cols <- as.data.table(add_cols, key=c("gene", "symbol"))
+			if (is.null(data_frame)) return(add_cols)
+			merged_table <- merge(data_frame, add_cols, all=TRUE, by=c("gene", "symbol"))
+			return(merged_table)
+		}}
+		indices <- as.list(names(input_rds_list))
+		result_summary <- Reduce(merge_contrast_cols, append(indices, list(NULL), after=0))
+
+		#----- save as XLSX and tsv
+		write_xlsx(result_summary, path=output_xlsx)
+		write.table(result_summary, file=output_tsv, sep="\t", quote=F)
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="contrast_summary", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
