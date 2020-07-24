@@ -112,7 +112,7 @@ indicates p-value.
 \n```{r, fig.width=9,fig.height=ceiling(4 + nrow(resS) / 2)}
 labs <- tmod_labels(resS$ID, resS$Title, max.length=25, nlines=2)
 
-tmodPanelPlot(resS, min.e=-3, max.e=3, filter.rows.auc=-Inf, pie.style='dotsymm', pval.thr=.05, row.labels=labs)
+tmodPanelPlot(resS, min.e=-3, max.e=3, filter.rows.auc=-Inf, pie.style='dotsymm', pval.thr=.05, row.labels=labs, text.cex=0.7)
 \n```
 "
 } else { ret <-
@@ -131,7 +131,7 @@ labs <- tmod_labels(resS$ID, resS$Title, max.length=35, nlines=2)
 ln <- names(labs)
 labs <- sprintf('%s (%s)', labs, names(labs))
 names(labs) <- ln
-tmodPanelPlot(resS, filter.rows.auc=-Inf, pval.thr=.05, row.labels=labs, max.e=NULL, min.e=1)
+tmodPanelPlot(resS, filter.rows.auc=-Inf, pval.thr=.05, row.labels=labs, max.e=NULL, min.e=1, text.cex=0.7)
 \n```
 "
 }

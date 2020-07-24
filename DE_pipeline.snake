@@ -75,6 +75,10 @@ def get_inputs_all():
 	for ts in config["time_series"]:
 		inputs.append(pph.file_path(step = "rain", extension = "tsv", contrast=ts))
 
+	#time series comparisons
+	for tsc in config["dodr"]["comparisons"]:
+		inputs.append(pph.file_path(step = "dodr", extension = "tsv", contrast=tsc))
+
 	return inputs
 
 
@@ -1165,9 +1169,10 @@ rule cluster_profiler:
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 		
-##-------------------- Rain -----------------------------------------------------------------------------
+##-------------------- time series -----------------------------------------------------------------------------
 
 rule rain:
+	""" run Rain for rhythm detection in time series """
 	input:
 		counts = pph.file_path("import_gene_counts", "tsv", contrast="all")
 	output:
@@ -1251,7 +1256,85 @@ rule rain:
 		script_file = pph.log(log.out, snakemake_format(script), step="rain", extension="R", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
+rule dodr:
+	input:
+		counts = pph.file_path("import_gene_counts", "tsv", contrast="all")
+	output:
+		tsv = pph.file_path("dodr", "tsv")
+	log:
+		out = pph.file_path(step = "dodr", extension = "output.log", log=True)
+	params:
+		time_series1 = lambda wcs: config["dodr"]["comparisons"][wcs.contrast]["time_series1"],
+		time_series2 = lambda wcs: config["dodr"]["comparisons"][wcs.contrast]["time_series2"],
+		period = config["dodr"]["period"],
+		method = config["dodr"]["method"],
+		annot_pkg  = config["organism"]["R"]["annotations"]
+	run:
+		def get_time_series_data(time_series):
+			""" get data from a time series, which may come from a different experiment """
+			time_series_path = time_series["path"] or pph.out_path_pattern
+			ts_config = pph.load_config_from_path(time_series_path)
+			r_time_points = pph.get_r_repr([
+					tp
+					for i, tp in enumerate(ts_config["time_series"][time_series["name"]]["time_points"])
+					for rep in ts_config["time_series"][time_series["name"]]["samples"][i]
+				], to_type = "vector"
+			)
+			ts_columns = [rep for samp in ts_config["time_series"][time_series["name"]]["samples"] for rep in samp]
+			r_ts_columns = pph.get_r_repr(ts_columns, to_type = "vector")
+			ts_counts = pph.file_path("import_gene_counts", "tsv", contrast="all", path_pattern=time_series_path)
+			return (ts_counts, r_time_points, r_ts_columns)
 
+		counts1, r_time_points1, r_ts_columns1 = get_time_series_data(params.time_series1)
+		counts2, r_time_points2, r_ts_columns2 = get_time_series_data(params.time_series2)
+
+		script = textwrap.dedent(r"""
+		library("DODR")
+		library("AnnotationDbi")
+		library("{params.annot_pkg}")
+		{R_SESSION_INFO}
+
+		#----- params
+		period <- {params.period}
+		method <- "{params.method}"
+		times1 <- {r_time_points1}
+		times2 <- {r_time_points2}
+
+		#----- prepare main matrix
+		counts1 <- data.frame(read.csv("{counts1}", sep="\t"))
+		ts_columns1 <- {r_ts_columns1}
+		counts1 <- t(counts1[,ts_columns1]); print(counts1[1:5,1:5]); print(times1)
+
+		#----- prepare comparison matrix
+		counts2 <- data.frame(read.csv("{counts2}", sep="\t"))
+		ts_columns2 <- {r_ts_columns2}
+		counts2 <- t(counts2[,ts_columns2]); print(counts2[1:5,1:5]); print(times2)
+
+		#----- keep common columns
+		common_col <- intersect(colnames(counts1), colnames(counts2))
+		counts1 <- counts1[,common_col]
+		counts2 <- counts2[,common_col]
+
+		print(paste("times1 length:", length(times1), "counts1 dim:", paste(dim(counts1), collapse=", ")))
+		print(paste("times2 length:", length(times2), "counts2 dim:", paste(dim(counts2), collapse=", ")))
+		print(counts1[1:5,1:5])
+
+		#----- run rain
+		dodrresult <- dodr(val1=counts1, val2=counts2, times1=times1, times2=times2, period=period, method=method)
+
+		#----- map Ids
+		symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", common_col),
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", common_col),
+		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+
+		#----- write tsv
+		write.table(data.frame(ensembl=common_col, symbol=symbol, entrez=entrez, dodrresult$p.value.table),
+		            sep = "\t", quote = F, row.names = F, file = "{output.tsv}")
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="dodr", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- report -------------------------------------------------------------------------------
 
