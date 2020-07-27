@@ -198,6 +198,9 @@ rule import_gene_counts:
 								for k,v in config["filters"]["experiment_blacklist"].items())
 		if column_filter == "":
 			column_filter = "TRUE"
+
+		r_gene_list = "'"+config["filters"]["gene_list"]["file"]+"'" or "NULL"
+		r_gene_list_type = config["filters"]["gene_list"]["type"]
 		
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
@@ -218,6 +221,8 @@ rule import_gene_counts:
 		output_tpm_xlsx <- "{params.tpm_xlsx}"
 		output_rds  <- "{output.rds}"
 		conf.f <- "{config_file}"
+		gene_list <- {r_gene_list}
+		subset_genes_type <- "{r_gene_list_type}"
 
 		#----- import data
 		sample_df <- read.table(sample_f, header=TRUE)
@@ -230,6 +235,18 @@ rule import_gene_counts:
 		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
 		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list)
 		rownames(count_dat) <- count_dat$ID
+
+		#----- subset genes
+		if (!is.null(gene_list)) {{
+			subset_genes <- as.character(read.csv(gene_list, header=F)[,1]); print(subset_genes)
+			if (subset_genes_type == "ENSEMBL"){{
+				subset_ensembl_genes <- subset_genes
+			}} else {{
+				subset_ensembl_genes <- mapIds({params.annot_pkg}, keys=subset_genes, column="ENSEMBL",
+											   keytype=subset_genes_type, multiVals="first"); print(subset_ensembl_genes)
+			}}
+			count_dat <- count_dat[subset_ensembl_genes[!is.na(subset_ensembl_genes)],]
+		}}
 
 		#----- if present, merge tpm values (generated from star bam with TPMcalculator) for display along results
 		if ("tpm" %in% colnames(sample_df)) {{

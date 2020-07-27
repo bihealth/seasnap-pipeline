@@ -44,6 +44,8 @@ filters:
     __any__: [\S+]
   experiment_whitelist:
     __any__: [\S+]
+  gene_list:
+    type: {"__opt__": ["ENSEMBL", "ENTREZID", "SYMBOL"]}
   
 #---------------------------------------- normalization parameters
 normalization:

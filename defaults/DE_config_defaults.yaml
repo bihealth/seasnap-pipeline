@@ -39,7 +39,13 @@ filters:
 
   min_counts: 5
   min_count_n: 3
-  
+
+  # filtering gene lists
+
+  gene_list:
+    file: null
+    type: ENSEMBL
+
 #---------------------------------------- normalization parameters
 normalization:
   DESeq2_parameters:
