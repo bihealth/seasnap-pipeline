@@ -220,7 +220,7 @@ msig2tmod <- function() {
 
   #df <- as.data.frame(msigdbr:::msigdbr_genesets)
   df <- as.data.frame(msigdbr::msigdbr())
-  df <- df[ , c("gs_name", "gs_id", "gs_cat", "gs_subcat", "gene_symbol") ]
+  df <- df[ , c("gs_name", "gs_id", "gs_cat", "gs_subcat", "entrez_gene") ]
   colnames(df) <- c("Title", "ID", "Category", "Subcategory", "GeneID")
 
   df2tmod(df, gene_id_col=ncol(df), module_id_col=2, module_title_col=1)
