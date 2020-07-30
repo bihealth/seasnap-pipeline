@@ -620,7 +620,7 @@ class PipelinePathHandler:
 											source_tmp.extend(
 												glob(str(Path(f) / "**"), recursive=True)
 											)
-										else:
+										elif fp.with_suffix("").stem not in compress_list or os.path.isdir(f):
 											source_tmp.append(f)
 								sourcef = source_tmp
 							search_pat = str(Path(search_pat).parent)
@@ -655,7 +655,18 @@ class PipelinePathHandler:
 									to_tar = str(f_src.with_suffix('.tar.gz'))
 									if not Path(to_tar).exists() or self._is_older(to_tar, f_src):
 										print(f"compression: create {to_tar} ...")
-										os.system(f"cd {str(f_src.parent)}; tar -czf {to_tar} {tar_excl} {str(f_src.name)}")
+										if extra_wcs:
+											print(extra_wc)
+											extra_wc_val = self._get_wildcard_values_from_file_path(
+												sourcef[i],
+												os.path.join(self.out_dir_pattern, "**"),
+												unix_style=True
+											)[1]
+											print(extra_wc_val)
+											tar_excl_upd = tar_excl.replace(f"{{{extra_wc}}}", extra_wc_val[extra_wc][0])
+										else:
+											tar_excl_upd = tar_excl
+										os.system(f"cd {str(f_src.parent)}; tar -czf {to_tar} {tar_excl_upd} {str(f_src.name)}")
 									sourcef[i], f_src = to_tar, Path(to_tar)
 									if mode == "dir" and compress_list:
 										tar_trg = f_trg.with_suffix(f_trg.suffix + '.tar.gz')
