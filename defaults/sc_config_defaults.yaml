@@ -51,16 +51,16 @@ export:
   path_pattern:
     - __SODAR__/{sample}/%Y_%m_%d_{files:cellranger}
     - __SODAR__/{sample}/%Y_%m_%d_cellranger/{files:cellranger_logs}.tgz
-    - __SODAR__/{sample}/%Y_%m_%d_{files:velocyto}
+    - __SODAR__/{sample}/%Y_%m_%d_{files:velocyto}/velocyto.{sample}.loom
   cellranger:
     - dir: {step: cellranger_count, mate: all_mates}
-      suffix: cellranger_wd/{sample}/outs
+      suffix: "cellranger_wd/{sample}/outs"
       compress: tar
       compress_list: [analysis, raw_feature_bc_matrix, filtered_feature_bc_matrix]
   cellranger_logs:
     - dir: {step: cellranger_count, mate: all_mates}
-      suffix: cellranger_wd/{sample}
+      suffix: "cellranger_wd/{sample}"
       compress: tar
-      exclude: [{sample}/outs, {sample}/SC_RNA_COUNTER_CS]
+      exclude: ["{sample}/outs", "{sample}/SC_RNA_COUNTER_CS"]
   velocyto:
     - files: {step: velocyto_run, extension: loom, mate: all_mates}
