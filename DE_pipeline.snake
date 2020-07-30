@@ -462,7 +462,7 @@ rule DESeq2:
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		count_threshold       = config["filters"]["low_counts"]
-                normalized_expression = config["normalization"]["normalized_expression"]
+		normalized_expression = config["normalization"]["normalized_expression"]
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
@@ -472,8 +472,8 @@ rule DESeq2:
 		{R_SESSION_INFO}
 
 		conf.f   <- "{config_file}"
-		
-    #----- load config
+
+		#----- load config
 		config <- yaml::yaml.load_file(conf.f)
 
 		#----- load DESeqDataSet
@@ -488,7 +488,7 @@ rule DESeq2:
 		  keep <- keep & rs >= config$filters$min_count_n
 		}}
 
-		dds  <- dds[keep,]
+		dds  <- dds[keep,]; print(dds)
 		
 		#----- DESeq2
 		dds <- DESeq(dds, betaPrior=FALSE, test="Wald")

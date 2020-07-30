@@ -47,8 +47,10 @@ counts_file <- t(counts_file[,ts_columns])
 counts_file <- data.frame(counts_file)
 counts_file$x <- x
 
-top_genes <- as.character(results_table[1:show_num, "ensembl"])
-top_symbs <- as.character(results_table[1:show_num, "symbol"])
+top_genes_raw <- as.character(results_table[1:show_num, "ensembl"])
+top_genes <- top_genes_raw[!is.na(top_genes_raw)]
+top_symbs_raw <- as.character(results_table[1:show_num, "symbol"])
+top_symbs <- top_symbs_raw[!is.na(top_genes_raw)]
 counts_file <- counts_file[,c(top_genes, "x")]
 colnames(counts_file) <- c(paste(top_genes, top_symbs), "x")
 
