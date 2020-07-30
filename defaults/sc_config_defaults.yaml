@@ -8,7 +8,7 @@ pipeline_param:
   test_config: true
   report_snippets: ""
 
-  feature_ref: BDtags_feature_ref.csv
+  feature_ref: ""
 
   # adjust which results are produced
   produce_results:
@@ -19,13 +19,14 @@ pipeline_param:
     velocyto:
       - cellranger_count
       - cellranger_aggr
+
 #---------------------------------------- organism annotation
 organism_defaults: null
 
 #---------------------------------------- parameters for rules
 rule_options:
   cellranger_count:
-    cmd_opt: "--jobmode sge --maxjobs=100 --jobinterval=1000"
+    cmd_opt: ""   # "--jobmode sge --maxjobs=100 --jobinterval=1000"
   velocyto_run:
     cmd_opt: "--samtools-memory 4000 -@ 4"
 
