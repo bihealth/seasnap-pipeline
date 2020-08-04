@@ -777,6 +777,7 @@ map_genelists <- function(db, ordered_genelist, db.map) {
 #' @param auc.thr AUC threshold
 #' @return a dataframe filtered and ordered by p-value
 reformat_res <- function(x, pval.thr=.05, auc.thr=.55) {
+  if(is.null(x)) return(x)
   x <- x[ order(x[["P.Value"]]), ]
   x <- x[ x$adj.P.Val < pval.thr & x$AUC > auc.thr, , drop=FALSE]
   x 

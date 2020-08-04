@@ -823,6 +823,9 @@ rule tmod:
 			## res.short still has two levels, one for the databases, another one
 			## for sorting keys, so we need to unlist – one level only
 			res.short <- unlist(res.short, recursive=FALSE)
+
+      ## remove if there were no results
+      res.short <- res.short[!sapply(res.short, is.null)]
 			write_xlsx(res.short, path=res.xlsx)
 		""")
 

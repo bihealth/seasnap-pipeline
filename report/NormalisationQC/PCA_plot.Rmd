@@ -19,7 +19,7 @@ nrow <- ceiling(numplots/2)
 ncol <- 2
 ```
 
-```{r normalisationQCPCA2,fig.width=6 * ncol,fig.height=6 * nrow}
+```{r normalisationQCPCA2,fig.width=4 * ncol,fig.height=4 * nrow}
 group <- NULL
 if(length(intgroups) > 0) {
   group <- factor(colData(RLD_BLIND)[[intgroups[1]]])
