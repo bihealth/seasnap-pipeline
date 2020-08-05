@@ -50,6 +50,8 @@ ggvolcano <- function(lfc, pvals, symbol=NULL, xlim=NULL, ylim=NULL, pval.thr=.0
 #' Filter and format tmod results for showing with DT::datatable()
 tmod_filter_format_res <- function(res, pval.thr=.05, AUC.thr=.65) {
 
+  if(is.null(res)) { return(res) }
+
   require(tidyverse)
   require(DT)
 
@@ -153,8 +155,8 @@ tmod_mod_sel <- function(res, qval.thr=.01, auc.thr=.65, max.n=25, min.n=max.n, 
   ret <- c(ret, list(#full_summary=res_sum, 
     results_n=NN, results_sign=Nsign))
 
-  if(Nsign == 0) {
-    ret$note <- "no significant results"
+  if(Nsign < 2) {
+    ret$note <- "less than 2 significant results"
     return(ret)
   }
 
@@ -432,14 +434,22 @@ process_dbs <- function(config) {
     if(!is.null(x$subset)) dbobj <- subset_tmod(dbobj, x$subset)
 
     x$dbobj <- dbobj
-    message(sprintf("process_dbs: processed database %s successfully", x$name))
+
+    if(nrow(dbobj$MODULES) < 1L) {
+      warning(sprintf("process_dbs: database %s contains no gene sets and will be removed", x$name))
+      x$dbobj <- NULL
+    } else {
+      message(sprintf("process_dbs: processed database %s successfully", x$name))
+    }
     x
   }
 
   res <- lapply(dbs, process_entry)
   names(res) <- dbs.names
 
-  message(sprintf("process_dbs: %d tmod databases read successfully", length(dbs.names)))
+  res <- res[ !sapply(res, function(x) is.null(x$dbobj)) ]
+
+  message(sprintf("process_dbs: %d tmod databases read successfully", length(res)))
 
   return(res)
 }

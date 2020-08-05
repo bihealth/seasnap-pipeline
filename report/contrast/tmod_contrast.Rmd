@@ -119,11 +119,16 @@ template <- '
 \n```{r, results="asis"}
     par(mar=rep(1, 4))
     cat(sprintf("\n###### %s\n", paste0(db, ".", .resn)))
+
     .res <- tmod_res[[db]][[.resn]]
-    .res <- .res[ order(.res$P.Value), ]
-    .res <- .res[ .res$adj.P.Val < .01 & .res$AUC > .6, ]
-    if(nrow(.res) > 20) .res <- .res[1:20, ]
-    if(nrow(.res) < 2) {
+
+    if(!is.null(.res)) {
+      .res <- .res[ order(.res$P.Value), ]
+      .res <- .res[ .res$adj.P.Val < .01 & .res$AUC > .6, ]
+      if(nrow(.res) > 20) .res <- .res[1:20, ]
+    }
+
+    if(is.null(.res) || nrow(.res) < 2) {
       cat("<br>Too few results to generate upset plot.<br><br>\n")
     } else {
       labels <- tmod_labels(.res$ID, .res$Title)

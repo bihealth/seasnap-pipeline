@@ -305,29 +305,35 @@ for(db_n in names(tmod.res$results)) {
   ## results with the "sort type" level flattened
   ## so instead of res$contrasts_name$pval$... we have res$contrasts_name.pval$...
   resU <- unlist(res, recursive=FALSE)
-  summary_t <- template_summary(db_n, db, resU)
-  foo <- knitr::knit_child(text=summary_t, quiet=TRUE)
-  cat(foo)
+  resU <- resU[ !sapply(resU, is.null) ]
 
-  # tmod_mod_sel <- function(res, qval.thr=.01, auc.thr=.65, max.n=25, min.n=max.n, res_sum=NULL) {
-  res_selection <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, 
-                                     auc.thr=conf.snip$fig_auc_min,
-                                     max.n=conf.snip$fig_n_max,
-                                     min.n=conf.snip$fig_n_min)
-  if(!is.null(res_selection$note)) {
-    cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+  if(length(resU) < 1L) {
+    cat("\n\nNo figure produced because there were no enrichment results.\n\n")
   } else {
-    figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
-    foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
+    summary_t <- template_summary(db_n, db, resU)
+    foo <- knitr::knit_child(text=summary_t, quiet=TRUE)
     cat(foo)
 
-		n <- conf.snip$n_evid
-    .sel <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, auc.thr=conf.snip$fig_auc_min, max.n=n, min.n=n)
-    ids <- .sel$sel_ids
-		gl <- genelists[[db_n]]
-    evidence_plot_t <- template_evidence_plots(db_n, db, ids, gl)
-    foo <- knitr::knit_child(text=evidence_plot_t, quiet=TRUE)
-    cat(foo)
+    # tmod_mod_sel <- function(res, qval.thr=.01, auc.thr=.65, max.n=25, min.n=max.n, res_sum=NULL) {
+    res_selection <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, 
+                                       auc.thr=conf.snip$fig_auc_min,
+                                       max.n=conf.snip$fig_n_max,
+                                       min.n=conf.snip$fig_n_min)
+    if(!is.null(res_selection$note)) {
+      cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+    } else {
+      figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
+      foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
+      cat(foo)
+
+      n <- conf.snip$n_evid
+      .sel <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, auc.thr=conf.snip$fig_auc_min, max.n=n, min.n=n)
+      ids <- .sel$sel_ids
+      gl <- genelists[[db_n]]
+      evidence_plot_t <- template_evidence_plots(db_n, db, ids, gl)
+      foo <- knitr::knit_child(text=evidence_plot_t, quiet=TRUE)
+      cat(foo)
+    }
   }
 }
 ```
