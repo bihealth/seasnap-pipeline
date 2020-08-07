@@ -847,7 +847,7 @@ rule multiqc:
 		
 		# set search directory
 		dirs = Path(str(output)).parents
-		results_base_dir = str(dirs[3])
+		results_base_dir = str(list(dirs)[-2])
 
 		script = textwrap.dedent(r"""
 		#----- prepare
