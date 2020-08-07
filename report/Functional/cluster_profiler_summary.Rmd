@@ -45,6 +45,9 @@ cp_data <- lapply(contrasts, function(.c) {
 })
 names(cp_data) <- contrasts
 
+sel <- sapply(cp_data, function(x) !is.null(x) && length(x) > 0)
+cp_data <- cp_data[sel]
+
 cps_db_names <- unique(unlist(lapply(cp_data, names)))
 
 ## cp_data will now hold one element per each unique database name (e.g.
