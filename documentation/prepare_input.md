@@ -22,7 +22,7 @@ would be a valid option.
 
 **Note: Wildcard values should not contain the characters `'/'` or `'.'`, since these are used to separate wildcards!**
 
-Inside the `input_path_pattern` you can use:
+Inside the `in_path_pattern` you can use:
 
 - normal text
 - wildcards in braces, e.g. `{sample}`, also with an optional regular expression after a comma, e.g. `{sample,[^_]+}`
