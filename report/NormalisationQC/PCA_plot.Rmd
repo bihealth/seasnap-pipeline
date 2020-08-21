@@ -1,68 +1,137 @@
 ## Principal component analysis
 
 The principal component analysis plot shown below was generated using the most varying `r config$report$snippet_parameters$Normalisation_QC$n_most_varying` genes across all samples.
+
 The expression values are obtained by the "`r config$normalization$normalized_expression`" method, where the normalisation doesn't take into account the experimental design.
 
 In presence of strong biological signal, the samples should cluster with the biological condition.
 When samples are clustered according to other effects (for example patient, or technical batch), great care must be used when interpreting the results, as the other effects will considerably reduce the ability to extract meaningful biological information.
 
-```{r normalisationQCPCA2_calc}
-intgroups <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
+
+<!-- Compute PCA using most varying genes or all if config$report$snippet_parameters$Normalisation_QC$n_most_varying == 0 -->
+```{r normalisationQCPCA_calc}
 mtx <- t(assay(RLD_BLIND))
-vars <- apply(mtx, 2, var)
-sel <- vars > 1e-26
+vars <- sort(apply(mtx, 2, var), decreasing=TRUE)
+sel <- names(vars)[vars > 1e-26]
+if (config$report$snippet_parameters$Normalisation_QC$n_most_varying > 0)
+	sel <- sel[1:min(length(sel), config$report$snippet_parameters$Normalisation_QC$n_most_varying)]
 pca <- prcomp(mtx[ , sel], scale.=TRUE)
+```
+
+<!-- Prepare for the plotting:
+     - Extract the covariates to display in the PCA plot, as per config$report$snippet_parameters$Normalisation_QC$annotation_columns,
+	   and merge with the principal components. 
+	   The points' colours will be assigned to the first covariate, and the points' shapes to the second. Extra covariates will be ignored.
+	   By default, config$report$snippet_parameters$Normalisation_QC$annotation_columns should contain only "group".
+     - Please note that the row names of the data frame colData(RLD_BLIND) must contain the sample labels, identical to the column names
+	   of the counts and expression matrices.
+	 - Because of plot_ly internals, the number of distinct groupings (n_group) must be computed. It is the product between the number of
+	   levels in the colour & shape covariates.
+-->
+```{r nomalisationQCPCA_prepare}
 numplots <- floor(ncol(pca$x)/2)
 numplots <- min(numplots, 6)
 
-nrow <- ceiling(numplots/2)
-ncol <- 2
+covariate_data <- as.data.frame(colData(RLD_BLIND))
+
+intgroups <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
+
+df <- data.frame(
+	label=rownames(covariate_data),
+	pca$x[rownames(covariate_data),paste("PC", 1:(2*numplots), sep="")],
+	stringsAsFactors=FALSE
+)
+
+n_group <- 1
+if (length(intgroups) > 0) {
+	df <- cbind(df, Color=factor(covariate_data[[intgroups[1]]]))
+	n_level <- length(levels(df$Color))
+	n_group <- n_group * n_level
+	if (length(intgroups) > 1) {
+		df <- cbind(df, Shape=factor(covariate_data[[intgroups[2]]]))
+		n_level <- length(levels(df$Shape))
+		n_group <- n_group * n_level
+	}
+}
 ```
 
-```{r normalisationQCPCA2,fig.width=4 * ncol,fig.height=4 * nrow}
-group <- NULL
-if(length(intgroups) > 0) {
-  group <- factor(colData(RLD_BLIND)[[intgroups[1]]])
-}
+<!-- Plotting. As an example, the code below produces up to 6 projections (i.e. up to the 12th principal component).
+Two distinct output are produced here:
+- A pdf file, which contains up to 6 plots, components 1 vs 2, 3 vs 4, ...
+  The filename is PLOTS_DIR/PCA.pdf, there is one page per projection, and the size is the default size of the pdf function.
+- One interactive plotly figure embedded in the report. The user can choose which projection she wants to see,
+  and the gene label is shown when the pointer hovers over the point.
 
-shape <- NULL
-if(length(intgroups) > 1) {
-  shape <- factor(colData(RLD_BLIND)[[intgroups[2]]])
-}
+3 cases must be manually distinguished: no grouping, grouping by colour only & grouping by colour & shape.
+-->
+```{r normalisationQCPCA_plot, fig.height=7, fig.width=7}
+library(plotly)
 
-#tmp <- plotPCA(RLD_BLIND, intgroup=intgroups, returnData=TRUE)
-#percentVar <- 100 * attr(tmp, "percentVar")
-library(RColorBrewer)
-pal <- brewer.pal(12, "Set1")
-if(is.null(group)) {
-  col <- "grey"
+fn <- file.path(PLOTS_DIR, "PCA.pdf")
+pdf(fn)
+
+# Print the first two components (shown by default)
+p <- NULL
+if ("Color" %in% names(df)) {
+	if ("Shape" %in% names(df)) {
+		tmp.f <- function(df, x, y, intgroups) {
+			ggplot2::ggplot(df, ggplot2::aes_string(x=x, y=y, color="Color", shape="Shape")) +
+				ggplot2::geom_point() +
+				ggplot2::labs(color=intgroups[1], shape=intgroups[2]) +
+				ggplot2::coord_fixed()
+		}
+		p <- plot_ly(df, type="scatter", mode="markers", x=~PC1, y=~PC2, text=~label, color=~Color, symbol=~Shape)
+	} else {
+		tmp.f <- function(df, x, y, intgroups) {
+			ggplot2::ggplot(df, ggplot2::aes_string(x=x, y=y, color="Color")) +
+				ggplot2::geom_point() +
+				ggplot2::labs(color=intgroups[1]) +
+				ggplot2::coord_fixed()
+		}
+		p <- plot_ly(df, type="scatter", mode="markers", x=~PC1, y=~PC2, text=~label, color=~Color)
+	}
 } else {
-  col <- pal[ group ]
+	tmp.f <- function(df, x, y, intgroups) {
+		ggplot2::ggplot(df, ggplot2::aes_string(x=x, y=y)) +
+			ggplot2::geom_point()
+	}
+	p <- plot_ly(df, type="scatter", mode="markers", x=~PC1, y=~PC2, text=~label)
+}
+print(tmp.f(df, "PC1", "PC2", intgroups))
+
+# Print the extra components (hidden by default, displayed at the user's request through updatemenus)
+updatemenus <- NULL
+if (numplots > 1) {
+	updatemenus <- list(
+		list(method="restyle", args=list("visible", rep((1:numplots) == 1, each=n_group)), label="1 vs 2")
+	)
+	for (i in 2:numplots) {
+		print(tmp.f(df, paste("PC", 2*i-1, sep=""), paste("PC", 2*i, sep=""), intgroups))
+		p <- add_markers(
+			p,
+			x=as.formula(paste("~", paste("PC", 2*i-1, sep=""))),
+			y=as.formula(paste("~", paste("PC", 2*i, sep=""))),
+			visible=FALSE
+		)
+		updatemenus <- c(
+			updatemenus,
+			list(list(
+				method="restyle",
+				args=list("visible", rep((1:numplots) == i, each=n_group)),
+				label=paste(2*i-1, 2*i, sep=" vs ")
+			))
+		)
+	}
 }
 
-if(is.null(shape)) {
-  pch <- 19
-} else {
-  pch <- c(15, 17, 19, 1:6)[shape]
-}
+dev.off()
 
-
-par(bty="n")
-par(pch=19)
-par(mfrow=c(nrow, ncol))
-for(i in 1:numplots) {
-  plot(pca$x[,i * 2 - 1], pca$x[, i * 2], col=col, pch=pch, xlab=paste0("PC", i * 2 - 1), ylab=paste0("PC2", i * 2))
-  if(!is.null(group)) {
-    legend("bottomleft", levels(group), col=pal, pch=pch[1], bty="n")
-  }
-  if(!is.null(shape)) {
-    legend("bottomright", levels(shape), col="grey", pch=c(15, 17, 19, 1:6), bty="n")
-  }
-}
-
-fn <- file.path(PLOTS_DIR, "PCA_2.pdf")
-dev.copy2pdf(file=fn)
+p %>% layout(
+	title="PCA analysis",
+	xaxis=list(title="Principal component", range=1.1*range(df$PC1)),
+	yaxis=list(title="Principal component", scaleanchor="x"),
+	updatemenus=ifelse(is.null(updatemenus), NULL, list(list(type="buttons", y=1, buttons=updatemenus)))
+)
 ```
 
 [Download plot](`r fn`)
-
