@@ -1,0 +1,43 @@
+#REQUIRE {{cluster_profiler-rds-{{ENTRY_ID}}}}
+
+#### Annotation results table {.tabset .tabset-pills}
+
+Annotation results table for `cluster profiler` results for contrast {{ENTRY_NAME}}.
+
+```{r, echo=FALSE,include = FALSE}
+library(DT)
+# dependences attaching
+datatable(matrix())
+```
+
+```{r clusterprofiler_resultstable_{{ENTRY_ID}}, results="asis"}
+library(enrichplot)
+
+for (test in names(ENRES)){
+  cat(sprintf("\n##### %s {- .tabset}\n", test))
+  for (cat in names(ENRES[[test]])){
+    cat(sprintf("\n###### %s {-}\n", cat))
+    
+    cp_res_df <- as.data.frame(ENRES[[test]][[cat]])
+    if ("geneID" %in% colnames(cp_res_df)) cp_res_df$geneID <- substr(cp_ref_df$geneID, 1, 25)
+    if ("core_enrichment" %in% colnames(cp_res_df)) cp_res_df$core_enrichment <- substr(cp_ref_df$core_enrichment, 1, 25)
+    rownames(cp_res_df) <- NULL
+
+    try({
+      x <- datatable(
+        cp_res_df,
+        extensions=c('Buttons','FixedColumns'), rownames=F, escape=F,
+        options = list(scrollX=TRUE, fixedColumns=list(leftColumns=1), dom='Bfrtip', buttons='csv'),
+        class='nowrap display'
+      ) %>%
+        formatRound('pvalue', 4) %>%
+        formatRound('p.adjust', 4) %>%
+        formatStyle("ID","white-space"="nowrap")
+      y <- htmltools::as.tags(x)
+      cat(paste(sapply(y, function(z) ifelse(is.null(z), "", as.character(z))), collapse="\n")
+      cat("\n")
+    })
+  }
+}
+```
+

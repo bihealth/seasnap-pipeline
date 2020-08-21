@@ -1,0 +1,29 @@
+id:
+  columns:
+    - "Sample Name"
+    - "Characteristics\\[Secondary ID\\]"
+  value:
+    ".*": "\\g<0>"
+
+paired:
+  columns:
+    - "Parameter Value\\[Library layout\\]"
+  value:
+    "paired": true
+    "mated": true
+    "unpaired": false
+    "single.?end": false
+    
+stranded:
+  columns: null
+  value: null
+  
+read_length:
+  columns: null
+  as_is: true
+  
+instrument:
+  columns:
+    - "Parameter Value\\[Platform\\]"
+  value:
+    ".*illumina.*": "\\g<0>"

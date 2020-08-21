@@ -1,7 +1,9 @@
 organism:
   name: human
-  genus: "Homo Sapiens"
+  genus: "Homo sapiens"
   taxon: 9606
+
+  genome_version: GRCh38
   
   files:
     genome: /fast/projects/cubit/18.12/static_data/reference/GRCh38/p7.chr_scaff/GRCh38.p7.genome.chr_scaff.fa
@@ -13,6 +15,6 @@ organism:
     
   star_index: null
   salmon_index: null
-    
+  bwa_index: null    
   R:
     annotations: org.Hs.eg.db

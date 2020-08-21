@@ -11,15 +11,19 @@ dependencies:
   - bioconductor-genomicfeatures
   - bioconductor-annotationdbi
   - bioconductor-org.hs.eg.db # annotation for human
+  - bioconductor-org.Mm.eg.db # annotation for mouse
   - bioconductor-tximport
   - bioconductor-goseq
   - bioconductor-apeglm
   - bioconductor-dupradar
+  - bioconductor-clusterprofiler
   - r-blob=1.2.0 #for deseq2
   - r-readr
   - r-ashr
   - r-pheatmap
   - r-shiny
+  - r-msigdbr
+  - r-dplyr
   - rpy2
 
   - drmaa
@@ -31,8 +35,11 @@ dependencies:
   - picard
   - rsem
   - rna-seqc
+  - qualimap
+  - preseq
   - bedtools
   - subread
   - trimadap=r9
   - salmon
   - rseqc
+  - multiqc

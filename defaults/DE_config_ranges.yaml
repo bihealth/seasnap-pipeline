@@ -1,0 +1,80 @@
+#---------------------------------------- general pipeline parameters
+pipeline_param:
+  # adjust pattern of stored files
+  out_path_pattern: \S+
+  log_path_pattern: \S+
+  in_path_pattern: \S+
+  
+  # base dir of report snippet library ("" for the default in git repo)
+  report_snippets: \S*
+
+  # define choices for choose_input()
+  input_choice:
+    mapping:
+      __opt__: ["import_gene_counts|import_sf|import_featurecounts", ["import_gene_counts|import_sf|import_featurecounts"]]
+
+#---------------------------------------- organism annotation (needs to be set)
+organism_defaults:
+  __opt__: [null, \S*]
+
+organism:
+  genus: "[A-Z][a-z]+ [a-z]+"
+  taxon:
+    __num__: [0, null]
+  files:
+    genome: \S+
+    gtf: \S+
+  R:
+    annotations: "[A-Za-z.]+"
+
+#---------------------------------------- information about experiment
+experiment:
+  covariate_file:
+    salmon: \S+
+    star: \S+
+  design_formula: .+
+  columns:
+    __any__: [\S+]
+      
+#---------------------------------------- filtering of count matrices
+filters:
+  low_counts: {"__num__": [0, null]}
+  experiment_blacklist:
+    __any__: [\S+]
+  experiment_whitelist:
+    __any__: [\S+]
+  
+#---------------------------------------- normalization parameters
+normalization:
+  DESeq2_parameters:
+    min_mu: {"__num__": [0, null]}
+  normalized_expression: vst|rld
+
+#---------------------------------------- description of contrasts
+contrasts:
+  defaults:
+    max_p_adj: {"__num__": [0, 1]}
+    ranking_by: log2FoldChange|pvalue|padj
+    ranking_order: .*
+    results_parameters:
+      lfcThreshold: {"__num__": [0, null]}
+      altHypothesis: greaterAbs|lessAbs|greater|less
+      independentFiltering:
+        __opt__: [true, false]
+    lfcShrink_parameters:
+      type: none|normal|apeglm|ashr
+    ORA:
+      fdr_threshold: {"__num__": [0, 1]}
+  contrast_list:
+    - title: .+
+      __opt__:
+        - ratio:
+            column: \S+
+            numerator: \S+
+            denominator: \S+
+        - coef: \S+
+        - vector: [{"__num__": [-1, 1]}]
+      __any_other__: "contrasts:defaults"
+
+
+

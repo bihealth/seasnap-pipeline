@@ -5,11 +5,18 @@ This is an interactive table of the covariate data.
 ```{r DataTable}
 #----- import packages
 library(DT)
+library(magrittr)
 
 #----- load DESeqDataSet
 dds <- readRDS(subset(file_tab, step=="DESeq2" & extension=="deseq2.rds" & contrast=="all")$filename)
+covariate_table <- as.data.frame(colData(dds))
+covariate_table <- covariate_table[,c(2:dim(covariate_table)[2], 1)]
 
 #----- create table
-datatable(as.data.frame(colData(dds)), options = list(scrollX = TRUE))
+datatable(covariate_table, rownames=F, extensions='Buttons', escape=F,
+          options = list(scrollX = TRUE, dom='Bfrtip', buttons=c('copy', 'csv', 'pdf'))) %>%
+  formatStyle("filename","white-space"="nowrap") %>%
+  formatStyle("group","white-space"="nowrap") %>%
+  formatStyle("label","white-space"="nowrap")
 ```
 

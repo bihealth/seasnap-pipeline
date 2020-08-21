@@ -6,24 +6,63 @@ The expression values are obtained by the "`r config$normalization$normalized_ex
 In presence of strong biological signal, the samples should cluster with the biological condition.
 When samples are clustered according to other effects (for example patient, or technical batch), great care must be used when interpreting the results, as the other effects will considerably reduce the ability to extract meaningful biological information.
 
-```{r normalisationQCPCA}
+```{r normalisationQCPCA2_calc}
 intgroups <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
-intgroups <- intgroups[1:min(2,length(intgroups))]
-tmp <- plotPCA(RLD_BLIND, intgroup=intgroups, returnData=TRUE)
-percentVar <- 100 * attr(tmp, "percentVar")
+mtx <- t(assay(RLD_BLIND))
+vars <- apply(mtx, 2, var)
+sel <- vars > 1e-26
+pca <- prcomp(mtx[ , sel], scale.=TRUE)
+numplots <- floor(ncol(pca$x)/2)
+numplots <- min(numplots, 6)
 
-if (length(intgroups) == 1) {
-    p <- ggplot2::ggplot(tmp, ggplot2::aes_string(x="PC1", y="PC2", color=intgroups[1]))
-} else {
-    p <- ggplot2::ggplot(tmp, ggplot2::aes_string(x="PC1", y="PC2", color=intgroups[1], shape=intgroups[2]))
+nrow <- ceiling(numplots/2)
+ncol <- 2
+```
+
+```{r normalisationQCPCA2,fig.width=4 * ncol,fig.height=4 * nrow}
+group <- NULL
+if(length(intgroups) > 0) {
+  group <- factor(colData(RLD_BLIND)[[intgroups[1]]])
 }
-p <- p +
-    ggplot2::geom_point(size=3) +
-    ggplot2::labs(x=sprintf("PC1: %.0f %% variance", percentVar[1]), y=sprintf("PC2: %.0f %% variance", percentVar[2])) + 
-    ggplot2::coord_fixed()
 
-fn <- file.path(PLOTS_DIR, "PCA.pdf")
-multiplot(p, fn=fn)
+shape <- NULL
+if(length(intgroups) > 1) {
+  shape <- factor(colData(RLD_BLIND)[[intgroups[2]]])
+}
+
+#tmp <- plotPCA(RLD_BLIND, intgroup=intgroups, returnData=TRUE)
+#percentVar <- 100 * attr(tmp, "percentVar")
+library(RColorBrewer)
+pal <- brewer.pal(12, "Set1")
+if(is.null(group)) {
+  col <- "grey"
+} else {
+  col <- pal[ group ]
+}
+
+if(is.null(shape)) {
+  pch <- 19
+} else {
+  pch <- c(15, 17, 19, 1:6)[shape]
+}
+
+
+par(bty="n")
+par(pch=19)
+par(mfrow=c(nrow, ncol))
+for(i in 1:numplots) {
+  plot(pca$x[,i * 2 - 1], pca$x[, i * 2], col=col, pch=pch, xlab=paste0("PC", i * 2 - 1), ylab=paste0("PC2", i * 2))
+  if(!is.null(group)) {
+    legend("bottomleft", levels(group), col=pal, pch=pch[1], bty="n")
+  }
+  if(!is.null(shape)) {
+    legend("bottomright", levels(shape), col="grey", pch=c(15, 17, 19, 1:6), bty="n")
+  }
+}
+
+fn <- file.path(PLOTS_DIR, "PCA_2.pdf")
+dev.copy2pdf(file=fn)
 ```
 
 [Download plot](`r fn`)
+

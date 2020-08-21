@@ -1,0 +1,33 @@
+#REQUIRE {{goseq-go.rds-{{ENTRY_ID}}}}
+
+### Goseq: GO enrichment analysis
+
+GO enrichment analysis results with `Goseq` for contrast {{ENTRY_NAME}}.
+
+```{r goseq_go_table_{{ENTRY_ID}}}
+#----- import packages
+library(DT)
+library(magrittr)
+
+#----- load table
+goseq_go_res <- as.data.frame(readRDS("{{goseq-go.rds-{{ENTRY_ID}}}}"))
+
+#----- reorder
+first_cols <- sapply(c("category","term","ontology","over_represented_qvalue", "under_represented_qvalue", "over_represented_pvalue",
+                       "under_represented_pvalue"), function(x) which(colnames(goseq_go_res)==x))
+other_cols <- (1:dim(goseq_go_res)[2])[-first_cols]
+goseq_go_res <- goseq_go_res[,c(first_cols, other_cols)]
+
+#----- filter results
+goseq_go_res <- subset(goseq_go_res, over_represented_qvalue < config$report$snippet_parameters$contrast$filter_goseq$qval)
+
+#----- plot interactive table
+datatable(goseq_go_res, extensions=c('Buttons','FixedColumns'), rownames=F, escape=F,
+          options = list(scrollX=TRUE, fixedColumns=list(leftColumns=1), dom='Bfrtip', buttons='csv')) %>%
+  formatRound('over_represented_pvalue', 4) %>%
+  formatRound('under_represented_pvalue', 4) %>%
+  formatRound('over_represented_qvalue', 4) %>%
+  formatRound('under_represented_qvalue', 4) %>%
+  formatStyle("term","white-space"="nowrap")
+```
+

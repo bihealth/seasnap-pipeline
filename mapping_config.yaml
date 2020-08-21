@@ -19,5 +19,15 @@ pipeline_param:
 
 rule_options:
   __options__: [star, star_index, salmon, salmon_index]
- 
 
+
+#--- report settings
+report:
+  __options__: [multiqc]
+  multiqc:
+    report_header_info: ### UNCOMMENT AND FILL (OPTIONAL) ###
+    #  - Contact E-mail: '<contact@bihealth.de>'
+    #  - Application Type: 'RNA-seq'
+    #  - Project Type: '<type>'
+    #  - Sequencing Platform: '<platform>'
+    #  - Sequencing Setup: '<setup>'

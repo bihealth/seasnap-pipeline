@@ -1,0 +1,70 @@
+<!--
+This is the snippet for a volcano plot overview of all contrasts
+January Weiner
+-->
+
+
+# Volcano plots for all contrasts
+
+
+```{r volcano_configuration}
+library(ggplot2)
+library(cowplot)
+library(scales)
+
+conf.wd  <- "{{WORKING_DIRECTORY}}" # the path to the working directory during pipeline execution
+r.path   <- "{{R_COMMON}}"          # the path to a folder with generic R functions to be used in snippets
+script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
+source(script_f)
+
+annot.f   <- subset(file_tab, step == "annotation" & extension == "rds")$filename
+annot     <- readRDS(annot.f)
+contrasts.def <- subset(file_tab, step == "contrasts_full" & extension == "rds")
+contrasts.conf <- config$contrasts$contrast_list
+names(contrasts.conf) <- sapply(contrasts.conf, `[[`, "ID")
+```
+
+
+```{r volcano_load_contrasts}
+cntr <- lapply(contrasts.def$filename, readRDS)
+names(cntr) <- contrasts.def$contrast
+cntr.n <- length(cntr)
+
+if(is.null(n.col <- config$report$snippet_parameters$volcano$ncol)) {
+  n.col <- 3
+} 
+
+n.row <- ceiling(cntr.n / n.col)
+message(sprintf("Volcano plots: %d x %d", n.row, n.col))
+```
+
+
+
+```{r volcano_fig,fig.width=5*n.col, fig.height=5*n.row}
+par(mfrow=c(n.row, n.col), bty="n")
+
+p.t <- .05
+l.t <- 1
+
+maxlfc <- max(sapply(cntr, function(x) max(abs(x$log2FoldChange), na.rm=TRUE)))
+xlim <- c(-maxlfc, maxlfc)
+minpval <- min(sapply(cntr, function(x) min(x$padj, na.rm=TRUE)))
+if(minpval < 1e-26) minpval <- 1e-26
+ylim <- c(1, minpval)
+
+## we use a fast but effective plotting function, nothing fancy
+for(cc in names(contrasts.conf)) {
+  x <- cntr[[cc]]
+  x$color <- ifelse(x$log2FoldChange < 0, "#3333cc33", "#cc333333")
+  x$color[ x$padj > p.t | abs(x$log2FoldChange) < l.t ] <- "#33333333"
+  plot(x$log2FoldChange, -log10(x$padj), pch=19, col=x$color,
+    xlab="log2 FC", ylab="-log10(p value)", 
+    xlim=xlim,
+    ylim=-log10(ylim),
+    main=contrasts.conf[[cc]]$title)
+  abline(h=-log10(p.t), col="#33333333")
+  abline(v=0, col="#33333333")
+}
+
+
+```

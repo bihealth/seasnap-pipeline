@@ -95,38 +95,34 @@ server <- function(input, output) {
        if (is.null(my_cov)) return(NULL)
        X <- Design()
        if (is.null(X)) return(NULL)
-       
+
+       my_cov$group <- factor(my_cov$group)
+
        dummy <- build_dummy_dds(X, my_cov)
-       
+          
        result_names <- DESeq2::resultsNames(dummy)
-       
-       X <- unique(X)
-       df <- unique(my_cov)
-       
-       n <- (nrow(df)*(nrow(df)-1))/2
+         
+       # In Z: mapping between group conditions and test model
+       Z <- model.matrix(~ -1 + group, data=my_cov)
+       Z <- solve(t(Z) %*% Z) %*% t(Z) %*% X
+
+       n <- (nrow(Z)*(nrow(Z)-1))/2
        tmp <- data.frame(Numerator=rep(as.character(NA), n), Denominator=rep(as.character(NA), n),
                          Coefficient=rep(as.character(NA), n),
                          Contrast=rep(as.character(NA), n),
                          stringsAsFactors=FALSE)
        n <- 0
-       for (j in 2:nrow(df)) for (i in 1:(j-1)) {
+       for (j in 2:nrow(Z)) for (i in 1:(j-1)) {
            n <- n+1
-           x <- X[i,]
-           y <- X[j,]
-           swap <- FALSE
-           if (sum(y<x) > sum(y>x)) swap <- TRUE
-           k <- which(abs(y-x) == 1)
-           if (length(k) == 1) tmp$Coefficient[n] <- result_names[k]
-           if (swap) {
-               tmp$Numerator[n] <- as.character(df[i,"group"])
-               tmp$Denominator[n] <- as.character(df[j,"group"])
-               tmp$Contrast[n] <- paste("[ ", paste(x-y, collapse=", "), " ]", sep="")
-           } else {
-               tmp$Numerator[n] <- as.character(df[j,"group"])
-               tmp$Denominator[n] <- as.character(df[i,"group"])
-               tmp$Contrast[n] <- paste("[ ", paste(y-x, collapse=", "), " ]", sep="")
-           }
+           tmp$Numerator[n]   <- levels(my_cov$group)[j]
+           tmp$Denominator[n] <- levels(my_cov$group)[i]
+           tmp$Coefficient[n] <- ""
+           d <- Z[j,] - Z[i,]
+           if (sum(abs(d)<tol) == length(d)-1) tmp$Coefficient[n] <- result_names[which(abs(d)>tol)]
+           if (all(abs(d)<1.0e-7)) d <- "Same model value"
+           tmp$Contrast[n]    <- paste("[ ", paste(d, collapse=", "), " ]", sep="")
        }
+
        tmp
    })
    

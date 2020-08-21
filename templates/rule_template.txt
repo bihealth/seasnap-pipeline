@@ -20,13 +20,7 @@ rule <rule_name>:
 	output:
 		pph.file_path(step = "<rule_name>", extension = "<file_extension>", <additional wildcards>)
 	log:
-		# logging an R script
-		r_script = pph.file_path(step = "<rule_name>", extension = "R",            log=True, <additional wildcards>),
-		r_output = pph.file_path(step = "<rule_name>", extension = "r_output.log", log=True, <additional wildcards>),
-		
-		# logging a shell script
-		sh_script = pph.file_path(step = "<rule_name>", extension = "sh",            log=True, <additional wildcards>),
-		sh_output = pph.file_path(step = "<rule_name>", extension = "sh_output.log", log=True, <additional wildcards>)
+		out = pph.file_path(step = "<rule_name>", extension = "output.log", log=True, <additional wildcards>)
 	run:
 		######## 1.) pre-compute, format
 		
@@ -39,11 +33,14 @@ rule <rule_name>:
 		#TODO: script code ...
 		
 		""")
-		with open(log.r_script, "w") as f: f.write(snakemake_format(script))
+
+		######## 3.) create log files, including the "script_file" with the script
 		
-		######## 3.) run the script with corresponding command
+		script_file = pph.log(log.out, snakemake_format(script), step="<rule_name>", extension="<e.g. R or sh>", **wildcards, <additional wildcards>)
+
+		######## 4.) run the script with corresponding command
 		
 		# run R
-		shell("Rscript --vanilla '{log.r_script}' &> '{log.r_output}'")
-		# or run sh
-		shell("{log.sh_script} &> {log.sh_output}")
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+		# or run shell script
+		shell("bash '{script_file}' &>> '{log.out}'")

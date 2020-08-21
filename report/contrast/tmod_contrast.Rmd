@@ -1,0 +1,151 @@
+#REQUIRE {{tmod-rds-{{ENTRY_ID}}}}
+
+```{r tmod_conf_{{ENTRY_ID}}}
+#----- import packages
+require(tidyverse)
+require(pander)
+require(DT)
+require(purrr)
+require(dplyr)
+require(tmod)
+
+# ---- get wildcards
+c_id       <- "{{ENTRY_ID}}"
+c_name     <- "{{ENTRY_NAME}}"
+tmod_res.f <- "{{tmod-rds-{{ENTRY_ID}}}}"
+
+# load tmod functions
+r.path <- "{{R_COMMON}}"
+script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
+source(script_f)
+
+tmod.dbs.f <- subset(file_tab, step=="tmod_dbs" & extension == "rds")$filename
+map.f      <- subset(file_tab, step == "tmod_dbs" & extension == "mapping.rds")$filename
+annot.f    <- subset(file_tab, step == "annotation" & extension == "rds")$filename
+
+#tmod.res  <- readRDS(tmod.res.f)
+tmod.dbs  <- readRDS(tmod.dbs.f)
+annot     <- readRDS(annot.f)
+
+
+snip.par     <- config$report$snippet_parameters$tmod_contrast
+res_auc_thr  <- snip.par$res_auc_thr
+res_pval_thr <- snip.par$res_pval_thr
+if(is.null(res_auc_thr)) res_auc_thr <- .65
+if(is.null(res_pval_thr)) res_pval_thr <- .01
+
+## No wildcards beyond this point except in chunk names
+```
+
+```{r tmod_contrast_{{ENTRY_ID}}}
+# load results table
+message(sprintf("tmod contrast %s, reading file %s", c_id, tmod_res.f))
+tmod_res <- readRDS(tmod_res.f)
+```
+
+
+### `tmod` enrichment analysis for `r c_name`
+
+
+**Table.** Summary of the results for contrast `r c_name` shows number of
+significant gene sets at various significance levels and for AUC > 0.65.
+
+```{r tmod_summary_table{{ENTRY_ID}}, results="asis"}
+pval.thr <- c(.01, .001, 1e-4, 1e-6)
+
+tmp <- purrr::imap_dfr(tmod_res, ~ {
+  .r <- .x
+  .rn <- .y
+  ret <- t(sapply(.r, function(.s) {
+    sapply(pval.thr, function(.pt) {
+      sum(.s$adj.P.Val < .pt & .s$AUC > 0.65, na.rm=TRUE)
+    })
+  }))
+  data.frame(DB=.y, ret)
+})
+
+colnames(tmp) <- c("DB", pval.thr)
+pandoc.table(tmp, row.names=FALSE, split.tables=Inf)
+```
+
+
+**Table.** Results of the tmod enrichment analysis for contrast `r c_name`.
+Only significantly enriched gene sets are shown (FDR < `r res_pval_thr`, 
+AUC > `r res_auc_thr`). **AUC**, area under curve; **p.value**, p-value
+from enrichment test; **FDR**, p-value corrected for multiple testing with
+Benjamini-Hochberg method.
+
+```{r, tmod_contrast_result_list{{ENTRY_ID}}, results="asis"}
+## each datatable must be knitted in a separate chunk, otherwise it doesn't
+## work
+resU  <- unlist(tmod_res, recursive=FALSE)
+mytab <- data.frame(ID=1:3, foo=letters[1:3])
+
+template <- "
+\n```{r}
+datatable(mytab, extensions=c('Buttons','FixedColumns'), rownames=FALSE, escape=FALSE,
+        options = list(scrollX=TRUE, fixedColumns=list(leftColumns=1), dom='Bfrtip', buttons=c('excel', 'csv'))) %>%
+        formatSignif('p.value', 2) %>%
+        formatSignif('FDR', 2) %>%
+        formatSignif('AUC', 2)
+
+\n```
+
+"
+
+cat("\n##### {.tabset}\n")
+
+for(db in names(resU)) {
+  mytab <- tmod_filter_format_res(resU[[db]], pval.thr=res_pval_thr, AUC.thr=res_auc_thr)
+  cat(sprintf("\n###### %s\n", db))
+  if(!is.null(resU[[db]]) && nrow(mytab) > 0) {
+    out <- knitr::knit_child(text=template, quiet=TRUE)
+    cat(out)
+  } else {
+    cat("**No results at the specified thresholds**\n")
+  }
+
+}
+cat("\n##### {-}\n")
+```
+
+**Fig. Upset plot.**
+
+```{r tmod_upset_plot_{{ENTRY_ID}},fig.width=14,fig.height=9,results="asis"}
+
+cat("\n##### {.tabset}\n")
+
+template <- '
+\n```{r, results="asis"}
+    par(mar=rep(1, 4))
+    cat(sprintf("\n###### %s\n", paste0(db, ".", .resn)))
+
+    .res <- tmod_res[[db]][[.resn]]
+
+    if(!is.null(.res)) {
+      .res <- .res[ order(.res$P.Value), ]
+      .res <- .res[ .res$adj.P.Val < .01 & .res$AUC > .6, ]
+      if(nrow(.res) > 20) .res <- .res[1:20, ]
+    }
+
+    if(is.null(.res) || nrow(.res) < 2) {
+      cat("<br>Too few results to generate upset plot.<br><br>\n")
+    } else {
+      labels <- tmod_labels(.res$ID, .res$Title)
+      upset(.res$ID, mset=tmod.dbs[[db]]$dbobj, min.overlap=2, group.cutoff=.1, min.group=2, labels=labels, max.comb=2, value="j")
+    }
+\n```
+
+'
+for(db in names(tmod_res)) {
+  for(.resn in names(tmod_res[[db]])) {
+    out <- knitr::knit_child(text=template, quiet=TRUE)
+    cat(out)
+  }
+}
+
+cat("\n##### {-}\n")
+
+```
+
+

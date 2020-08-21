@@ -15,7 +15,7 @@ fontsize: 14pt
 
 <!---
 - Compile from command-line
-Rscript -e "rmarkdown::render('report.Rmd', c('html_document'), clean=FALSE)"
+Rscript -e "rmarkdown::render('report.all.Rmd', c('html_document'), clean=FALSE)"
 -->
 
 ```{r setup, echo=FALSE, message=FALSE}
@@ -29,12 +29,14 @@ ggplot2::theme_set(ggplot2::theme_bw())
 
 # variables and functions accessible from all chunks
 setwd(working_dir)
-config   <- yaml.load_file("{{pipeline_report-yaml}}")
+{{LOAD_CONFIG_FILE}}
+{{LOAD_FILE_TABLE}}
 r_common <- "{{R_COMMON}}"
-file_tab <- data.frame(read.table("{{FILE_TABLE}}", sep="\t", header = TRUE))
-file_tab$filename <- as.character(file_tab$filename)
 source(paste0(r_common, "/basic_funcs.R"))
 source(paste0(r_common, "/basic_plots.R"))
+report_dir      <- file.path(working_dir, dirname("{{report-tsv}}"))
+PLOTS_BASE_DIR  <- file.path(report_dir, "plots")
+dir.create(PLOTS_BASE_DIR, recursive=TRUE, showWarnings=FALSE, mode="0750")
 ```
 
 #>--------------------------------------------INSERT--------------------------------------------<#
