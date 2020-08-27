@@ -147,6 +147,11 @@ return(ret)
 for(db_n in names(cp_data)) {
   res <- lapply(cp_data[[db_n]], function(x) { x <- x@result ; x$Title <- x$Description ; x })
   message(glue("generating plots for {db_n}"))
+
+  if(length(res) < 2) {
+    cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+  } else {
+
  
   ## results with the "sort type" level flattened
   ## so instead of res$contrasts_name$pval$... we have res$contrasts_name.pval$...
@@ -178,6 +183,7 @@ for(db_n in names(cp_data)) {
     figure_t <- template_figure(res, resS, db_n, effect.col)
     foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
     cat(foo)
+  }
   }
 }
 ```
