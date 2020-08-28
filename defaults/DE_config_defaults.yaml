@@ -88,8 +88,11 @@ time_series: {}
 rain:
   period: 24
   peak_boarder: "c(0.3, 0.7)"
-  min_fold_change: 1.5
-  min_mean: 5
+  filter:
+    min_fold_change: 1.5
+    frac_above_threshold:
+      threshold: 5
+      frac: 0.8
 
 dodr:
   period: 24

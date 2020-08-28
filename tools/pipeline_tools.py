@@ -1447,7 +1447,7 @@ class ReportTool(PipelinePathHandler):
 
 	def _insert_file_paths(self, text, path_pattern):
 		wildcards_orig = re.findall("{{([^{}]+)}}", text)
-		wildcards_prep = [rwo.replace(".","_") for rwo in wildcards_orig]
+		wildcards_prep = [rwo.replace(".", "_") for rwo in wildcards_orig]
 		for rwo, rwp in zip(wildcards_orig, wildcards_prep):
 			text = text.replace(rwo, rwp)
 			parts = rwo.split("-")
@@ -1483,7 +1483,7 @@ class ReportTool(PipelinePathHandler):
 		text = re.sub("#+ [^{\n]+", r"\g<0>{} ".format(ana_id_tit), text, count=1)
 
 		def subs(m):
-			return f"{m.group(0)}" if len(m.groups()) > 1 and "=" in m.group(1) else f"{m.group(0)}_{ana_id_var}"
+			return f"{m.group(0)}" if "=" in m.group(0) else f"{m.group(0)}_{ana_id_var}"
 		text = re.sub("{ ?r +[^,\n ]+(?! *\n)", subs, text)
 		return self._insert_file_paths(text, path_pattern)
 

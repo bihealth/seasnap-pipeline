@@ -1,10 +1,11 @@
 ### Rain results
 
-Rain finds significantly rhythmic genes in timeseries using an non-parametric approach.
+Rain finds significantly rhythmic genes in timeseries using a non-parametric approach.
 
-Results for time series: "{{ENTRY_NAME}}"\
-Period: ``r config$rain$period``
+**Results for time series:** "{{ENTRY_NAME}}"\
+**Period:** ``r config$rain$period``
 
+STAR counts were filtered for genes with at least ``r config$rain$filter$frac_above_threshold$frac*100``% of the samples having more than ``r config$rain$filter$frac_above_threshold$threshold`` counts and a fold change of at least ``r config$rain$filter$min_fold_change``.
 Only results with a q-value < ``r config$report$snippet_parameters$rain$filter_results$qval`` are listed.
 
 ```{r rain_{{ENTRY_ID}}}

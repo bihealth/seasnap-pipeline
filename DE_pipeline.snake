@@ -1199,8 +1199,9 @@ rule rain:
 	params:
 		period = config["rain"]["period"],
 		peak_boarder = config["rain"]["peak_boarder"],
-		min_fold_change = config["rain"]["min_fold_change"],
-		min_mean = config["rain"]["min_mean"],
+		min_fold_change = config["rain"]["filter"]["min_fold_change"],
+		min_threshold = config["rain"]["filter"]["frac_above_threshold"]["threshold"],
+		frac_above_threshold = config["rain"]["filter"]["frac_above_threshold"]["frac"],
 		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		ts_columns = [rep for samp in config["time_series"][wildcards.contrast]["samples"] for rep in samp]
@@ -1220,27 +1221,33 @@ rule rain:
 		period <- {params.period}
 		peak_boarder <- {params.peak_boarder}
 		min_fold_change <- {params.min_fold_change}
-		min_mean <- {params.min_mean}
+		min_threshold <- {params.min_threshold}
+		frac_above_threshold <- {params.frac_above_threshold}
 
 		#----- prepare matrix
 		counts_file <- data.frame(read.csv("{input.counts}", sep="\t"))
 		ts_columns <- {r_ts_columns}
 		counts_file <- t(counts_file[,ts_columns])
 
+		#----- fraction above threshold filter
+		frac <- apply(counts_file, 2, function(x) sum(x >= min_threshold)/length(x))
+		counts_file <- counts_file[,frac >= frac_above_threshold]
+
 		#----- fold change filter
 		maxima <- apply(counts_file, 2, function(x) max(x, na.rm=T))
 		minima <- apply(counts_file, 2, function(x) min(x, na.rm=T))
-		counts_file <- counts_file[,(maxima+minima)/2 > min_mean & maxima/minima > min_fold_change]
+		counts_file <- counts_file[,maxima/minima > min_fold_change]
 
 		#----- run rain
 		distances <- diff({r_time_points})
 		rainresult <- rain(counts_file,
-                   period=period,
-                   deltat=distances[1],
-                   peak.border=peak_boarder,
-                   verbose=F,
-                   measure.sequence={r_nr_replicates},
-                   na.rm=F)
+		                   period=period,
+		                   deltat=distances[1],
+		                   peak.border=peak_boarder,
+		                   verbose=F,
+		                   measure.sequence={r_nr_replicates},
+		                   na.rm=F
+		)
 
 		pvalues <- rainresult[T,1]
 		qvalues_BH <- p.adjust(pvalues, 'BH')
