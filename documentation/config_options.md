@@ -70,6 +70,8 @@ Config options
 |                             |                                                                                   |
 |**`filters:`**               | **(set filters for input data)**                                                  |
 | \|---`low_counts`           | exclude genes with counts lower than <x>; *default: 0*                            |
+| \|---`min_counts`           | include only features with at least `min_counts` counts in at least `min_count_n` samples *default: not set*                            |
+| \|---`min_count_n`          | (see above)                            |
 | \|---`experiment_blacklist` | exclude certain entries of the covariate file from analysis<br>given as a dictionary of the form: {<column name>: [<level name>, ...]}<br>e.g. exclude samples: {"group": ["sample1", "sample1"]}<br>*default: {}* |
 | \|---`experiment_whitelist` | only allow certain entries of the covariate file for analysis<br>given as a dictionary of the form: {<column name>: [<level name>, ...]} |
 |                             |                                                                                   |
