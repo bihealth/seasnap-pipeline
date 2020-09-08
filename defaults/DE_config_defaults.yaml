@@ -176,7 +176,7 @@ tmod:
         (https://www.gsea-msigdb.org/gsea/msigdb/).
       taxonID: 9606
       primaryID: ENTREZID
-      subset: "Category=C3,Subcategory=MIR"
+      subset: "Category=C3,Subcategory=MIR:MIRDB"
     - name: msigdb_go_bp
       file: msigdb
       title: "GO Biological Process (MSigDB)"
