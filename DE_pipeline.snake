@@ -175,6 +175,7 @@ rule import_gene_counts:
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
+		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
 			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
@@ -198,11 +199,13 @@ rule import_gene_counts:
     #----- variables
     sample_f  <- "{input.samples}"
     output_rds  <- "{output.rds}"
+		conf.f   <- "{config_file}"
 		
 		#----- import data
 		sample_df <- read.table(sample_f, header=TRUE)
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
+		config <- yaml::yaml.load_file(conf.f)
 
 		#----- merge count files from star
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", 
@@ -402,6 +405,7 @@ rule DESeq2:
 		rld_names  = pph.file_path("DESeq2", "rld.model.csv", contrast = "all"),
 		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
+		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		count_threshold       = config["filters"]["low_counts"]
                 normalized_expression = config["normalization"]["normalized_expression"]
 		script = textwrap.dedent(r"""
@@ -411,12 +415,24 @@ rule DESeq2:
 		library({params.annot_pkg})
 		
 		{R_SESSION_INFO}
+
+		conf.f   <- "{config_file}"
 		
+    #----- load config
+		config <- yaml::yaml.load_file(conf.f)
+
 		#----- load DESeqDataSet
 		dds <- readRDS("{input}")
 		
 		#----- pre-filtering
 		keep <- rowSums(counts(dds)) >= {count_threshold}
+
+		## at least min_counts in at least min_count_n number of samples
+		if(!is.null(config$filters$min_counts) && !is.null(config$filters$min_count_n)) {{
+		  rs <- rowSums(counts(dds) > config$filters$min_counts)
+		  keep <- keep & rs >= config$filters$min_count_n
+		}}
+
 		dds  <- dds[keep,]
 		
 		#----- DESeq2
