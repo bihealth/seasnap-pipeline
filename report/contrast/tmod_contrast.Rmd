@@ -131,7 +131,7 @@ template <- '
     if(is.null(.res) || nrow(.res) < 2) {
       cat("<br>Too few results to generate upset plot.<br><br>\n")
     } else {
-      labels <- tmod_labels(.res$ID, .res$Title)
+      labels <- tmod_labels(.res$ID, .res$Title, max.length=100)
       upset(.res$ID, mset=tmod.dbs[[db]]$dbobj, min.overlap=2, group.cutoff=.1, min.group=2, labels=labels, max.comb=2, value="j")
     }
 \n```
