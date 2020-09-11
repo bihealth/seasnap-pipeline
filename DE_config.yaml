@@ -59,6 +59,12 @@ experiment:
 
 contrasts:
   __options__: [defaults, contrast_list]
+
+  ## by default: run tmod, goseq and cluster_profiler
+  defaults:
+    tmod: true 
+    cluster_profiler:
+      run: true
   
   contrast_list:
     - title: ### FILL HERE ###  (unique title)
