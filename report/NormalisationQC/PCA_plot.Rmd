@@ -40,6 +40,7 @@ numplots <- min(numplots, 6)
 covariate_data <- as.data.frame(colData(RLD_BLIND))
 
 cov_default <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
+threeD <- config$report$snippet_parameters$Normalisation_QC$threeD %||% FALSE
 
 df <- data.frame(
 	label=rownames(covariate_data),
@@ -179,24 +180,47 @@ if(length(cov_default) > 1) {
   def_symbols <- cov_symbols[[ cov_default[2] ]]
 } 
 
+if(threeD) {
+  numplots <- floor(ncol(pca$x)/3)
+}
+
 ## create the initial plotly object. We need it to know how plotly cuts up the data into segments
-p <- plot_ly(data=df, type="scatter", mode="markers", 
-             x=df$PC1, y=df$PC2, 
+plotly.args <- list(data=df, type="scatter", mode="markers",
+             x=df$PC1, y=df$PC2,
              hovertext=hovertext,
              ids=plotly_ids,
              marker=list(size=10),
-             visible=TRUE, 
-             color= def_color, colors= def_colors, 
-             symbol=def_symbol, symbols=def_symbols) 
+             visible=TRUE,
+             color= def_color, colors= def_colors,
+             symbol=def_symbol, symbols=def_symbols)
+
+if(threeD) {
+  plotly.args$z <- df$PC3
+  plotly.args$type <- "scatter3d"
+  plotly.args$marker <- list(size=5)
+}
+
+p <- do.call("plot_ly", plotly.args)
+
 
 ## if there are more than two components to be shown, we need to add the data
 if(numplots > 1) {
-  for(i in 2:numplots) {
-    pc1 <- paste0("PC", i * 2 - 1)
-    pc2 <- paste0("PC", i * 2)
-    p <- p %>% add_trace(data=df, type="scatter", mode="markers", x=df[[pc1]], y=df[[pc2]], visible=FALSE)
+  if(threeD) {
+    for(i in 2:numplots) {
+      pc1 <- paste0("PC", i * 3 - 2)
+      pc2 <- paste0("PC", i * 3 - 1)
+      pc3 <- paste0("PC", i * 3)
+      p <- p %>% add_trace(data=df, type="scatter3d", mode="markers", x=df[[pc1]], y=df[[pc2]], z=df[[pc3]], visible=FALSE)
+    }
+  } else {
+    for(i in 2:numplots) {
+      pc1 <- paste0("PC", i * 2 - 1)
+      pc2 <- paste0("PC", i * 2)
+      p <- p %>% add_trace(data=df, type="scatter", mode="markers", x=df[[pc1]], y=df[[pc2]], visible=FALSE)
+    }
   }
 }
+
 
 ## here we build the plotly object and dissect it to figure out
 ## how plotly cut up the data. Note that plotly is efficient and that if
@@ -244,22 +268,39 @@ col_update <- lapply(covariates, function(cov) {
       )
 })
 
-pc_update <- lapply(1:numplots, function(i) {
-  pc1 <- paste0("PC", i * 2 - 1)
-  pc2 <- paste0("PC", i * 2)
-  list(
-    method="restyle",
-    label=paste(pc1, "vs", pc2),
-    args=list(
-      list(visible=rep((1:numplots) == i, each=nblocks))
-    ))
-})
+
+if(threeD) {
+  pc_update <- lapply(1:numplots, function(i) {
+    pc1 <- paste0("PC", i * 3 - 2)
+    pc2 <- paste0("PC", i * 3 - 1)
+    pc3 <- paste0("PC", i * 3)
+    list(
+      method="update",
+      label=sprintf("PC%d/%d/%d", i * 3 - 2, i * 3 - 1, i * 3),
+      args=list(
+        list(visible=rep((1:numplots) == i, each=nblocks)),
+        list(scene=list(
+            xaxis=list(title=pc1),
+            yaxis=list(title=pc2),
+            zaxis=list(title=pc3)
+          ))
+      ))
+  })
+} else {
+  pc_update <- lapply(1:numplots, function(i) {
+    pc1 <- paste0("PC", i * 2 - 1)
+    pc2 <- paste0("PC", i * 2)
+    list(
+      method="restyle",
+      label=paste(pc1, "vs", pc2),
+      args=list(
+        list(visible=rep((1:numplots) == i, each=nblocks))
+     ))
+  })
+}
+
 
 menus <- list(
-  list(
-    y=.8,
-    buttons=col_update
-  ),
   list(
     type="buttons",
     direction="right",
@@ -270,12 +311,40 @@ menus <- list(
     buttons=pc_update
   ),
   list(
-    y=.6,
+    yanchor="bottom",
+    y=0,
+    x=-.1,
+    xanchor="right",
+    direction="up",
+    buttons=col_update
+  ),
+  list(
+    yanchor="bottom",
+    y=.1,
+    xanchor="right",
+    x=-.1,
+    direction="up",
     buttons=sym_update
   )
 )
 
-p %>% layout(updatemenus=menus)
+scene <- list(
+  xaxis=list(title="PC1"),
+  yaxis=list(title="PC2")
+)
+
+if(threeD) {
+  scene$zaxis <- list(title="PC3")
+}
+
+p %>% layout(updatemenus=menus,
+  scene=scene,
+  legend=list(
+    xanchor="right",
+    x=-.1
+  ))
+
+
 ```
 
 [Download plot](`r fn`)
