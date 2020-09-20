@@ -60,8 +60,12 @@ covariate_data <- covariate_data[ , covariates ]
 ## we are sure that the order is the same
 df <- cbind(covariate_data, df)
 
+## which covariates are numerical?
+cov_numeric <- covariates[ map_lgl(covariates, ~ is.numeric(df[[.]])) ]
+
 ## make sure the covariates are factors
-df <- df %>% mutate_at(covariates, factor)
+df <- df %>% mutate_at(setdiff(covariates, cov_numeric), factor)
+
 
 ## make the PCA data more terse
 df <- df %>% mutate_at(vars(starts_with("PC")), signif, digits=4)
@@ -115,31 +119,46 @@ dev.off()
 library(plotly)
 library(RColorBrewer)
 
+plotly_ids <- paste0("ID", 1:nrow(df))
+
+## First, assign palettes to factor covariates
 ## We need to set up coloring manually, because plotly is stupid
 ## use palettes from RColorBrewer, preferring the colorblind ones
 palettes <- brewer.pal.info %>% rownames_to_column("palette") %>% filter(category == "qual") %>% arrange(-colorblind)
+palette_names <- palettes[["palette"]]
 
-## limit the number of covariates if necessary (if there are not sufficient palettes)
-covariates <- covariates[1:min(length(covariates), nrow(palettes)) ]
-covariates_pal_names <- set_names(palettes[["palette"]][1:length(covariates)], covariates)
-covariates_levels_n <- sapply(covariates, function(cov) length(levels(df[[cov]])))
+covariates_fac <- covariates[ sapply(covariates, function(cov) is.factor(df[[cov]])) ]
+if(nrow(palettes) < length(covariates_fac)) {
+  palette_names <- rep(palette_names, ceiling(length(covariates_fac)/nrow(palettes)))
+}
 
-## covariates_pals is a named list, named by the covariates. Each element
-## is a named vector of colors, the names corresponding to the levels of
-## the given factor
-covariates_pals <- lapply(covariates, function(cov) {
+covariates_pal_names <- set_names(palette_names[1:length(covariates_fac)], covariates_fac)
+
+## get colors for each of the factor covariates
+covariates_col <- lapply(set_names(covariates_fac), function(cov) {
   pal.name <- covariates_pal_names[cov]
-  n.col <- covariates_levels_n[cov]
+  n.col <- length(levels(df[[cov]]))
   max.col <- subset(palettes, palette == pal.name)$maxcolors[1]
   .pal <- brewer.pal(n=min(max.col, max(3, n.col)), name=pal.name)
   if(max.col < n.col) {
-    warning(sprintf("covariate: %s more levels (%d) thane colors (%d) in palette (%s)", 
+    warning(sprintf("covariate: %s more levels (%d) thane colors (%d) in palette (%s)",
       cov, n.col, max.col, pal.name))
     .pal <- rep(.pal, ceiling(n.col / max.col))
   }
   names(.pal) <- levels(df[[cov]])
-  return(.pal)
-}) %>% set_names(covariates)
+
+  set_names(.pal[ as.character(df[[cov]]) ], plotly_ids)
+})
+
+cont_pal <- colorRampPalette(c("#440154FF", "#21908CFF", "#FDE725FF"))(32)
+covariates_col_cont <- lapply(set_names(setdiff(covariates, covariates_fac)), function(cov) {
+  x <- df[[cov]]
+  col_i <- seq(min(x, na.rm=TRUE), max(x, na.rm=TRUE), length.out=33)
+  i <- findInterval(x, col_i, all.inside=TRUE)
+  set_names(cont_pal[i], plotly_ids)
+})
+
+covariates_col <- c(covariates_col, covariates_col_cont)
 
 
 ## Same for symbols
@@ -172,8 +191,17 @@ hovertext <- paste(hovertext, sprintf("plotlyID: %s", plotly_ids), sep="\n")
 def_symbol <- def_symbols <- def_color <- def_colors <- NULL
 if(length(cov_default) > 0) {
   def_color <- df[[ cov_default[1] ]]
-  def_colors <- covariates_pals[[ cov_default[1] ]]
-} 
+  if(is.factor(def_color)) {
+    levs <- levels(def_color)
+    matches <- match(levs, df[[ cov_default[1] ]])
+    def_colors <- covariates_col[[cov_default[1]]][ matches ]
+    names(def_colors) <- levs
+  } else {
+    def_colors <- covariates_col[[cov_default[1]]]
+  }
+}
+
+
 
 if(length(cov_default) > 1) {
   def_symbol <- df[[ cov_default[2] ]]
@@ -181,7 +209,7 @@ if(length(cov_default) > 1) {
 } 
 
 if(threeD) {
-  numplots <- floor(ncol(pca$x)/3)
+  numplots <- floor(numplots * 2/3)
 }
 
 ## create the initial plotly object. We need it to know how plotly cuts up the data into segments
@@ -233,7 +261,7 @@ p.obj <- p.obj[ 1:nblocks ]
 p.ids <- map(p.obj, ~ .$ids)
 
 ## here we build the menu for updating symbol style
-sym_update <- lapply(covariates, function(cov) {
+sym_update <- lapply(covariates_fac, function(cov) {
   sym_pal <- cov_symbols[[cov]]
 
   ## map levels to symbol
@@ -254,10 +282,8 @@ sym_update <- lapply(covariates, function(cov) {
 
 ## set up update menus for colors
 col_update <- lapply(covariates, function(cov) {
-  pal <- covariates_pals[[cov]]
   cols <- lapply(p.ids, function(ids) {
-    ord <-match(ids, paste0("ID", 1:nrow(df)))
-    pal[ as.character(df[[cov]][ord]) ]
+    covariates_col[[cov]][ids]
   })
   list(
         method="restyle",
@@ -268,7 +294,7 @@ col_update <- lapply(covariates, function(cov) {
       )
 })
 
-
+## prepare the buttons to change the coordinates
 if(threeD) {
   pc_update <- lapply(1:numplots, function(i) {
     pc1 <- paste0("PC", i * 3 - 2)
