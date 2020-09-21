@@ -542,7 +542,7 @@ rule feature_counts:
 		out = pph.file_path(step="feature_counts", extension="output.log", log=True)
 	params:
 		nsrt_bam = pph.file_path(step="feature_counts", extension="name_sorted.bam"),
-                options = config["rule_options"]["feature_counts"]["cmd_opt"]
+		options = config["rule_options"]["feature_counts"]["cmd_opt"]
 	threads: 2
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
