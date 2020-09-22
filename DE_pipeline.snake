@@ -1120,6 +1120,7 @@ rule cluster_profiler:
 					    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
         return(em)
 			}})
+      names(cat_tests) <- categories
       return(cat_tests)
 		}})
     names(tests) <- tests_to_run
@@ -1155,8 +1156,7 @@ rule report:
 			config_file = pph.file_path("pipeline_report", "yaml", contrast="all", path_pattern=path)
 			pph.log_generated_files(save_to=file_table, path_pattern=path)
 			id_suffix, _ = rt.get_id_suffix(tag, num)
-			text_sub["file_tab"] += (f'file_tab{id_suffix} <- data.frame(read.table("{file_table}", sep="\\t", header=TRUE))\n'
-			                         f'file_tab{id_suffix}$filename <- as.character(file_tab{id_suffix}$filename)\n')
+			text_sub["file_tab"] += (f'file_tab{id_suffix} <- read.table("{file_table}", sep="\\t", header=TRUE, stringsAsFactors=FALSE)\n')
 			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
 
 		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
