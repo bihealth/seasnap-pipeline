@@ -1371,7 +1371,7 @@ class ReportTool(PipelinePathHandler):
 		which is described by the respective path pattern
 		"""
 		if path not in self._id_cache:
-			config_file = self.path_handler.file_path("pipeline_report", "yaml", sample="all_sample", path_pattern=path)
+			config_file = self.path_handler.file_path("pipeline_report", "yaml", fix="all", path_pattern=path)
 			with open(config_file, "r") as stream:
 				try:
 					config_dict = yaml.safe_load(stream)
