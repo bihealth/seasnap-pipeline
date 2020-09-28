@@ -1,0 +1,36 @@
+# Processed data
+
+This is an interactive table of the covariate data.
+
+```{r DataTable}
+#----- import packages
+library(DT)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+
+ciri_list=list()
+ciri_files <- subset(file_tab, step=="ciri" & extension=="tsv")
+
+for (i in 1:length(ciri_files$filename)){
+    ciri_list[[as.character(ciri_files$sample)[i]]]<-read.table(ciri_files$filename[i], comment.char = "", sep='\t', header=T)
+    colnames(ciri_list[[as.character(ciri_files$sample)[i]]]) <- gsub(x=colnames(ciri_list[[as.character(ciri_files$sample)[i]]]) , pattern = "X.", replacement = "")
+    ciri_list[[as.character(ciri_files$sample)[i]]]$sample=as.character(ciri_files$sample)[i]
+  }
+
+ciri_all<-do.call(rbind.data.frame, ciri_list) %>% tbl_df()
+
+  
+```
+
+```{r}
+
+ciri_all %>% group_by(sample) %>% count() %>% ggplot(aes(y=n, x=sample))+geom_bar()
+ciri_all %>% group_by(sample) %>% count() %>% ggplot(aes(y=n, x=sample))+geom_bar(stat="identity")+ggtitle("Total number of circRNAs per sample")
+
+ciri_all %>% group_by(sample) %>% summarise(all_junction_reads=sum(junction_reads)) %>% ggplot(aes(y=all_junction_reads, x=sample))+geom_bar(stat="identity")+ggtitle("Total number of circRNAs per sample")
+
+```
+
+
+
