@@ -175,6 +175,8 @@ rule import_gene_counts:
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
 	run:
+		count_threshold = config["filters"]["low_counts"]
+
 		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
 			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
@@ -187,6 +189,9 @@ rule import_gene_counts:
 		
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
+		
+		gtf = config["organism"]["files"]["gtf"]
+		filter_gtf = config["filters"]["gtf"]
 		
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -220,6 +225,22 @@ rule import_gene_counts:
 		rownames(sample_df) <- sample_df$label; count_dat <- count_dat[, rownames(sample_df)]
 		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = {DESIGN})
 		
+		#----- filter genes
+		keep <- rowSums(counts(dds)) >= {count_threshold}
+		if ("{filter_gtf}" != "") {{
+			gene_names <- rownames(counts(dds))
+			gtf <- rtracklayer::import("{gtf}")
+			g   <- GenomicRanges::as.data.frame(gtf[gtf$type=="gene"])
+			stopifnot("gene_id" %in% colnames(g))
+			stopifnot(all(gene_names %in% g$gene_id))
+			g   <- g[match(gene_names, g$gene_id),]
+			attach(g)
+			filtered <- eval(parse(text="{filter_gtf}"))
+			detach(g)
+			keep <- keep & filtered
+		}}
+		dds <- dds[keep,]
+		
 		#----- save as rds
 		saveRDS(dds, file=output_rds)
 		""")
@@ -236,6 +257,8 @@ rule import_featurecounts:
 	log:
 		out = pph.file_path("import_featurecounts", "output.log", contrast = "all", log=True)
 	run:
+		count_threshold = config["filters"]["low_counts"]
+
 		column_filter = ""
 		if config["filters"]["experiment_whitelist"]:
 			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
@@ -248,6 +271,9 @@ rule import_featurecounts:
 								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list  = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
+		
+		gtf = config["organism"]["files"]["gtf"]
+		filter_gtf = config["filters"]["gtf"]
 		
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -276,6 +302,22 @@ rule import_featurecounts:
 		#----- import counts in DESeq2
 		rownames(sample_df) <- sample_df$label; count_dat <- count_dat[, rownames(sample_df)]
 		dds <- DESeqDataSetFromMatrix(countData = as.matrix(count_dat), colData = sample_df, design = {DESIGN})
+		
+		#----- filter genes
+		keep <- rowSums(counts(dds)) >= {count_threshold}
+		if ("{filter_gtf}" != "") {{
+			gene_names <- rownames(counts(dds))
+			gtf <- rtracklayer::import("{gtf}")
+			g   <- GenomicRanges::as.data.frame(gtf[gtf$type=="gene"])
+			stopifnot("gene_id" %in% colnames(g))
+			stopifnot(all(gene_names %in% g$gene_id))
+			g   <- g[match(gene_names, g$gene_id),]
+			attach(g)
+			filtered <- eval(parse(text="{filter_gtf}"))
+			detach(g)
+			keep <- keep & filtered
+		}}
+		dds <- dds[keep,]
 		
 		#----- save as rds
 		saveRDS(dds, file="{output}")
