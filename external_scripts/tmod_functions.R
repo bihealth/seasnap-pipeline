@@ -216,12 +216,29 @@ df2tmod <- function(df, gene_id_col=ncol(df), module_id_col=1, module_title_col=
 #'
 #' Use the Msigdb from the msigdbr package to generate a tmod object
 #' @return a tmod object
-msig2tmod <- function() {
+msig2tmod <- function(taxon=NULL) {
 
   if(!require(msigdbr, quietly=TRUE)) stop("Package msigdbr not installed! Cannot proceed")
 
+  organism <- NULL
+
+  if(!is.null(taxon)) {
+    if(!require(orthomapper, quietly=TRUE)) {
+      stop("Package orthomapper not installed! Cannot proceed")
+    }
+    sptab <- orthomapper::speciesDBITable()
+    if(!taxon %in% sptab$taxonID) {
+      stop(sprintf("Taxon %s not in msigdbr!  use another taxonID (human or mouse, preferably)", taxon))
+    }
+    organism <- sptab[["species"]][ match(taxon, sptab[["taxonID"]]) ]
+    if(!organism %in% msigdbr::msigdbr_show_species()) {
+      stop(sprintf("Species %s not in msigdbr! Use another species (human or mouse, preferably)", organism))
+    }
+    message("msigdb, reading organism: ", organism)
+  }
+
   #df <- as.data.frame(msigdbr:::msigdbr_genesets)
-  df <- as.data.frame(msigdbr::msigdbr())
+  df <- as.data.frame(msigdbr::msigdbr(species=organism))
   df <- df[ , c("gs_name", "gs_id", "gs_cat", "gs_subcat", "entrez_gene") ]
   colnames(df) <- c("Title", "ID", "Category", "Subcategory", "GeneID")
 
@@ -391,11 +408,13 @@ process_dbs <- function(config) {
     return(NULL)
   }
 
+  ## fill in name and title, check for the file field
   dbs <- lapply(1:length(dbs), function(i) .fill_missing(dbs[[i]], i)) 
 
   dbs.names <- sapply(dbs, function(x) x$name)
-  msig <- NULL
-  tmod <- NULL
+  msig    <- NULL
+  msig_mm <- NULL
+  tmod    <- NULL
 
   if(is.null(config$file_path)) config$file_path <- "./"
   
@@ -408,23 +427,28 @@ process_dbs <- function(config) {
     # two special keywords: msigdb and tmod define databases configured
     # from within the script
     if(x$file == "msigdb") {
+      if(is.null(x$taxonID)) { x$taxonID <- config$organism$taxon }
       if(is.null(msig)) {
         message("reading msigdb")
-        msig <<- msig2tmod()
+        msig <<- msig2tmod(taxon=x$taxonID)
       }
       dbobj <- msig
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "ENTREZID" }
     } else if(x$file == "tmod") {
       if(is.null(tmod)) {
         data("tmod", envir=environment())
         tmod <<- tmod
       }
       dbobj <- tmod
+      if(is.null(x$taxonID)) { x$taxonID <- 9606 }
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "ENTREZID" }
     # if a file is provided, a format is required
     } else if(is.null(x$format)) {
       stop("Processing tmod db configuration: if file path provided, format must not be empty")
     } else {
       x$file <- file.path(config$file_path, x$file)
       dbobj <- tmod_read_file(x$file, x$format)
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "SYMBOL" }
     }
 
     # we need to make sure that the above code worked

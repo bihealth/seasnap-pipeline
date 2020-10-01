@@ -92,14 +92,32 @@ will correspond to the built-in databases tmod and various subsets of the
 [MSigDB](https://www.gsea-msigdb.org/gsea/msigdb/index.jsp) database, including
 gene ontologies etc. 
 
-The only issue you need to know if you want to run tmod with the default db's
-is that the default databases are defined using human gene symbols
-([HGNC](https://www.genenames.org/) symbols) or human Entrez IDs. If you are
+The only issue you need to know if you want to run tmod with the default
+db's is that the default databases are defined using human gene symbols
+([HGNC](https://www.genenames.org/) symbols) or human Entrez IDs. So, what
+if you have another organism, e.g. mouse?
+
+For msigdb, we use the msigdbr package that contains mappings between human
+IDs of the MSigDB and a number of other organisms (notably including
+mouse). To use these mappings, simply make sure that there is no `taxonID` in the
+`tmod: databases: ...` section. Then, the taxonID from 
+the `DE_config.yaml` file, sections `organism_defaults:` / `organism:` will be
+used. sea-snap will then attempt to use this taxon for getting the database
+from the `msigdbr` package, and the genes will have native Entrez IDs.
+
+Alternatively, modify the 
+`tmod: databases: ...:` configuration, inserting a `taxonID:` indicating
+the taxon ID of the organism that you are analysing. E.g., if your samples
+are from mouse, use `taxonID: 10090`. The mappings to that organism
+contained in the msigdbr package will be used.
+
+The tmod database does not by itself contain such mappings. However, if you are
 using a standard organism (eg. mouse) and if the entrez IDs and an annotation
 DBI are defined for that organism in the config file (which they normally
-should), you will be fine. If not, you need to provide a mapping between your
-IDs and the HGNC IDs yourself and need to read the [gory details](#mapping) below. You also
-need to read on if you plan to use custom DBs.
+should), you should be fine. The package orthomapper will map your IDs to
+the IDs of the database. If not, you need to provide a mapping between your
+IDs and the HGNC IDs yourself and need to read the [gory details](#mapping)
+below. You also need to read on if you plan to use custom DBs.
 
 Following databases are predefined in
 `sea-snap/defaults/DE_config_defaults.yaml`, section `tmod`:

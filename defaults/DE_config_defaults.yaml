@@ -151,7 +151,6 @@ tmod:
         Reactome gene sets
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C2,Subcategory=CP:REACTOME"
     - name: msigdb_hallmark
@@ -161,7 +160,6 @@ tmod:
         Hallmark gene sets
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=H"
     - name: msigdb_kegg
@@ -171,7 +169,6 @@ tmod:
         KEGG pathways from 
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C2,Subcategory=CP:KEGG"
     - name: msigdb_mir
@@ -181,7 +178,6 @@ tmod:
         MIR targets from
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C3,Subcategory=MIR:MIRDB"
     - name: msigdb_go_bp
@@ -191,7 +187,6 @@ tmod:
         GO Biological Process definitions from
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C5,Subcategory=BP"
        
