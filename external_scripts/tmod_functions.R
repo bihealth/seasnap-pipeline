@@ -431,11 +431,13 @@ process_dbs <- function(config) {
 
     dbobj <- NULL
     x$PROCESSED <- TRUE
+    if(is.null(x$taxonID)) { 
+      x$taxonID <- config_full$organism$taxon 
+    }
     
     # two special keywords: msigdb and tmod define databases configured
     # from within the script
     if(x$file == "msigdb") {
-      if(is.null(x$taxonID)) { x$taxonID <- config_full$organism$taxon }
       if(is.null(msig)) {
         message("reading msigdb")
         msig <<- msig2tmod(taxon=x$taxonID)
@@ -448,15 +450,13 @@ process_dbs <- function(config) {
         tmod <<- tmod
       }
       dbobj <- tmod
-      if(is.null(x$taxonID)) { x$taxonID <- 9606 }
-      if(is.null(x$PrimaryID)) { x$PrimaryID <- "ENTREZID" }
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "SYMBOL" }
     # if a file is provided, a format is required
     } else if(is.null(x$format)) {
       stop("Processing tmod db configuration: if file path provided, format must not be empty")
     } else {
       x$file <- file.path(config$file_path, x$file)
       dbobj <- tmod_read_file(x$file, x$format)
-      if(is.null(x$PrimaryID)) { x$PrimaryID <- "SYMBOL" }
     }
 
     # we need to make sure that the above code worked

@@ -183,7 +183,7 @@ and the gene ids in the database.
 |subset                   |Definition of a subset; [see below](#mapping)                                                  |
 |mapping                  |Definition of a mapping; [see below](#mapping)                                                 |
 |primaryID                |Type of the primary gene identifier used by the database                                       |
-|taxonID                  |the taxonID to which the gene identifiers in the database refer to                             |
+|taxonID                  |the taxonID to which the gene identifiers in the database refer to; by default, it is taken over from the `organism:` section of `DE_config.yaml`|
 |annotationDBI            |AnnotationDBI to translate entrez IDs into the required primaryID; [see below](#mapping)       |
 |sort\_by                 |Same as for general tmod options, use this to replace the sorting order for a particular db    |
 
