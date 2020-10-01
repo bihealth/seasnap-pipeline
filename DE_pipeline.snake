@@ -759,6 +759,8 @@ rule tmod_dbs:
 			dbs <- process_dbs(config)
 			saveRDS(dbs, file=res.file)
 
+      config$tmod$databases <- dbs
+
 			## provide mapping for the databases
 			map <- get_mapping(config, config$tmod$databases, annot.f)
 			saveRDS(map, file=map.file)
