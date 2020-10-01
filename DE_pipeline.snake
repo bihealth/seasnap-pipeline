@@ -811,8 +811,6 @@ rule tmod:
 			dbs <- readRDS(dbs.f)
 			db.map <- readRDS(map.f)
 			de.res <- readRDS(de.input)
-			foo <- rownames(de.res)
-			if(is.null(foo)) stop("foo is NULL!")
 
 			## create ordered gene lists for every database
 			message(paste0("Starting tmod for contrast ", de.input))
@@ -829,7 +827,7 @@ rule tmod:
 			## each of these elements contains objects `res` (df with results)
 			## and `gl` (genelist used to generate the results) 
 			saveRDS(res, file=res.file)
-			message("rds saved")
+			message("tmod rds saved")
 
 			## shorten results for the human readable XLSX file
 
