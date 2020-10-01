@@ -35,6 +35,12 @@ pipeline_param:
   ## The in_path_pattern can be the same as the out_path_pattern of the mapping pipeline
   ## You should be able to safely leave the predefined {out,log}_path_pattern[s].
 
+  # define choices for choose_input()
+  input_choice:
+    mapping:
+      - import_gene_counts
+      - import_sf
+
 
 
 #--- information about experiment
@@ -82,6 +88,15 @@ contrasts:
 filters:
   __options__: [low_counts, experiment_blacklist, experiment_whitelist]
 
+  # at least 10 counts per row
+  low_counts: 10
+
+  # these two parameters allow a more fine grained filtering:
+  # setting them means that only genes will be kept which have at least
+  # `min_counts` in at least `min_count_n` samples
+
+  min_counts: 5
+  min_count_n: 3
 
 #--- normalization parameters
 

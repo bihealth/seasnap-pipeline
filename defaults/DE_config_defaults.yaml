@@ -29,9 +29,16 @@ experiment:
       
 #---------------------------------------- filtering of count matrices
 filters:
-  low_counts: 0
+  low_counts: 10
   experiment_blacklist: {} # {<Column>: [<Level1>,...]} for columns of covariate file
   experiment_whitelist: {}
+
+  # these two parameters allow a more fine grained filtering:
+  # setting them means that only genes will be kept which have at least
+  # `min_counts` in at least `min_count_n` samples
+
+  min_counts: 5
+  min_count_n: 3
   
 #---------------------------------------- normalization parameters
 normalization:
