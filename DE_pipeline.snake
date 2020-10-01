@@ -756,7 +756,7 @@ rule tmod_dbs:
 
 			## read the necessary files
 			## create the databases
-			dbs <- process_dbs(config$tmod)
+			dbs <- process_dbs(config)
 			saveRDS(dbs, file=res.file)
 
 			## provide mapping for the databases

@@ -218,9 +218,11 @@ df2tmod <- function(df, gene_id_col=ncol(df), module_id_col=1, module_title_col=
 #' @return a tmod object
 msig2tmod <- function(taxon=NULL) {
 
+  if(is.null(taxon)) stop("taxon is null")
+
   if(!require(msigdbr, quietly=TRUE)) stop("Package msigdbr not installed! Cannot proceed")
 
-  organism <- NULL
+  organism <- "Homo sapiens"
 
   if(!is.null(taxon)) {
     if(!require(orthomapper, quietly=TRUE)) {
@@ -234,10 +236,13 @@ msig2tmod <- function(taxon=NULL) {
     if(!organism %in% msigdbr::msigdbr_show_species()) {
       stop(sprintf("Species %s not in msigdbr! Use another species (human or mouse, preferably)", organism))
     }
-    message("msigdb, reading organism: ", organism)
   }
 
   #df <- as.data.frame(msigdbr:::msigdbr_genesets)
+  if(is.null(organism)) {
+    warning("organism is null")
+  }
+  message("msigdb, reading organism: ", organism)
   df <- as.data.frame(msigdbr::msigdbr(species=organism))
   df <- df[ , c("gs_name", "gs_id", "gs_cat", "gs_subcat", "entrez_gene") ]
   colnames(df) <- c("Title", "ID", "Category", "Subcategory", "GeneID")
@@ -399,6 +404,8 @@ tmod_read_file <- function(x, format) {
 #' @return object containing all tmod databases
 process_dbs <- function(config) {
 
+  config_full <- config
+  config <- config$tmod
   require(tmod, quietly=TRUE)
 
   dbs <- config$databases
@@ -423,11 +430,12 @@ process_dbs <- function(config) {
   process_entry <- function(x) {
 
     dbobj <- NULL
+    x$PROCESSED <- TRUE
     
     # two special keywords: msigdb and tmod define databases configured
     # from within the script
     if(x$file == "msigdb") {
-      if(is.null(x$taxonID)) { x$taxonID <- config$organism$taxon }
+      if(is.null(x$taxonID)) { x$taxonID <- config_full$organism$taxon }
       if(is.null(msig)) {
         message("reading msigdb")
         msig <<- msig2tmod(taxon=x$taxonID)
