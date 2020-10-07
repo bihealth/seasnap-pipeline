@@ -832,7 +832,7 @@ rule tmod:
 			## shorten results for the human readable XLSX file
 
 			## filter the results
-			res.short <- lapply(res, function(x) lapply(x, reformat_res, pval.thr=.05, auc.thr=.55))
+			res.short <- lapply(res, function(x) lapply(x, reformat_res, pval.thr=Inf, auc.thr=0))
 
 			## res.short still has two levels, one for the databases, another one
 			## for sorting keys, so we need to unlist – one level only
