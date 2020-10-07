@@ -538,7 +538,7 @@ rule salmon:
 		#----- Salmon mapping
 		salmon quant --validateMappings -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
-		mv $(dirname {output.sf})/aux_info/meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
+		ln -s meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
 		mv $(dirname {output.sf})/libParams/flenDist.txt $(dirname {output.sf})/libParams/{wildcards.sample}.flenDist.txt #for multiqc
 		""")
 		
