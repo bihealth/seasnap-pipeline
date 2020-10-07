@@ -1094,7 +1094,7 @@ class CovariateFileTool(PipelinePathHandler):
 		:param step:  Snakemake rule name for which the files are searched
 		:param extension: file extension of the searched files
 		"""
-		files = self._get_mapping_input(step, extension, wildcards={})
+		files = sorted(self._get_mapping_input(step, extension, wildcards={}))
 		extra_files = {}
 		if other is not None:
 			for col, (a_step, a_ext) in other.items():
