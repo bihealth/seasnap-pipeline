@@ -549,8 +549,8 @@ class PipelinePathHandler:
 							source = glob(source.replace("{{{}}}".format(extra_wc), "*"), recursive=True)
 							search_pat = str(Path(search_pat).parent)
 							
-						get_wc = self._get_wildcard_values_from_file_path[1]
-						target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[extra_wc][0]}) for src in source]
+						get_wc = self._get_wildcard_values_from_file_path
+						target = [pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[1][extra_wc][0]}) for src in source]
 					else:
 						source = [self.file_path(**arg_dct)]
 						target = [pat.format(**{k:v for k,v in arg_dct.items() if k in wildcards})]
