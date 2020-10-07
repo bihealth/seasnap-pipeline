@@ -216,12 +216,34 @@ df2tmod <- function(df, gene_id_col=ncol(df), module_id_col=1, module_title_col=
 #'
 #' Use the Msigdb from the msigdbr package to generate a tmod object
 #' @return a tmod object
-msig2tmod <- function() {
+msig2tmod <- function(taxon=NULL) {
+
+  if(is.null(taxon)) stop("taxon is null")
 
   if(!require(msigdbr, quietly=TRUE)) stop("Package msigdbr not installed! Cannot proceed")
 
+  organism <- "Homo sapiens"
+
+  if(!is.null(taxon)) {
+    if(!require(orthomapper, quietly=TRUE)) {
+      stop("Package orthomapper not installed! Cannot proceed")
+    }
+    sptab <- orthomapper::speciesDBITable()
+    if(!taxon %in% sptab$taxonID) {
+      stop(sprintf("Taxon %s not in msigdbr!  use another taxonID (human or mouse, preferably)", taxon))
+    }
+    organism <- sptab[["species"]][ match(taxon, sptab[["taxonID"]]) ]
+    if(!organism %in% msigdbr::msigdbr_show_species()) {
+      stop(sprintf("Species %s not in msigdbr! Use another species (human or mouse, preferably)", organism))
+    }
+  }
+
   #df <- as.data.frame(msigdbr:::msigdbr_genesets)
-  df <- as.data.frame(msigdbr::msigdbr())
+  if(is.null(organism)) {
+    warning("organism is null")
+  }
+  message("msigdb, reading organism: ", organism)
+  df <- as.data.frame(msigdbr::msigdbr(species=organism))
   df <- df[ , c("gs_name", "gs_id", "gs_cat", "gs_subcat", "entrez_gene") ]
   colnames(df) <- c("Title", "ID", "Category", "Subcategory", "GeneID")
 
@@ -305,7 +327,6 @@ csv_bycol2tmod <- function(file, header=TRUE, row.names=NULL, stringsAsFactors=F
 #'
 #' Subset a tmod object using a parseable definition of subsets.
 #'
-#'
 #' @param subset definition of the subset
 #' @return a tmod object
 subset_tmod <- function(x, subset=NULL) {
@@ -383,6 +404,8 @@ tmod_read_file <- function(x, format) {
 #' @return object containing all tmod databases
 process_dbs <- function(config) {
 
+  config_full <- config
+  config <- config$tmod
   require(tmod, quietly=TRUE)
 
   dbs <- config$databases
@@ -392,11 +415,13 @@ process_dbs <- function(config) {
     return(NULL)
   }
 
+  ## fill in name and title, check for the file field
   dbs <- lapply(1:length(dbs), function(i) .fill_missing(dbs[[i]], i)) 
 
   dbs.names <- sapply(dbs, function(x) x$name)
-  msig <- NULL
-  tmod <- NULL
+  msig    <- NULL
+  msig_mm <- NULL
+  tmod    <- NULL
 
   if(is.null(config$file_path)) config$file_path <- "./"
   
@@ -405,21 +430,27 @@ process_dbs <- function(config) {
   process_entry <- function(x) {
 
     dbobj <- NULL
+    x$PROCESSED <- TRUE
+    if(is.null(x$taxonID)) { 
+      x$taxonID <- config_full$organism$taxon 
+    }
     
     # two special keywords: msigdb and tmod define databases configured
     # from within the script
     if(x$file == "msigdb") {
       if(is.null(msig)) {
         message("reading msigdb")
-        msig <<- msig2tmod()
+        msig <<- msig2tmod(taxon=x$taxonID)
       }
       dbobj <- msig
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "ENTREZID" }
     } else if(x$file == "tmod") {
       if(is.null(tmod)) {
         data("tmod", envir=environment())
         tmod <<- tmod
       }
       dbobj <- tmod
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "SYMBOL" }
     # if a file is provided, a format is required
     } else if(is.null(x$format)) {
       stop("Processing tmod db configuration: if file path provided, format must not be empty")
@@ -455,33 +486,6 @@ process_dbs <- function(config) {
 }
 
 
-
-#' Retrieve target and source gene IDs from the orthology db
-#'
-#' Given a connection to the orthology database, retrieve matching gene IDs
-#' from a source and target species given the taxon ID.
-#' 
-#' The orthology database must have a table 'orthologs' with columns
-#' Tax_id, Other_tax_id, GeneID and Other_GeneID.
-#' @param con DBI connection
-#' @param source_id,target_id source and target organism taxon IDs
-#' @return a data frame with two columns: "Source" and "Target"
-get_orthologs <- function(con, source_id, target_id) {
-
-  # we need to search DB both ways, since there are no duplicate pairs in
-  # the db
-  fmt <- "SELECT GeneID, Other_GeneID FROM orthologs WHERE (Tax_id == %s AND Other_tax_id == %s)"
-  query <- sprintf(fmt, source_id, target_id)
-  map <- dbGetQuery(con, query)
-  colnames(map) <- c("Source", "Target")
-
-  fmt <- "SELECT Other_GeneID, GeneID FROM orthologs WHERE (Other_tax_id == %s AND Tax_id == %s)"
-  query <- sprintf(fmt, source_id, target_id)
-  map2 <- dbGetQuery(con, query)
-  colnames(map2) <- c("Source", "Target")
-  map <- rbind(map, map2)
-  return(map)
-}
 
 #' Map from entrez to selected column of an annDBI
 #'
@@ -662,14 +666,13 @@ get_msd <- function(de, ci=.95) {
 #' config and the default parameter; the first non-null value from these three
 #' sources is used.
 #' @param de differential expression data frame (form DESeq2)
-#' @param config config object (a list)
+#' @param config main sea-snap config object (a list)
 #' @return a list with one element for each sort key
 #' @export
 get_ordered_genelist <- function(de, config, default="pval") {
 
   ## take the first non-NULL value
   sort_by  <- c(config$tmod$sort_by, default)[1]
-
 
   sort_by <- strsplit(sort_by, " *, *")[[1]]
   gene.ids <- rownames(de)
@@ -725,30 +728,27 @@ get_ordered_genelist <- function(de, config, default="pval") {
 #' Wrapper around tmod 
 #'
 #' Wrapper around tmod 
-#' @param db object holding a tmod database
+#' @param db object holding a tmod database in db$dbobj
+#' @param genelists a list of character vectors; each character vector is a sorted gene list mapped to the IDs of the respective database
 #' @param config object holding the global configuration
 #' @param de results of differential gene expression analysis
 #' @param db.map mapping for the databases
-#' @return a list containing two elements: res=data frame – raw tmod
-#'         results, no filtering, no sorting; gl=character vector of 
-#'         ordered gene ids
+#' @return a list containing tmod results for each gene list: data frame – raw tmod
+#'         results, no filtering, no sorting
 #' @export
 run_tmod <- function(db, config, genelists, db.map) {
   require(tmod)
   message(sprintf("Running tmod with db %s", db$name))
 
   name <- db$name
-# mapping.id <- db.map$dbs[[ name ]]
-# mapping <- db.map$maps[[ mapping.id ]]
 
   gl <- genelists[[name]]
 
   tmod.func <- "tmodCERNOtest"
-  tmod.func <- eval(parse(text=tmod.func))
   
   res <- lapply(gl, function(gene.ids) {
     #gene.ids.db <- mapping[gene.ids]
-    tmod.func(gene.ids, qval=Inf, order.by="n", mset=db$dbobj)
+    do.call(tmod.func, list(gene.ids, qval=Inf, order.by="n", mset=db$dbobj))
   })
   return(res)
 }
@@ -756,7 +756,9 @@ run_tmod <- function(db, config, genelists, db.map) {
 #' Generate mapped ordered lists of genes for enrichment analysis
 #'
 #' For a given database, map all genelists which correspond to that
-#' database with the respective database IDs
+#' database with the respective database IDs.
+#'
+#' The ordered_genelist parameter
 #' @param db database object from configuration
 #' @param ordered genelist a list with ordered gene lists
 #' @param db.map mapping object for databases

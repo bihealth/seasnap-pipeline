@@ -756,11 +756,11 @@ rule tmod_dbs:
 
 			## read the necessary files
 			## create the databases
-			dbs <- process_dbs(config$tmod)
+			dbs <- process_dbs(config)
 			saveRDS(dbs, file=res.file)
 
 			## provide mapping for the databases
-			map <- get_mapping(config, config$tmod$databases, annot.f)
+			map <- get_mapping(config, dbs, annot.f)
 			saveRDS(map, file=map.file)
 		""")
 
@@ -811,8 +811,6 @@ rule tmod:
 			dbs <- readRDS(dbs.f)
 			db.map <- readRDS(map.f)
 			de.res <- readRDS(de.input)
-			foo <- rownames(de.res)
-			if(is.null(foo)) stop("foo is NULL!")
 
 			## create ordered gene lists for every database
 			message(paste0("Starting tmod for contrast ", de.input))
@@ -829,12 +827,12 @@ rule tmod:
 			## each of these elements contains objects `res` (df with results)
 			## and `gl` (genelist used to generate the results) 
 			saveRDS(res, file=res.file)
-			message("rds saved")
+			message("tmod rds saved")
 
 			## shorten results for the human readable XLSX file
 
 			## filter the results
-			res.short <- lapply(res, function(x) lapply(x, reformat_res, pval.thr=.05, auc.thr=.55))
+			res.short <- lapply(res, function(x) lapply(x, reformat_res, pval.thr=Inf, auc.thr=0))
 
 			## res.short still has two levels, one for the databases, another one
 			## for sorting keys, so we need to unlist – one level only
@@ -1120,6 +1118,7 @@ rule cluster_profiler:
 					    sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
         return(em)
 			}})
+      names(cat_tests) <- categories
       return(cat_tests)
 		}})
     names(tests) <- tests_to_run
@@ -1155,8 +1154,7 @@ rule report:
 			config_file = pph.file_path("pipeline_report", "yaml", contrast="all", path_pattern=path)
 			pph.log_generated_files(save_to=file_table, path_pattern=path)
 			id_suffix, _ = rt.get_id_suffix(tag, num)
-			text_sub["file_tab"] += (f'file_tab{id_suffix} <- data.frame(read.table("{file_table}", sep="\\t", header=TRUE))\n'
-			                         f'file_tab{id_suffix}$filename <- as.character(file_tab{id_suffix}$filename)\n')
+			text_sub["file_tab"] += (f'file_tab{id_suffix} <- read.table("{file_table}", sep="\\t", header=TRUE, stringsAsFactors=FALSE)\n')
 			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
 
 		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)

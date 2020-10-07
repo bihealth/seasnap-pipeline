@@ -132,10 +132,10 @@ if(nrow(palettes) < length(covariates_fac)) {
   palette_names <- rep(palette_names, ceiling(length(covariates_fac)/nrow(palettes)))
 }
 
-covariates_pal_names <- set_names(palette_names[1:length(covariates_fac)], covariates_fac)
+covariates_pal_names <- rlang::set_names(palette_names[1:length(covariates_fac)], covariates_fac)
 
 ## get colors for each of the factor covariates
-covariates_col <- lapply(set_names(covariates_fac), function(cov) {
+covariates_col <- lapply(rlang::set_names(covariates_fac), function(cov) {
   pal.name <- covariates_pal_names[cov]
   n.col <- length(levels(df[[cov]]))
   max.col <- subset(palettes, palette == pal.name)$maxcolors[1]
@@ -147,15 +147,15 @@ covariates_col <- lapply(set_names(covariates_fac), function(cov) {
   }
   names(.pal) <- levels(df[[cov]])
 
-  set_names(.pal[ as.character(df[[cov]]) ], plotly_ids)
+  rlang::set_names(.pal[ as.character(df[[cov]]) ], plotly_ids)
 })
 
 cont_pal <- colorRampPalette(c("#440154FF", "#21908CFF", "#FDE725FF"))(32)
-covariates_col_cont <- lapply(set_names(setdiff(covariates, covariates_fac)), function(cov) {
+covariates_col_cont <- lapply(rlang::set_names(setdiff(covariates, covariates_fac)), function(cov) {
   x <- df[[cov]]
   col_i <- seq(min(x, na.rm=TRUE), max(x, na.rm=TRUE), length.out=33)
   i <- findInterval(x, col_i, all.inside=TRUE)
-  set_names(cont_pal[i], plotly_ids)
+  rlang::set_names(cont_pal[i], plotly_ids)
 })
 
 covariates_col <- c(covariates_col, covariates_col_cont)
@@ -166,7 +166,7 @@ symbols <- c("circle", "square", "diamond", "cross", "x", "triangle",
              "pentagon", "hexagram", "star", "diamond", "hourglass",
              "bowtie", "asterisk", "hash")
 
-cov_symbols <- lapply(set_names(covariates), function(cov) {
+cov_symbols <- lapply(rlang::set_names(covariates), function(cov) {
   lev <- levels(df[[cov]])
   .s <- symbols
   if(length(lev) > length(.s)) {
@@ -183,7 +183,7 @@ cov_symbols <- lapply(set_names(covariates), function(cov) {
 plotly_ids <- paste0("ID", 1:nrow(df))
 
 ## create hovertext as a combination of covariates
-hovertext <- apply(map_dfc(set_names(covariates), ~ sprintf("%s: %s", ., df[[.]])), 1, paste, collapse="\n")
+hovertext <- apply(map_dfc(rlang::set_names(covariates), ~ sprintf("%s: %s", ., df[[.]])), 1, paste, collapse="\n")
 hovertext <- paste(hovertext, sprintf("plotlyID: %s", plotly_ids), sep="\n")
 
 ## set up default colors and symbols

@@ -29,9 +29,16 @@ experiment:
       
 #---------------------------------------- filtering of count matrices
 filters:
-  low_counts: 0
+  low_counts: 10
   experiment_blacklist: {} # {<Column>: [<Level1>,...]} for columns of covariate file
   experiment_whitelist: {}
+
+  # these two parameters allow a more fine grained filtering:
+  # setting them means that only genes will be kept which have at least
+  # `min_counts` in at least `min_count_n` samples
+
+  min_counts: 5
+  min_count_n: 3
   
 #---------------------------------------- normalization parameters
 normalization:
@@ -144,7 +151,6 @@ tmod:
         Reactome gene sets
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C2,Subcategory=CP:REACTOME"
     - name: msigdb_hallmark
@@ -154,7 +160,6 @@ tmod:
         Hallmark gene sets
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=H"
     - name: msigdb_kegg
@@ -164,7 +169,6 @@ tmod:
         KEGG pathways from 
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C2,Subcategory=CP:KEGG"
     - name: msigdb_mir
@@ -174,7 +178,6 @@ tmod:
         MIR targets from
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C3,Subcategory=MIR:MIRDB"
     - name: msigdb_go_bp
@@ -184,7 +187,6 @@ tmod:
         GO Biological Process definitions from
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
-      taxonID: 9606
       primaryID: ENTREZID
       subset: "Category=C5,Subcategory=BP"
        
