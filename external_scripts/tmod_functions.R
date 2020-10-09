@@ -779,6 +779,37 @@ map_genelists <- function(db, ordered_genelist, db.map) {
   return(ret)
 }
 
+#' Add a column with significant genes to the data frame with results
+add_sign_genes <- function(df, db, de.res, db_map, qval.thr=.05, lfc.thr=0) {
+  require(tmod)
+
+  mod.ids <- df$ID
+
+  mod.ids <- mod.ids[!is.na(mod.ids)]
+
+  df <- df[ match(mod.ids, df$ID), ]
+
+  name <- db$name
+  mapping.id <- db.map$dbs[[ name ]]
+  mapping <- db.map$maps[[ mapping.id ]]
+
+  sign <- de.res$padj < qval.thr & abs(de.res$log2FoldChange) > lfc.thr 
+  sign.ids <- rownames(de.res)[ sign ]
+  sign.ids.db <- mapping[ sign.ids ]
+
+  mod.genes <- getModuleMembers(mod.ids, mset=db$dbobj)
+
+  mod.genes <- lapply(mod.genes, function(x) {
+    x <- x[ x %in% sign.ids.db ]
+  })
+
+  mod.genes <- sapply(mod.genes, function(x) {
+    paste(x, collapse="; ")
+  })
+
+  df[["Significant genes"]] <- mod.genes
+  return(df)
+}
 
 
 #' Reformat tmod results
@@ -791,6 +822,6 @@ map_genelists <- function(db, ordered_genelist, db.map) {
 reformat_res <- function(x, pval.thr=.05, auc.thr=.55) {
   if(is.null(x)) return(x)
   x <- x[ order(x[["P.Value"]]), ]
-  x <- x[ x$adj.P.Val < pval.thr & x$AUC > auc.thr, , drop=FALSE]
+  x <- x[ !is.na(x$adj.P.Val) & x$adj.P.Val < pval.thr & !is.na(x$AUC) & x$AUC > auc.thr, , drop=FALSE]
   x 
 }
