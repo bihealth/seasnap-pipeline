@@ -37,7 +37,7 @@ tmod.pca  <- readRDS(tmod.pca.f)
 tmod.mapping <- readRDS(map.f)
 
 # load tmod functions
-r.path <- "{{R_COMMON}}"
+r.path <- r_common
 script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
 source(script_f)
 ```

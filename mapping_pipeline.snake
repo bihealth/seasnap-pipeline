@@ -74,6 +74,7 @@ def get_inputs_all():
 	if "star-gene_counts" in mapping_choices: 
 		inputs += pph.expand_path("star",           "bam",            fix="!sample")
 		inputs += pph.expand_path("feature_counts", "feature_counts", fix="!sample")
+		inputs += pph.expand_path("tpm_calculator", "tsv",            fix="!sample")
 	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", fix="!sample")
 	if "ciri-circRNA" in mapping_choices:
@@ -312,6 +313,32 @@ rule star:
 		script_file = pph.log(log.out, snakemake_format(script), step="star", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+
+rule tpm_calculator:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		pph.file_path(step="tpm_calculator", extension="tsv")
+	log:
+		out = pph.file_path(step="tpm_calculator", extension="output.log", log=True)
+	params:
+		nsrt_bam = pph.file_path(step="tpm_calculator", extension="name_sorted.bam")
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		TPMCalculator -version || true
+
+		#----- run TPMCalculator
+		TPMCalculator -g {input.gtf} -b {input.bam}
+		cut -f1,7 $(basename {input.bam} .bam)_genes.out > {output}
+		mv $(basename {input.bam} .bam)_genes.* $(dirname {output})
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="tpm_calculator", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
 ##-------------------- bwa ---------------------------------------------------------------------------------
 
 GENOME_FILE_NAME = os.path.basename(config["organism"]["files"]["genome"])
@@ -336,6 +363,7 @@ rule bwa_index:
 		rm -fr $(dirname {output.index})/*
 
 		#----- run bwa index
+		mkdir -p $(dirname {db_prefix})
 		ln -s {input.genome} {db_prefix}
 		bwa index {params.options} {db_prefix}
 		""")
@@ -538,7 +566,7 @@ rule salmon:
 		#----- Salmon mapping
 		salmon quant --validateMappings -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
-		mv $(dirname {output.sf})/aux_info/meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
+		ln -s meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
 		mv $(dirname {output.sf})/libParams/flenDist.txt $(dirname {output.sf})/libParams/{wildcards.sample}.flenDist.txt #for multiqc
 		""")
 		

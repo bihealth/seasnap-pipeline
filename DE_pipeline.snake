@@ -45,11 +45,11 @@ onstart:
 	# draw a dag
 	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", contrast="all")
 	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
-	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
+	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng 1> {}".format(SNAKEFILE, dag_file))
 	# info about the pipeline run
 	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", contrast="all")
 	os.makedirs(os.path.dirname(info_file), exist_ok=True)
-	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' 1> {}".format(SNAKEFILE, info_file))
 	# save merged config
 	config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
@@ -64,13 +64,21 @@ def get_inputs_all():
 	#functional annotation
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
-	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
+	#inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
-	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
+	#inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
 	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
 	inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
-	
+
+	#time series
+	for ts in config["time_series"]:
+		inputs.append(pph.file_path(step = "rain", extension = "tsv", contrast=ts))
+
+	#time series comparisons
+	for tsc in config["dodr"]["comparisons"]:
+		inputs.append(pph.file_path(step = "dodr", extension = "tsv", contrast=tsc))
+
 	return inputs
 
 
@@ -171,9 +179,14 @@ rule import_gene_counts:
 	input:
 		samples = config["experiment"]["covariate_file"]["star"]
 	output:
-		rds=pph.file_path("import_gene_counts", "rds", contrast = "all")
+		rds=pph.file_path("import_gene_counts", "rds", contrast = "all"),
+		tsv=pph.file_path("import_gene_counts", "tsv", contrast = "all"),
+		xlsx=pph.file_path("import_gene_counts", "xlsx", contrast = "all")
 	log:
 		out = pph.file_path("import_gene_counts", "output.log", contrast = "all", log=True)
+	params:
+		tpm_xlsx=pph.file_path("import_gene_counts", "tpm.xlsx", contrast = "all"),
+		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		column_filter = ""
@@ -185,6 +198,9 @@ rule import_gene_counts:
 								for k,v in config["filters"]["experiment_blacklist"].items())
 		if column_filter == "":
 			column_filter = "TRUE"
+
+		r_gene_list = "'"+config["filters"]["gene_list"]["file"]+"'" or "NULL"
+		r_gene_list_type = config["filters"]["gene_list"]["type"]
 		
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
@@ -192,15 +208,22 @@ rule import_gene_counts:
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
-    library(writexl)
-		
+		library(writexl)
+		library(AnnotationDbi)
+		library({params.annot_pkg})
+
 		{R_SESSION_INFO}
 
-    #----- variables
-    sample_f  <- "{input.samples}"
-    output_rds  <- "{output.rds}"
-		conf.f   <- "{config_file}"
-		
+		#----- variables
+		sample_f  <- "{input.samples}"
+		output_xlsx <- "{output.xlsx}"
+		output_tsv <- "{output.tsv}"
+		output_tpm_xlsx <- "{params.tpm_xlsx}"
+		output_rds  <- "{output.rds}"
+		conf.f <- "{config_file}"
+		gene_list <- {r_gene_list}
+		subset_genes_type <- "{r_gene_list_type}"
+
 		#----- import data
 		sample_df <- read.table(sample_f, header=TRUE)
 		files     <- as.character(sample_df$filename); print(files)
@@ -210,9 +233,29 @@ rule import_gene_counts:
 		#----- merge count files from star
 		df_list   <- lapply(1:length(files), function(i) as.data.frame(read.csv(files[i], skip=4, sep="\t", 
 		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
-		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list) 
-    rownames(count_dat) <- count_dat$ID
-		
+		count_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), df_list)
+		rownames(count_dat) <- count_dat$ID
+
+		#----- subset genes
+		if (!is.null(gene_list)) {{
+			subset_genes <- as.character(read.csv(gene_list, header=F)[,1]); print(subset_genes)
+			if (subset_genes_type == "ENSEMBL"){{
+				subset_ensembl_genes <- subset_genes
+			}} else {{
+				subset_ensembl_genes <- mapIds({params.annot_pkg}, keys=subset_genes, column="ENSEMBL",
+											   keytype=subset_genes_type, multiVals="first"); print(subset_ensembl_genes)
+			}}
+			count_dat <- count_dat[subset_ensembl_genes[!is.na(subset_ensembl_genes)],]
+		}}
+
+		#----- if present, merge tpm values (generated from star bam with TPMcalculator) for display along results
+		if ("tpm" %in% colnames(sample_df)) {{
+			tpm_files <- as.character(sample_df$tpm)
+			tpm_df_list <- lapply(1:length(tpm_files), function(i) as.data.frame(read.csv(tpm_files[i], sep="\t",
+		                                                                        col.names=c("ID", samples[i]), check.names=FALSE, header=FALSE)))
+			tpm_dat <- Reduce(function(...) merge(..., all=TRUE, by="ID"), tpm_df_list); rownames(tpm_dat) <- tpm_dat$ID
+		}}
+
 		#----- change levels
 		level_cols <- {level_list}
 		for (col in names(level_cols)) {{
@@ -225,6 +268,18 @@ rule import_gene_counts:
 		
 		#----- save as rds
 		saveRDS(dds, file=output_rds)
+
+		#----- export counts as tables
+		colnames(count_dat) <- sample_df$label
+		write_xlsx(count_dat, path=output_xlsx)
+		write.table(count_dat, file=output_tsv, sep="\t", quote=F)
+		if ("tpm" %in% colnames(sample_df)) {{
+			symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", tpm_dat$ID),
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		    tpm_dat <- cbind(symbol, tpm_dat)
+			colnames(tpm_dat) <- c("Symbol", "geneID", as.character(sample_df$label))
+			write_xlsx(tpm_dat, path=output_tpm_xlsx)
+		}}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
@@ -377,7 +432,7 @@ rule export_raw_counts:
 		count_dat <- as.data.frame(assay(dds))
 		col_dat <- colData(dds)
 		colnames(count_dat) <- col_dat$label
-    write_xlsx(count_dat, path=output_xlsx)
+    	write_xlsx(count_dat, path=output_xlsx)
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="export_raw_counts", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -407,7 +462,7 @@ rule DESeq2:
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		count_threshold       = config["filters"]["low_counts"]
-                normalized_expression = config["normalization"]["normalized_expression"]
+		normalized_expression = config["normalization"]["normalized_expression"]
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
@@ -417,8 +472,8 @@ rule DESeq2:
 		{R_SESSION_INFO}
 
 		conf.f   <- "{config_file}"
-		
-    #----- load config
+
+		#----- load config
 		config <- yaml::yaml.load_file(conf.f)
 
 		#----- load DESeqDataSet
@@ -433,7 +488,7 @@ rule DESeq2:
 		  keep <- keep & rs >= config$filters$min_count_n
 		}}
 
-		dds  <- dds[keep,]
+		dds  <- dds[keep,]; print(dds)
 		
 		#----- DESeq2
 		dds <- DESeq(dds, betaPrior=FALSE, test="Wald")
@@ -748,7 +803,7 @@ rule tmod_dbs:
 			annot.f  <- "{input.annotation}"
 			 
 			## ------------------------------
-      ## no wildcards beyond this point
+			## no wildcards beyond this point
 			## ------------------------------
 
 			config <- yaml::yaml.load_file(conf.f)
@@ -799,7 +854,7 @@ rule tmod:
 			res.gl.f <- "{output.tmod_gl}"
 			 
 			## ------------------------------
-      ## no wildcards beyond this point
+			## no wildcards beyond this point
 			## ------------------------------
 			library(DESeq2)
 			library(tmod)
@@ -847,15 +902,15 @@ rule tmod:
 			## for sorting keys, so we need to unlist – one level only
 			res.short <- unlist(res.short, recursive=FALSE)
 
-      ## remove if there were no results
-      res.short <- res.short[!sapply(res.short, is.null)]
+			## remove if there were no results
+			res.short <- res.short[!sapply(res.short, is.null)]
 			write_xlsx(res.short, path=res.xlsx)
-		""")
+			""")
 
-		script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
+			script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
 
-		# run R
-		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+			# run R
+			shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- multivariate tmod ----------------------------------------------------------------
 
@@ -886,7 +941,7 @@ rule tmod_pca:
 			res.pca.f <- "{output.pca}"
 			 
 			## ------------------------------
-      ## no wildcards beyond this point
+			## no wildcards beyond this point
 			## ------------------------------
 			require(DESeq2)
 			require(tmod)
@@ -907,7 +962,7 @@ rule tmod_pca:
 			genes <- rownames(rl)
 			if(is.null(genes)) stop("can't get primary IDs from DESeq2 object!")
 
-		  pca <- prcomp(t(rl), scale.=TRUE)
+			pca <- prcomp(t(rl), scale.=TRUE)
 			saveRDS(pca, file=res.pca.f)
 
 			ncomp <- min(4, ncol(pca$x))
@@ -1140,10 +1195,179 @@ rule cluster_profiler:
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 		
-##-------------------- QC steps -----------------------------------------------------------------------------
+##-------------------- time series -----------------------------------------------------------------------------
 
-# plots go into report snippets
+rule rain:
+	""" run Rain for rhythm detection in time series """
+	input:
+		counts = pph.file_path("import_gene_counts", "tsv", contrast="all")
+	output:
+		tsv = pph.file_path("rain", "tsv")
+	log:
+		out = pph.file_path(step = "rain", extension = "output.log", log=True)
+	params:
+		period = config["rain"]["period"],
+		peak_boarder = config["rain"]["peak_boarder"],
+		min_fold_change = config["rain"]["filter"]["min_fold_change"],
+		min_threshold = config["rain"]["filter"]["frac_above_threshold"]["threshold"],
+		frac_above_threshold = config["rain"]["filter"]["frac_above_threshold"]["frac"],
+		annot_pkg  = config["organism"]["R"]["annotations"]
+	run:
+		ts_columns = [rep for samp in config["time_series"][wildcards.contrast]["samples"] for rep in samp]
+		r_ts_columns = pph.get_r_repr(ts_columns, to_type = "vector")
+		r_time_points = pph.get_r_repr(config["time_series"][wildcards.contrast]["time_points"], to_type = "vector")
+		r_nr_replicates = pph.get_r_repr([len(samp) for samp in config["time_series"][wildcards.contrast]["samples"]], to_type = "vector")
 
+		script = textwrap.dedent(r"""
+		library("stats")
+		library("siggenes")
+		library("rain")
+		library("AnnotationDbi")
+		library("{params.annot_pkg}")
+		{R_SESSION_INFO}
+
+		#----- params
+		period <- {params.period}
+		peak_boarder <- {params.peak_boarder}
+		min_fold_change <- {params.min_fold_change}
+		min_threshold <- {params.min_threshold}
+		frac_above_threshold <- {params.frac_above_threshold}
+
+		#----- prepare matrix
+		counts_file <- data.frame(read.csv("{input.counts}", sep="\t"))
+		ts_columns <- {r_ts_columns}
+		counts_file <- t(counts_file[,ts_columns])
+
+		#----- fraction above threshold filter
+		frac <- apply(counts_file, 2, function(x) sum(x >= min_threshold)/length(x))
+		counts_file <- counts_file[,frac >= frac_above_threshold]
+
+		#----- fold change filter
+		maxima <- apply(counts_file, 2, function(x) max(x, na.rm=T))
+		minima <- apply(counts_file, 2, function(x) min(x, na.rm=T))
+		counts_file <- counts_file[,maxima/minima > min_fold_change]
+
+		#----- run rain
+		distances <- diff({r_time_points})
+		rainresult <- rain(counts_file,
+		                   period=period,
+		                   deltat=distances[1],
+		                   peak.border=peak_boarder,
+		                   verbose=F,
+		                   measure.sequence={r_nr_replicates},
+		                   na.rm=F
+		)
+
+		pvalues <- rainresult[T,1]
+		qvalues_BH <- p.adjust(pvalues, 'BH')
+
+		#----- map Ids
+		symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", colnames(counts_file)),
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", colnames(counts_file)),
+		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+
+		#----- write tsv
+		write.table(
+			data.frame(
+				ensembl=colnames(counts_file),
+				symbol=symbol,
+				entrez=entrez,
+				q_val_BH=qvalues_BH,
+				p_val=pvalues,
+				phase=rainresult["phase"],
+				peak_shape=rainresult["peak.shape"],
+				period=rainresult["period"]
+				),
+			sep = "\t",
+			quote = F,
+			row.names = F,
+			file = "{output.tsv}"
+		)
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="rain", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
+rule dodr:
+	input:
+		counts = pph.file_path("import_gene_counts", "tsv", contrast="all")
+	output:
+		tsv = pph.file_path("dodr", "tsv")
+	log:
+		out = pph.file_path(step = "dodr", extension = "output.log", log=True)
+	params:
+		time_series1 = lambda wcs: config["dodr"]["comparisons"][wcs.contrast]["time_series1"],
+		time_series2 = lambda wcs: config["dodr"]["comparisons"][wcs.contrast]["time_series2"],
+		period = config["dodr"]["period"],
+		method = config["dodr"]["method"],
+		annot_pkg  = config["organism"]["R"]["annotations"]
+	run:
+		def get_time_series_data(time_series):
+			""" get data from a time series, which may come from a different experiment """
+			time_series_path = time_series["path"] or pph.out_path_pattern
+			ts_config = pph.load_config_from_path(time_series_path)
+			r_time_points = pph.get_r_repr([
+					tp
+					for i, tp in enumerate(ts_config["time_series"][time_series["name"]]["time_points"])
+					for rep in ts_config["time_series"][time_series["name"]]["samples"][i]
+				], to_type = "vector"
+			)
+			ts_columns = [rep for samp in ts_config["time_series"][time_series["name"]]["samples"] for rep in samp]
+			r_ts_columns = pph.get_r_repr(ts_columns, to_type = "vector")
+			ts_counts = pph.file_path("import_gene_counts", "tsv", contrast="all", path_pattern=time_series_path)
+			return (ts_counts, r_time_points, r_ts_columns)
+
+		counts1, r_time_points1, r_ts_columns1 = get_time_series_data(params.time_series1)
+		counts2, r_time_points2, r_ts_columns2 = get_time_series_data(params.time_series2)
+
+		script = textwrap.dedent(r"""
+		library("DODR")
+		library("AnnotationDbi")
+		library("{params.annot_pkg}")
+		{R_SESSION_INFO}
+
+		#----- params
+		period <- {params.period}
+		method <- "{params.method}"
+		times1 <- {r_time_points1}
+		times2 <- {r_time_points2}
+
+		#----- prepare main matrix
+		counts1 <- data.frame(read.csv("{counts1}", sep="\t"))
+		ts_columns1 <- {r_ts_columns1}
+		counts1 <- t(counts1[,ts_columns1]); print(counts1[1:5,1:5]); print(times1)
+
+		#----- prepare comparison matrix
+		counts2 <- data.frame(read.csv("{counts2}", sep="\t"))
+		ts_columns2 <- {r_ts_columns2}
+		counts2 <- t(counts2[,ts_columns2]); print(counts2[1:5,1:5]); print(times2)
+
+		#----- keep common columns
+		common_col <- intersect(colnames(counts1), colnames(counts2))
+		counts1 <- counts1[,common_col]
+		counts2 <- counts2[,common_col]
+
+		print(paste("times1 length:", length(times1), "counts1 dim:", paste(dim(counts1), collapse=", ")))
+		print(paste("times2 length:", length(times2), "counts2 dim:", paste(dim(counts2), collapse=", ")))
+		print(counts1[1:5,1:5])
+
+		#----- run rain
+		dodrresult <- dodr(val1=counts1, val2=counts2, times1=times1, times2=times2, period=period, method=method)
+
+		#----- map Ids
+		symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", common_col),
+		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+		entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", common_col),
+		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+
+		#----- write tsv
+		write.table(data.frame(ensembl=common_col, symbol=symbol, entrez=entrez, dodrresult$p.value.table),
+		            sep = "\t", quote = F, row.names = F, file = "{output.tsv}")
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="dodr", extension="R", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- report -------------------------------------------------------------------------------
 
@@ -1187,4 +1411,53 @@ rule report_html:
 	run:
 		shell("Rscript --vanilla -e 'rmarkdown::render(\"{input.rmd}\", output_file=\"{output.html}\")' &>> '{log.out}'")
 
+## ----------------------- contrast summary table -------------------------
 
+rule contrast_summary:
+	""" generate a summary table with contrast results """
+	input:
+		rds_list = pph.expand_path(step="contrast", extension="rds")
+	output:
+		xlsx = pph.file_path(step="contrast_summary", extension="xlsx", contrast="all"),
+		tsv = pph.file_path(step="contrast_summary", extension="tsv", contrast="all")
+	log:
+		out = pph.file_path(step = "contrast_summary", extension = "output.log", contrast="all", log=True)
+	run:
+		rds_list = pph.get_r_repr(input.rds_list, to_type="list")
+		contrast_ids = pph.get_r_repr(pph.contrast_ids)
+
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(DESeq2)
+		library(writexl)
+		library(data.table)
+
+		{R_SESSION_INFO}
+
+		#----- variables
+		input_rds_list <- {rds_list}
+		names(input_rds_list) <- {contrast_ids}
+		output_xlsx <- "{output.xlsx}"
+		output_tsv  <- "{output.tsv}"
+
+		#----- merge contrast results in table
+		merge_contrast_cols <- function(data_frame, rds_index){{
+			print(paste("merge", rds_index))
+			rds_file <- input_rds_list[[rds_index]]
+			add_cols <- as.data.frame(readRDS(rds_file))[,c("log2FoldChange", "padj", "symbol")]
+			colnames(add_cols) <- c(paste(c("LFC", "padj"), rds_index, sep="_"), "symbol")
+			add_cols$gene <- rownames(add_cols)
+			add_cols <- as.data.table(add_cols, key=c("gene", "symbol"))
+			if (is.null(data_frame)) return(add_cols)
+			merged_table <- merge(data_frame, add_cols, all=TRUE, by=c("gene", "symbol"))
+			return(merged_table)
+		}}
+		indices <- as.list(names(input_rds_list))
+		result_summary <- Reduce(merge_contrast_cols, append(indices, list(NULL), after=0))
+
+		#----- save as XLSX and tsv
+		write_xlsx(result_summary, path=output_xlsx)
+		write.table(result_summary, file=output_tsv, sep="\t", quote=F)
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="contrast_summary", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")

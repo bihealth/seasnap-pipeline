@@ -1,0 +1,6 @@
+# Time series comparisons
+
+#HSTART
+## `r config$dodr$comparisons${{ENTRY_NAME}}$description`
+#HEND
+#>--------------------------------------------INSERT--------------------------------------------<#

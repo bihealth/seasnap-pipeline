@@ -11,6 +11,7 @@ library(magrittr)
 dds <- readRDS(subset(file_tab, step=="DESeq2" & extension=="deseq2.rds" & contrast=="all")$filename)
 covariate_table <- as.data.frame(colData(dds))
 covariate_table <- covariate_table[,c(2:dim(covariate_table)[2], 1)]
+covariate_table$tpm <- NULL
 
 #----- create table
 datatable(covariate_table, rownames=F, extensions='Buttons', escape=F,

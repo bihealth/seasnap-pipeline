@@ -9,7 +9,7 @@ library(enrichplot)
 
 for (test in names(ENRES)){
   cat(sprintf("\n##### %s {- .tabset}\n", test))
-  for (cat in names(ENRES[[test]])){
+  for (cat in 1:length(ENRES[[test]])){
     cat(sprintf("\n###### %s {-}\n", cat))
     
     try({print(dotplot(ENRES[[test]][[cat]], showCategory=20)); cat("\n")})
