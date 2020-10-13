@@ -18,7 +18,7 @@ CLUSTER_CONFIG = "cluster_config.json"
 
 CLUSTER_START = dict(
 	sge="export /opt/sge/lib/lx-amd64/libdrmaa.so; qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
-	slurm="unset DRMAA_LIBRARY_PATH; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	slurm="unset DRMAA_LIBRARY_PATH; unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
 )
 
 
