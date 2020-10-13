@@ -199,7 +199,7 @@ rule import_gene_counts:
 		if column_filter == "":
 			column_filter = "TRUE"
 
-		r_gene_list = ("'"+config["filters"]["gene_list"]["file"]+"'") if not config["filters"]["gene_list"]["file"] is None else "NULL"
+		r_gene_list = ("'"+config["filters"]["gene_list"]["file"]+"'") if config["filters"]["gene_list"]["file"] else "NULL"
 		r_gene_list_type = config["filters"]["gene_list"]["type"] or "NULL"
 		
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
