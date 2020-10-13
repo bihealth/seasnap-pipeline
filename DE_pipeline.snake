@@ -890,13 +890,13 @@ rule tmod:
 			## filter the results
 			res.short <- lapply(res, function(x) lapply(x, reformat_res, pval.thr=Inf, auc.thr=0))
 
-      ## hard: add lists of significant genes to the results tables
-      res.short <- imap(res, ~ {{
-        db.name <- .y
-        map(.x, ~ {{
-          add_sign_genes(., dbs[[db.name]], de.res, db.map)
-        }})
-      }})
+			## hard: add lists of significant genes to the results tables
+			res.short <- imap(res, ~ {{
+			  db.name <- .y
+			  map(.x, ~ {{
+			    add_sign_genes(., dbs[[db.name]], de.res, db.map)
+			  }})
+			}})
 
 			## res.short still has two levels, one for the databases, another one
 			## for sorting keys, so we need to unlist – one level only
@@ -906,11 +906,10 @@ rule tmod:
 			res.short <- res.short[!sapply(res.short, is.null)]
 			write_xlsx(res.short, path=res.xlsx)
 			""")
+		script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
 
-			script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
-
-			# run R
-			shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+		# run R
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- multivariate tmod ----------------------------------------------------------------
 
