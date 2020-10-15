@@ -78,6 +78,7 @@ def get_inputs_all():
 	if "ciri-circRNA" in mapping_choices:
 		inputs += pph.expand_path("bwa", "sam", fix="!sample")
 		inputs += pph.expand_path("ciri", "tsv", fix="!sample")
+#		inputs += [pph.file_path("circRNA_report",  extension="circRNA_report.Rmd", fix="all")]
 	elif "bwa-gene_counts" in mapping_choices:
 		inputs += pph.expand_path("bwa", "sam", fix="!sample")
 
@@ -102,7 +103,7 @@ def get_inputs_all():
 			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", fix="!sample")
 		if "qc"               in qc_choices: 
 			inputs += pph.expand_path("qc", "done", fix="!sample")
-
+        
 	return inputs
 
 
@@ -834,7 +835,7 @@ rule circRNA_report:
 	input:
 		get_inputs_all()
 	output:
-		pph.file_path("circRNA_report", "Rmd", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+		pph.file_path("circRNA_report", extension="circRNA_report.Rmd", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
 	run:
 		rt = ReportTool(pph, profile="circRNA")
 		report_text = rt.generate_report()
@@ -853,6 +854,6 @@ rule circRNA_report:
 		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"R_common"))
 		report_text = report_text.replace("{{LOAD_FILE_TABLE}}", text_sub["file_tab"])
 		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
-
+		print(report_text)
 		with open(output[0], "w") as f: f.write(report_text)
 
