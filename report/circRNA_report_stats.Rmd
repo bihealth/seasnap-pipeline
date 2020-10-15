@@ -1,6 +1,6 @@
 # Processed data
 
-This is an interactive table of the covariate data.
+We use CIRI to detect circRNAs
 
 ```{r DataTable}
 #----- import packages
@@ -8,6 +8,8 @@ library(DT)
 library(magrittr)
 library(dplyr)
 library(ggplot2)
+library(tidyr)
+
 
 ciri_list=list()
 ciri_files <- subset(file_tab, step=="ciri" & extension=="tsv")
@@ -20,17 +22,70 @@ for (i in 1:length(ciri_files$filename)){
 
 ciri_all<-do.call(rbind.data.frame, ciri_list) %>% tbl_df()
 
+  stats_file <-  (file_tab %>% filter(step=="multiqc") %>% filter(extension=="qc_report_data"))$filename
+  stats_file <- paste(stats_file, "/multiqc_samtools_stats.txt", sep = "")
+  stats<-read.table(stats_file, header=T) 
   
+  mean_mapped=mean(stats$reads_mapped)
+
 ```
 
 ```{r}
 
-ciri_all %>% group_by(sample) %>% count() %>% ggplot(aes(y=n, x=sample))+geom_bar()
-ciri_all %>% group_by(sample) %>% count() %>% ggplot(aes(y=n, x=sample))+geom_bar(stat="identity")+ggtitle("Total number of circRNAs per sample")
+ciri_all %>% group_by(sample) %>% count() %>% ggplot(aes(y=n, x=sample))+geom_bar(stat="identity")+ggtitle("Total number of circRNAs per sample") +
+ theme(text = element_text(size=15), axis.text.y=element_text(size=12), axis.text.x=element_text(size=12))+ coord_flip()
 
-ciri_all %>% group_by(sample) %>% summarise(all_junction_reads=sum(junction_reads)) %>% ggplot(aes(y=all_junction_reads, x=sample))+geom_bar(stat="identity")+ggtitle("Total number of circRNAs per sample")
+ciri_all %>% group_by(sample) %>% summarise(all_junction_reads=sum(junction_reads))%>% left_join(stats, by=c("sample"="Sample")) %>% dplyr::select(sample, all_junction_reads, reads_mapped) %>% mutate(norm_factor=reads_mapped/mean_mapped) %>% mutate(all_junction_reads=all_junction_reads/norm_factor) %>% ggplot(aes(y=all_junction_reads, x=sample))+geom_bar(stat="identity")+
+ggtitle("Number of circular reads per sample")+
+  theme(text = element_text(size=15), axis.text.y=element_text(size=12), axis.text.x=element_text(size=12))+ coord_flip()
+
+
+```
+
+the number of head-to-tail reads is normalized to the total number of (linearly) mapped reads
+
+```{r, fig.width=16, fig.height=12}
+ pie = ciri_all %>% group_by(sample, circRNA_type) %>% count()
+
+ ggplot(data = pie, aes(x = "", y = n, fill = circRNA_type )) + 
+   geom_bar(stat = "identity", position = position_fill()) +
+   geom_text(aes(label = n), position = position_fill(vjust = 0.5)) +
+   coord_polar(theta = "y") +
+   facet_wrap(~ sample)  +
+   theme(axis.title.x = element_blank(),
+         axis.title.y = element_blank()) + 
+   guides(fill=guide_legend(nrow=2, byrow=TRUE)) + ggtitle("Genomic annotations of circRNAs")
+ 
 
 ```
 
 
+```{r}
+ciri_all %>% ggplot(aes(x=junction_reads))+ geom_histogram(binwidth=5) + facet_wrap(~ sample) 
+```
+
+highest expressed circRNAs (junction_reads > 30)
+
+```{r}
+
+ciri_table <- ciri_all %>% filter(junction_reads > 30) %>% dplyr::select(circRNA_ID,strand, junction_reads, non_junction_reads, junction_reads_ratio, circRNA_type, gene_id, sample)
+
+DT::datatable(ciri_table)
+
+```
+
+```{r}
+
+covariates <- read.table("./covariate_file.txt", header=T) %>% tbl_df()
+
+```
+
+
+```{r, fig.width=16, fig.height=12}
+
+ciri_mean_norm <- ciri_all %>%  dplyr::select(circRNA_ID,junction_reads, sample) %>% left_join(stats, by=c("sample"="Sample")) %>% dplyr::select(circRNA_ID, sample, junction_reads, reads_mapped) %>% mutate(norm_factor=reads_mapped/mean_mapped) %>% mutate(norm_junction_reads=junction_reads/norm_factor)  %>% dplyr::select(sample, norm_junction_reads, circRNA_ID) %>% tidyr::spread(sample, norm_junction_reads ) %>% replace(is.na(.), 0) %>% tidyr::gather(sample, norm_junction_reads, covariates$group) %>% left_join(covariates, by=c("sample"="group")) %>% dplyr::select(circRNA_ID, sample, group2, norm_junction_reads) %>% group_by(circRNA_ID, group2) %>% summarise(mean_junction_count=mean(norm_junction_reads)) %>% tidyr::spread(group2, mean_junction_count)
+
+GGally::ggpairs(log2(ciri_mean_norm[,-1]+1))
+
+```
 
