@@ -55,7 +55,7 @@ sel <- apply(covariate_data, 2, function(x) {
 })
 
 covariates <- union(cov_default, colnames(covariate_data)[sel])
-covariate_data <- covariate_data[ , covariates ]
+covariate_data <- covariate_data[ , covariates, drop=FALSE ]
 
 ## we are sure that the order is the same
 df <- cbind(covariate_data, df)
