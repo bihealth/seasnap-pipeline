@@ -8,9 +8,10 @@ require(DESeq2)
 require(edgeR)
 require(pander)
 
-export_dir <- config$report$snippets$export_files$export_dir
+export_dir <- config$report$snippets$Export_files$export_dir
 if(is.null(export_dir)) {
   export_dir <- "export_files"
+  warning("config report:snippets:Export_files:export_dir not found, using export_files/")
 }
 
 dir.create(export_dir, showWarnings=FALSE)
