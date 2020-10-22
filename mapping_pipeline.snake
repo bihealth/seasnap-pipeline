@@ -104,6 +104,8 @@ def get_inputs_all():
 			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", fix="!sample")
 		if "qc"               in qc_choices: 
 			inputs += pph.expand_path("qc", "done", fix="!sample")
+		if "bw_from_bam"      in qc_choices:
+			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
 	return inputs
 
@@ -313,6 +315,29 @@ rule star:
 		script_file = pph.log(log.out, snakemake_format(script), step="star", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+## -----------------------------------------------------------------------------------
+## Create BW files suitable for IGV / USCS browser
+## -----------------------------------------------------------------------------------
+rule bw_from_bam:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+	output:
+		pph.file_path(step="bw_from_bam", extension="bw")
+	log:
+		out = pph.file_path(step="bw_from_bam", extension="output.log", log=True)
+	run:
+		genome_size=config["organism"]["genome_size"]
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		bamCoverage --version
+
+		#----- run bamCoverage
+		bamCoverage --bam {input.bam} --outFileFormat bigwig --outFileName {output} --effectiveGenomeSize {genome_size} --extendReads --normalizeUsing RPGC
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
 
 rule tpm_calculator:
 	input:

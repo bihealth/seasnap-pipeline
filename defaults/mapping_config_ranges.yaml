@@ -7,7 +7,7 @@ pipeline_param:
   mapping_results:
     - __opt__: [salmon-transcript_counts, star-gene_counts, bwa-gene_counts, ciri-circRNA]
   QC_results:
-    - __opt__: [fastqc, dupradar, infer_experiment, rna_seqc, qualimap_rnaseq, qualimap_bamqc, preseq_c_curve, preseq_lc_extrap]
+    - __opt__: [fastqc, dupradar, infer_experiment, rna_seqc, qualimap_rnaseq, qualimap_bamqc, preseq_c_curve, preseq_lc_extrap, bw_from_bam]
 
 #---------------------------------------- organism annotation
 organism_defaults:
