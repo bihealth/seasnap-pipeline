@@ -139,6 +139,8 @@ report:
     tmod_contrast:
       res_auc_thr: 0.65
       res_pval_thr: 0.01
+    Export_files:
+      dir: "export_files"
 
   defaults:
     NormalisationQC:
@@ -176,6 +178,7 @@ report:
     - contrast: __defaults__
     #- time_series: __defaults__
     #- time_series_comparison: __defaults__
+    #- Export_files.Rmd  ## export files for clients to export_files directory
 #
 #---------------------------------------- configuration for tmod
 

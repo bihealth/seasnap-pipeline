@@ -1,0 +1,86 @@
+# Exported files
+
+```{r export_files_setup}
+require(dplyr)
+require(writexl)
+require(purrr)
+require(DESeq2)
+require(edgeR)
+require(pander)
+
+export_dir <- config$report$snippets$export_files$export_dir
+if(is.null(export_dir)) {
+  export_dir <- "export_files"
+}
+
+dir.create(export_dir, showWarnings=FALSE)
+
+counts_f        <- file.path(export_dir, "counts.xlsx")
+gene_expr_res_f <- file.path(export_dir, "differential_expression_results.xlsx")
+```
+
+
+
+
+
+```{r export_files_do}
+## export raw counts
+ds_ft <- file_tab %>% filter(step == "DESeq2")
+
+ds <- file_tab %>% filter(extension == "deseq2.rds") %>% 
+  pull(filename) %>% readRDS
+
+rld <- file_tab %>% filter(extension == "rld.blind.rds") %>% 
+  pull(filename) %>% readRDS
+
+write_xlsx(list("Raw counts"=as.data.frame(counts(ds)), 
+                "RLD"=as.data.frame(assay(rld))),
+           path=counts_f)
+
+## export DE analysis data
+contrasts <- file_tab %>% filter(step=="contrast" & extension=="rds") %>%
+  mutate(ID=gsub(".*_", "", contrast)) %>%
+  arrange(ID)
+
+files <- set_names(contrasts[["filename"]], contrasts[["contrast"]])
+gene_expr_res <- map(files, readRDS) %>% map(as.data.frame) %>%
+  map(rownames_to_column, "PrimaryID") %>% map(arrange, padj)
+
+annotation <- file_tab %>% filter(step=="annotation" & extension=="rds") %>%
+ pull("filename") %>% readRDS()
+
+write_xlsx(c(list(Annotation=annotation), gene_expr_res), 
+  path=gene_expr_res_f)
+
+
+## Export tmod results
+tmod_ft <- file_tab %>% filter(step == "tmod" & extension == "xlsx") %>%
+  mutate(ID=gsub(".*_", "", contrast)) %>% arrange(ID)
+for(f in tmod_ft %>% pull(filename)) {
+  file.copy(f, export_dir)
+}
+
+```
+
+**Table.** Following files have been exported to the `r export_dir` directory.
+
+```{r export_files_filetab,results="markdown"}
+.f <- c(counts_f, gene_expr_res_f)
+export_ft <- data.frame(
+  Description=c(
+    "Raw counts, log CPM and rlog counts",
+    "Results of differential expression analysis for all contrasts"),
+  File=sprintf("[%s](%s)", basename(.f), .f),
+  stringsAsFactors=FALSE)
+     
+export_ft_2 <- tmod_ft %>%
+  mutate(Description=sprintf("Results of gene enrichment analysis with tmod for contrast %s", contrast),
+         File=sprintf("[%s](%s)", basename(filename), file.path(export_dir, basename(filename)))) %>%
+  select(Description, File)
+
+export_ft <- rbind(export_ft, export_ft_2)
+pander(export_ft)
+```
+
+
+
