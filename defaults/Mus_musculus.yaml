@@ -4,6 +4,7 @@ organism:
   taxon: 10090
 
   genome_version: GRCm38
+  genome_size: 2652783500
   
   files:
     genome: /fast/projects/cubit/18.12/static_data/reference/GRCm38/p5.chr_scaff/GRCm38.p5.genome.chr_scaff.fa
