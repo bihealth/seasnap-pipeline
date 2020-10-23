@@ -5,7 +5,7 @@ organism:
   taxon: 9606
 
   genome_version: GRCh38
-  genome_size: 2913022398
+  genome_size: "2913022398"
   
   files:
     genome: /fast/projects/cubit/18.12/static_data/reference/GRCh38/p7.chr_scaff/GRCh38.p7.genome.chr_scaff.fa
