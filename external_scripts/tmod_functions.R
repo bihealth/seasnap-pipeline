@@ -155,8 +155,8 @@ tmod_mod_sel <- function(res, qval.thr=.01, auc.thr=.65, max.n=25, min.n=max.n, 
   ret <- c(ret, list(#full_summary=res_sum, 
     results_n=NN, results_sign=Nsign))
 
-  if(Nsign < 2) {
-    ret$note <- "less than 2 significant results"
+  if(Nsign < 1) {
+    ret$note <- "0 significant results"
     return(ret)
   }
 

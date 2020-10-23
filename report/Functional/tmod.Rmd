@@ -320,7 +320,7 @@ for(db_n in names(tmod.res$results)) {
                                        max.n=conf.snip$fig_n_max,
                                        min.n=conf.snip$fig_n_min)
     if(!is.null(res_selection$note)) {
-      cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+      cat(paste("\n\nNo figure produced because there were", res_selection$note, ".\n\n"))
     } else {
       figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
       foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
