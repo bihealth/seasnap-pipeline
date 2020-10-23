@@ -1,6 +1,7 @@
 organism:
   name: human
   genus: "Homo sapiens"
+  abbreviation: "hs"
   taxon: 9606
 
   genome_version: GRCh38

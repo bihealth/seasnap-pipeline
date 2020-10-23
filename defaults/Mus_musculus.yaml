@@ -2,6 +2,7 @@ organism:
   name: mouse
   genus: "Mus musculus"
   taxon: 10090
+  abbreviation: "mm"
 
   genome_version: GRCm38
   genome_size: 2652783500
