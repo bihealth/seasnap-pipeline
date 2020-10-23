@@ -107,6 +107,11 @@ def get_inputs_all():
 		if "bw_from_bam"      in qc_choices:
 			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
+  # ATAC-seq
+	atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
+	if "macs2" in atacseq_choices:
+		inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
+	
 	return inputs
 
 
@@ -338,6 +343,44 @@ rule bw_from_bam:
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+## -----------------------------------------------------------------------------------
+## Run macs2 to detect peaks in ATAC-Seq
+## -----------------------------------------------------------------------------------
+rule macs2:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+	output:
+		bed=pph.file_path(step="macs2", extension="summits.bed")
+	log:
+		out = pph.file_path(step="macs2", extension="output.log", log=True)
+	run:
+		genome_abbr=config["organism"]["abbreviation"]
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		macs2 --version
+
+		#----- run macs2
+		macs2 callpeak -t {input.bam} -f BAMPE --outdir $(dirname {output.bed}) --name $(basename {output.bed} .summits.bed) -g {genome_abbr}
+		mv $(dirname {output.bed})/$(basename {output.bed} .summits.bed)_summits.bed {output.bed}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="macs2", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+
+
+
+
+
+
 
 rule tpm_calculator:
 	input:
