@@ -108,9 +108,10 @@ def get_inputs_all():
 			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
   # ATAC-seq
-	atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
-	if "macs2" in atacseq_choices:
-		inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
+	if "ATAC_Seq" in config["pipeline_param"]:
+		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
+		if "macs2" in atacseq_choices:
+			inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
 	
 	return inputs
 
