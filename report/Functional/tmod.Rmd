@@ -322,9 +322,14 @@ for(db_n in names(tmod.res$results)) {
     if(!is.null(res_selection$note)) {
       cat(paste("\n\nNo figure produced because there were", res_selection$note, ".\n\n"))
     } else {
-      figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
-      foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
-      cat(foo)
+
+      if(length(res_selection$sel_ids) < 2) {
+        cat(paste("\n\nNo panel plot produced because there was only 1 module to show.\n\n"))
+      } else {
+        figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
+        foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
+        cat(foo)
+      }
 
       n <- conf.snip$n_evid
       .sel <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, auc.thr=conf.snip$fig_auc_min, max.n=n, min.n=n)

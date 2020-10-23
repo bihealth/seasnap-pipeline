@@ -150,6 +150,7 @@ tmod_mod_sel <- function(res, qval.thr=.01, auc.thr=.65, max.n=25, min.n=max.n, 
 
   ret$full_summary <- res_sum
 
+  ## NN is the number of modules passing the filter based on both qval and AUC
   NN <- sum(res_sum$min_qvals < qval.thr & res_sum$max_aucs >= auc.thr)
   Nsign <- sum(res_sum$min_qvals < qval.thr)
   ret <- c(ret, list(#full_summary=res_sum, 
@@ -355,6 +356,7 @@ subset_tmod <- function(x, subset=NULL) {
     stop(sprintf("processing yaml file config/tmod/databases, entry %d: `file` field is mandatory!", i))
   if(is.null(db$name)) db$name <- paste0("DB", i)
   if(is.null(db$title)) db$title <- db$name
+  if(is.null(db$description)) db$description <- db$title
 
   db
 }
