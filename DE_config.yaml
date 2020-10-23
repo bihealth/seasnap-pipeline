@@ -11,7 +11,8 @@
 #    - for each variable used in formula, add an entry in "columns:"
 #      listing the levels of that variable
 # 5. Go to the `report:` section and choose which snippets you wish to run.
-# 6. Run the pipeline locally (e.g. `sea-snap DE l --cores 1`), or
+# 6. Test the configuration with `sea-snap DE l -np`
+# 7. Run the pipeline locally (e.g. `sea-snap DE l --cores 4`), or
 #    on the cluster (`sea-snap DE --slurm c`).
 
 
