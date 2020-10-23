@@ -155,4 +155,5 @@ report:
     - Functional:
       - tmod.Rmd
       - cluster_profiler_summary.Rmd
+      # - Disco.Rmd
  
