@@ -747,10 +747,14 @@ run_tmod <- function(db, config, genelists, db.map) {
   gl <- genelists[[name]]
 
   tmod.func <- "tmodCERNOtest"
+
+  if(is.null(db$nodups)) {
+    db$nodups <- TRUE
+  }
   
   res <- lapply(gl, function(gene.ids) {
     #gene.ids.db <- mapping[gene.ids]
-    do.call(tmod.func, list(gene.ids, qval=Inf, order.by="n", mset=db$dbobj))
+    do.call(tmod.func, list(gene.ids, qval=Inf, order.by="n", mset=db$dbobj, nodups=db$nodups))
   })
   return(res)
 }
