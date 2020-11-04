@@ -1341,7 +1341,7 @@ class ReportTool(PipelinePathHandler):
 
 		self.snippet_path = [ self.report_snippet_base_dir ]
 		if config_dict["report"]["path"]:
-			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + [ self.snippet_path ]
+			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + self.snippet_path 
 
 
 		print(str(self.snippet_path))
