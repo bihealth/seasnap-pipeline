@@ -1331,16 +1331,6 @@ class ReportTool(PipelinePathHandler):
 	entry_name_wildcard   = "{{ENTRY_NAME}}", "{{ENTRY_ID}}"
 
 	def __init__(self, pph, profile="DE"):
-		#if type(config) is dict:
-		#	config_dict = config
-		#elif isinstance(config, str):
-		#	with open(config, "r") as stream:
-		#		try:
-		#			config_dict = yaml.safe_load(stream)
-		#		except yaml.YAMLError as exc:
-		#			print(exc)
-		#else:
-		#	raise TypeError("Wrong type of argument config: must be dict or str.")
 		self.path_handler = pph
 		config_dict       = self.path_handler.snakemake_workflow.config
 
@@ -1348,6 +1338,13 @@ class ReportTool(PipelinePathHandler):
 			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
 		else:
 			self.report_snippet_base_dir = Path(sys.path[0]) / "report"
+
+		self.snippet_path = [ self.report_snippet_base_dir ]
+		if config_dict["report"]["path"]:
+			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + [ self.snippet_path ]
+
+
+		print(str(self.snippet_path))
 
 		self.use_results = self._make_use_results_dict(config_dict)
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
@@ -1522,6 +1519,14 @@ class ReportTool(PipelinePathHandler):
 
 		return "".join(entry_text)
 
+	def _search_snippet_path(self, snippet, searchpath):
+		""" given a search path, find where the snippet is, return the full path """
+		for path in searchpath:
+			pp = path / snippet
+			if pp.exists():
+				return pp
+		raise KeyError("Snippet '{}' not found in path '{}'".format(snippet, ':'.join([ str(p) for p in searchpath ])))
+		
 
 	def _assemble_template(self, snippet_list, path, snippet_name, entry_heading_code, entry=("",""), results_key=(-1,"analysis")):
 		""" assemble snippet list """
@@ -1533,8 +1538,9 @@ class ReportTool(PipelinePathHandler):
 			#--- add snippets
 			if type(snippet) is str:
 
-				snippet_file = path / snippet
-				snippet_cont = snippet_file.read_text()
+				#snippet_file = path / snippet
+				#snippet_cont = snippet_file.read_text()
+				snippet_cont = self._search_snippet_path(snippet, path).read_text()
 
 				for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 					snippet_prep = self._insert_entry_name(snippet_cont, entry, results_path)
@@ -1560,7 +1566,8 @@ class ReportTool(PipelinePathHandler):
 					snippet_text.append(add_txt)
 				#--- open sub-template folder
 				else:
-					sub_template_path  = path / snippet_key / (snippet_key + "_main_template.Rmd")
+					sub_template_path = self._search_snippet_path(Path(snippet_key) / (snippet_key + "_main_template.Rmd"), path)
+					# sub_template_path  = path / snippet_key / (snippet_key + "_main_template.Rmd")
 					sub_template_text  = sub_template_path.read_text()
 
 					entry_heading_code = self._get_entry_heading_code(sub_template_text)
@@ -1569,7 +1576,8 @@ class ReportTool(PipelinePathHandler):
 					# add sub-section
 					for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 						temp_begin, temp_end = self._split_template(self._edit_template(sub_template_text, results_path, results_key[1], i))
-						sub_section_text = self._assemble_template(snippet_value, path/snippet_key, snippet_key, entry_heading_code, entry, results_key=(i,results_key[1]))
+						sub_path = [ self._search_snippet_path(snippet_key, path) ]
+						sub_section_text = self._assemble_template(snippet_value, sub_path, snippet_key, entry_heading_code, entry, results_key=(i,results_key[1]))
 						all_text = temp_begin + sub_section_text + temp_end
 
 						all_text_prep = self._insert_entry_name(all_text, entry, results_path)
@@ -1594,12 +1602,12 @@ class ReportTool(PipelinePathHandler):
 		Starts in report directory and recursively alternates between concatenating lists of snippets 
 		and creating sub-lists of entries (e.g. contrasts).
 		"""
-		template_path = self.report_snippet_base_dir / self.start_template
+		template_path = self._search_snippet_path(self.start_template, self.snippet_path)
 		template_text = template_path.read_text()
 
 		# generate report
 		temp_begin, temp_end = self._split_template(template_text)
-		report_text = self._assemble_template(self.report_snippet_building_plan, self.report_snippet_base_dir,
+		report_text = self._assemble_template(self.report_snippet_building_plan, path=self.snippet_path,
 							snippet_name="other", entry_heading_code="# {{ENTRY_NAME}}")
 
 		return temp_begin + report_text + temp_end

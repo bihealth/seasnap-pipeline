@@ -112,6 +112,8 @@ dodr:
 #---------------------------------------- report parameters
 report:
   #merge: null
+  #
+  path: null
 
   snippet_parameters:
     Normalisation_QC:
