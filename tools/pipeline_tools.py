@@ -1344,8 +1344,6 @@ class ReportTool(PipelinePathHandler):
 			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + self.snippet_path 
 
 
-		print(str(self.snippet_path))
-
 		self.use_results = self._make_use_results_dict(config_dict)
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
 		self.config = config_dict
