@@ -34,8 +34,12 @@ ds <- file_tab %>% filter(extension == "deseq2.rds") %>%
 rld <- file_tab %>% filter(extension == "rld.blind.rds") %>% 
   pull(filename) %>% readRDS
 
-write_xlsx(list("Raw counts"=as.data.frame(counts(ds)), 
-                "RLD"=as.data.frame(assay(rld))),
+annot <- file_tab %>% filter(step=="annotation" & extension == "rds") %>% 
+  pull(filename) %>% readRDS %>% slice(match(rownames(rld), PrimaryID))
+
+write_xlsx(list("Raw counts"=as.data.frame(counts(ds)) %>% rownames_to_column("PrimaryID"), 
+                "RLD"=as.data.frame(assay(rld)) %>% rownames_to_column("PrimaryID"),
+                "Annotation"=annot),
            path=counts_f)
 
 ## export DE analysis data
