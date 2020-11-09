@@ -30,8 +30,8 @@ experiment:
 #---------------------------------------- filtering of count matrices
 filters:
   low_counts: 10
-  experiment_blacklist: {} # {<Column>: [<Level1>,...]} for columns of covariate file
-  experiment_whitelist: {}
+  experiment_out: {} # {<Column>: [<Level1>,...]} for columns of covariate file
+  experiment_in: {}
 
   # these two parameters allow a more fine grained filtering:
   # setting them means that only genes will be kept which have at least

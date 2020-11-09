@@ -40,9 +40,9 @@ experiment:
 #---------------------------------------- filtering of count matrices
 filters:
   low_counts: {"__num__": [0, null]}
-  experiment_blacklist:
+  experiment_out:
     __any__: [\S+]
-  experiment_whitelist:
+  experiment_in:
     __any__: [\S+]
   gene_list:
     type: {"__opt__": ["ENSEMBL", "ENTREZID", "SYMBOL"]}
