@@ -566,11 +566,11 @@ class PipelinePathHandler:
 
 		return script_file
 
-	def export(self):
+	def export(self, config_key="export"):
 		"""
 		export selected results into a separate folder structure (as configured in config file)
 		"""
-		export_spec = self.snakemake_workflow.config["export"]
+		export_spec = self.snakemake_workflow.config[config_key]
 		blueprint = export_spec["blueprint"]
 		none_context = contextmanager(lambda: iter([None]))()
 		with (open(blueprint["file"], "w") if blueprint and blueprint["file"] else none_context) as bp_out:
@@ -624,14 +624,18 @@ class PipelinePathHandler:
 								if suffix: list_dir = list_dir / suffix
 								dirs = glob(str(list_dir).replace(f"{{{extra_wc}}}", "*"))
 								for d in dirs:
-									for fp in Path(d).iterdir():
-										f = str(fp)
-										if os.path.isdir(f) and str(fp.name) not in compress_list:
-											source_tmp.extend(
-												glob(str(Path(f) / "**"), recursive=True)
-											)
-										elif fp.with_suffix("").stem not in compress_list or os.path.isdir(f):
-											source_tmp.append(f)
+									if Path(d).is_file():
+										source_tmp.append(str(d))
+									else:
+										for fp in Path(d).iterdir():
+											f = str(fp)
+											if os.path.isdir(f) and str(fp.name) not in compress_list:
+												source_tmp.extend(
+													glob(str(Path(f) / "**"), recursive=True)
+												)
+											# elif fp.with_suffix("").stem not in compress_list or os.path.isdir(f):
+											else:
+												source_tmp.append(f)
 								sourcef = source_tmp
 							search_pat = str(Path(search_pat).parent)
 

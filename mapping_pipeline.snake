@@ -107,7 +107,7 @@ def get_inputs_all():
 		if "bw_from_bam"      in qc_choices:
 			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
-  # ATAC-seq
+	# ATAC-seq
 	if "ATAC_Seq" in config["pipeline_param"]:
 		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
 		if "macs2" in atacseq_choices:
@@ -173,10 +173,18 @@ rule all:
 		""", output.html, graph = rule_execution, table = summary)
 		
 rule export:
+	""" export files for upload to SODAR """
 	input:
 		get_inputs_all()
 	run:
 		pph.export()
+
+rule UCSC_export:
+	""" export files for UCSC track hub """
+	input:
+		get_inputs_all()
+	run:
+		pph.export(config_key = "UCSC_export")
 
 ##-------------------- fastqc -------------------------------------------------------------------------------
 
