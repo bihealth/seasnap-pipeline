@@ -1,10 +1,47 @@
-#--- organism annotation
+# ---------------------- QUICK START ----------------------------------
+# 1. Edit the organism defaults file (and, optionally, change the settings 
+#    under `organism:`)
+# 2. Configure the in_path_pattern under `pipeline:`. This depends on the
+#    location of the files with the count data.
+# 3. Run `sea-snap covariate_file star` or 
+#    `sea-snap covariate_file salmon` to automatically generate the covariate file.
+#    Remember to edit it.
+# 4. Edit the `experiment:` section:
+#    - add the design formula (e.g. "~ group")
+#    - for each variable used in formula, add an entry in "columns:"
+#      listing the levels of that variable
+# 5. Go to the `report:` section and choose which snippets you wish to run.
+# 6. Test the configuration with `sea-snap DE l -np`
+# 7. Run the pipeline locally (e.g. `sea-snap DE l --cores 4`), or
+#    on the cluster (`sea-snap DE --slurm c`).
+
+
+# 1. --- organism annotation
 
 organism_defaults: ### FILL HERE ###  (e.g. Homo_sapiens.yaml) 
 
 organism:
   __options__: [name, genus, taxon, files, star_index, salmon_index, R]
   ### OVERWRITE ###  organism defaults (e.g. gtf, genome and indices)
+
+# 2. --- general pipeline parameters
+
+pipeline_param:
+  __options__: [out_path_pattern, log_path_pattern, in_path_pattern, report_snippets, input_choice]
+
+  in_path_pattern: ### FILL HERE ###
+  out_path_pattern: DE/{contrast}/{step}/out/{step}.{contrast}.{extension}
+  log_path_pattern: DE/{contrast}/{step}/report/{step}.{contrast}.{extension}
+  ## Notes:
+  ## The in_path_pattern can be the same as the out_path_pattern of the mapping pipeline
+  ## You should be able to safely leave the predefined {out,log}_path_pattern[s].
+
+  # define choices for choose_input()
+  input_choice:
+    mapping:
+      - import_gene_counts
+      - import_sf
+
 
 
 #--- information about experiment
@@ -14,11 +51,27 @@ experiment:
   
   design_formula: ### FILL HERE ###  (e.g. "~ group")
 
+  columns: ### FILL HERE ###
+## example:
+#  columns:
+#    treatment:
+#      - control
+#      - treatment
+#    strain:
+#      - WT
+#      - KO
+
     
 #--- creation of contrasts
 
 contrasts:
   __options__: [defaults, contrast_list]
+
+  ## by default: run tmod, goseq and cluster_profiler
+  defaults:
+    tmod: true 
+    cluster_profiler:
+      run: true
   
   contrast_list:
     - title: ### FILL HERE ###  (unique title)
@@ -31,17 +84,20 @@ contrasts:
       vector:
 
 
-#--- general pipeline parameters
-
-pipeline_param:
-  __options__: [out_path_pattern, log_path_pattern, in_path_pattern, report_snippets, input_choice]
-
-
 #--- filtering of count matrices
 
 filters:
   __options__: [low_counts, experiment_blacklist, experiment_whitelist]
 
+  # at least 10 counts per row
+  low_counts: 10
+
+  # these two parameters allow a more fine grained filtering:
+  # setting them means that only genes will be kept which have at least
+  # `min_counts` in at least `min_count_n` samples
+
+  min_counts: 5
+  min_count_n: 3
 
 #--- normalization parameters
 
@@ -58,6 +114,46 @@ QC:
 #--- report parameters
 
 report:
-  __options__: [defaults, report_snippets]
+  __options__: [defaults, report_snippets, snippet_parameters]
+
+  ## to choose other snippet parameters,
+  ## take a look at sea-snap/defaults/DE_config_defaults.yaml
  
+  defaults:
+    ## this is a special construct
+    ## to add the snippets for each
+    ## of the contrasts
+    contrast:
+      - __list__: __contrasts__
+    contrast_list:
+      - Init_code.Rmd
+      - MA_plot.Rmd
+      - Result_table.Rmd
+      - Goseq_GO_table.Rmd
+      - tmod_contrast.Rmd
+      - cluster_profiler: __defaults__
+    cluster_profiler:
+      - Dot_plot.Rmd
+      - EnrichmentMap_plot.Rmd
+      - Upset_plot.Rmd
+
+  ## comment snippets which you do not want to include
+  report_snippets:
+    - Covariate_table.Rmd
+    - NormalisationQC: 
+      - PCA_plot.Rmd
+      - HierarchicalClustering_plot.Rmd
+      - SampleSimilarity_plot.Rmd
+      - NormExprDens_plot.Rmd
+      - DESeq2Norm_plot.Rmd
+      - CoxOutlier_plot.Rmd
+    # volcano plot for each contrast
+    - Volcano.Rmd
+    - contrast: __defaults__
+    # a summary of enrichment results for all contrasts
+    # in one place
+    - Functional:
+      - tmod.Rmd
+      - cluster_profiler_summary.Rmd
+      # - Disco.Rmd
  

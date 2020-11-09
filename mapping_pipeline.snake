@@ -74,6 +74,7 @@ def get_inputs_all():
 	if "star-gene_counts" in mapping_choices: 
 		inputs += pph.expand_path("star",           "bam",            fix="!sample")
 		inputs += pph.expand_path("feature_counts", "feature_counts", fix="!sample")
+		inputs += pph.expand_path("tpm_calculator", "tsv",            fix="!sample")
 	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", fix="!sample")
 	if "ciri-circRNA" in mapping_choices:
@@ -103,7 +104,15 @@ def get_inputs_all():
 			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", fix="!sample")
 		if "qc"               in qc_choices: 
 			inputs += pph.expand_path("qc", "done", fix="!sample")
+		if "bw_from_bam"      in qc_choices:
+			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
+  # ATAC-seq
+	if "ATAC_Seq" in config["pipeline_param"]:
+		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
+		if "macs2" in atacseq_choices:
+			inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
+	
 	return inputs
 
 
@@ -312,6 +321,95 @@ rule star:
 		script_file = pph.log(log.out, snakemake_format(script), step="star", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+## -----------------------------------------------------------------------------------
+## Create BW files suitable for IGV / USCS browser
+## -----------------------------------------------------------------------------------
+rule bw_from_bam:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+	output:
+		pph.file_path(step="bw_from_bam", extension="bw")
+	log:
+		out = pph.file_path(step="bw_from_bam", extension="output.log", log=True)
+	run:
+		genome_size=config["organism"]["genome_size"]
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		bamCoverage --version
+
+		#----- run bamCoverage
+		bamCoverage --bam {input.bam} --outFileFormat bigwig --outFileName {output} --effectiveGenomeSize {genome_size} --extendReads --normalizeUsing RPGC
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+## -----------------------------------------------------------------------------------
+## Run macs2 to detect peaks in ATAC-Seq
+## -----------------------------------------------------------------------------------
+rule macs2:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+	output:
+		bed=pph.file_path(step="macs2", extension="summits.bed"),
+		pn=pph.file_path(step="macs2", extension="peaks.narrowPeak")
+	log:
+		out = pph.file_path(step="macs2", extension="output.log", log=True)
+	run:
+		genome_abbr=config["organism"]["abbreviation"]
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		macs2 --version
+
+		#----- run macs2
+		macs2 callpeak -t {input.bam} -f BAMPE --outdir $(dirname {output.bed}) --name $(basename {output.bed} .summits.bed) -g {genome_abbr}
+		mv $(dirname {output.bed})/$(basename {output.bed} .summits.bed)_summits.bed {output.bed}
+		mv $(dirname {output.pn})/$(basename {output.pn} .peaks.narrowPeak)_peaks.narrowPeak {output.pn}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="macs2", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+
+
+
+
+
+
+
+rule tpm_calculator:
+	input:
+		bam = pph.file_path(step="star", extension="bam"),
+		gtf = config["organism"]["files"]["gtf"]
+	output:
+		pph.file_path(step="tpm_calculator", extension="tsv")
+	log:
+		out = pph.file_path(step="tpm_calculator", extension="output.log", log=True)
+	params:
+		nsrt_bam = pph.file_path(step="tpm_calculator", extension="name_sorted.bam")
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		TPMCalculator -version || true
+
+		#----- run TPMCalculator
+		TPMCalculator -g {input.gtf} -b {input.bam}
+		cut -f1,7 $(basename {input.bam} .bam)_genes.out > {output}
+		mv $(basename {input.bam} .bam)_genes.* $(dirname {output})
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="tpm_calculator", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
 ##-------------------- bwa ---------------------------------------------------------------------------------
 
 GENOME_FILE_NAME = os.path.basename(config["organism"]["files"]["genome"])
@@ -336,6 +434,7 @@ rule bwa_index:
 		rm -fr $(dirname {output.index})/*
 
 		#----- run bwa index
+		mkdir -p $(dirname {db_prefix})
 		ln -s {input.genome} {db_prefix}
 		bwa index {params.options} {db_prefix}
 		""")
@@ -538,7 +637,7 @@ rule salmon:
 		#----- Salmon mapping
 		salmon quant --validateMappings -i $(dirname {input.index}) -l A {reads} -p {threads} {params.options} -o $(dirname {output.sf})
 		mv $(dirname {output.sf})/quant.sf {output.sf}
-		mv $(dirname {output.sf})/aux_info/meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
+		ln -s meta_info.json $(dirname {output.sf})/aux_info/{wildcards.sample}.meta_info.json #for multiqc
 		mv $(dirname {output.sf})/libParams/flenDist.txt $(dirname {output.sf})/libParams/{wildcards.sample}.flenDist.txt #for multiqc
 		""")
 		

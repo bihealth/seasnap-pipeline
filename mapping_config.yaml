@@ -1,27 +1,85 @@
-#--- organism annotation
+## -------------------- QUICK START ------------------------
+# 1. Add organism defaults (e.g. Homo_sapiens.yaml or Mus_musculus.yaml)
+# (optional) Overwrite the organism defaults under `organism:`
+# 2. Under `pipeline_param:`, configure the paths
+# 3. Under `pipeline_param:`, select the steps you wish to run
+# 4. Under `report`, enter the meta data (like your name)
+# 5. Run `sea-snap sample_info` to generate the sample_info.yaml file
+# 5b. To test the configuration, run `sea-snap mapping l -np --cores 1`
+# 6. Run `sea-snap mapping l --cores 1` (local, choose how many cores you want) or 
+#        `sea-snap mapping --slumr c` (cluster)
+
+## -------------------- PIPELINE CONFIGURATION ------------------------
+
+# 1. --- organism annotation
 
 organism_defaults: ### FILL HERE ###  (e.g. Homo_sapiens.yaml)
+
+  ## See in {sea-snap-directory}/defaults/ for predefined organism files
 
 organism:
   __options__: [name, genus, taxon, files, star_index, salmon_index, R]
   ### OVERWRITE ###  organism defaults (e.g. gtf, genome and indices)
 
 
-#--- general pipeline parameters
+# --- general pipeline parameters
 
 pipeline_param:
   __options__: [out_path_pattern, log_path_pattern, in_path_pattern, mapping_results, QC_results]
   
-  in_path_pattern: ### FILL HERE ###  (path pattern where fastq files are stored)
+  # 2. configure the paths
+
+  in_path_pattern: ### FILL HERE ###  (path pattern where fastq files are stored, without fastq.gz extension)
+  out_path_pattern: ### FILL HERE ###
+  log_path_pattern: ### FILL HERE ###
+  # Note: 
+  # you need to use every wildcard from `in_path_pattern` both in folder names and file names 
+  # of the output patterns.
+  #
+  # Examples:
+  # in_path_pattern: ../fastq/{sample}/{sample}
+  # out_path_pattern: mapping/{step}/{sample}/out/{step}.{sample}.{extension}
+  # log_path_pattern: mapping/{step}/{sample}/report/{step}.{sample}.{extension}
+  #
+  # in_path_pattern: input/{sample}/HLFFWDRXX/{lane}/{sample}_{library}_{lane}_{mate}_001
+  # out_path_pattern: mapping/{step}/{lane}/{library}/{mate}/{sample}/out/{step}.{lane}.{library}.{mate}.{sample}.{extension}
+  # log_path_pattern: mapping/{step}/{lane}/{library}/{mate}/{sample}/report/{step}.{lane}.{library}.{mate}.{sample}.{extension}
+  # Default output patterns:
+  out_path_pattern: mapping/{step}/{sample}/out/{step}.{sample}.{extension}
+  log_path_pattern: mapping/{step}/{sample}/report/{step}.{sample}.{extension}
+
+
+  # 3. adjust to select which steps to perform
+  mapping_results:
+    - salmon-transcript_counts
+    - star-gene_counts
+    - ciri-circRNA
+  ## The QC results will be summarized by the multiqc step
+  ## You will find the output under  
+  ## mapping/multiqc/.../out/multiqc....html
+  QC_results:
+    - fastqc
+    - dupradar
+    - infer_experiment
+    - qualimap_rnaseq
+    - qualimap_bamqc            
+    - rna_seqc
+    - preseq_c_curve
+    - preseq_lc_extrap
+    #- bw_from_bed
+    
+  #ATAC_Seq:
+  #  - macs2
 
 
 #--- parameters for rules
+# See {sea-snap-dir}/defaults/mapping_config_defaults.yaml for more information
 
 rule_options:
   __options__: [star, star_index, salmon, salmon_index]
 
 
-#--- report settings
+# 4. --- report settings and metadata
 report:
   __options__: [multiqc]
   multiqc:
@@ -31,3 +89,9 @@ report:
     #  - Project Type: '<type>'
     #  - Sequencing Platform: '<platform>'
     #  - Sequencing Setup: '<setup>'
+    ## Default output configuration:
+    title: SeA-SnaP mapping pipeline QC report
+    subtitle: run at the BIH CUBI
+    intro_text: The reports summarises results of several QC analyses
+    custom_logo: documentation/pictures/SeA-SnaP_logo.png
+

@@ -1,0 +1,27 @@
+# Pipeline setup
+
+The report was generated using the following setup:
+
+```{r params}
+library(pander)
+tab <- rbind(
+  c("experiment", "", "", ""),
+  c("experiment", "design_formula", config$experiment$design_formula, ""),
+  c("contrasts", "defaults:lfcShrink_parameters", config$contrasts$defaults$lfcShrink_parameters, ""))
+colnames(tab) <- c("Section", "Parameter", "Value", "Comment")
+pander(tab)
+```
+
+ * Working directory: `{{WORKING_DIRECTORY}}` (the path to the working directory during pipeline execution)
+ * Common R functions: `{{R_COMMON}}` (the path to a folder with generic R functions to be used in snippets)
+
+
+**Table.** Generated files
+
+```{r filetab,results="markdown"}
+library(tidyverse)
+file_tab %>% mutate(filename=sprintf("[%s](%s)", basename(filename), filename)) %>% DT::datatable()
+```
+
+
+

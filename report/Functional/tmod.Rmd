@@ -32,7 +32,7 @@ annot     <- readRDS(annot.f)
 tmod.mapping <- readRDS(map.f)
 
 # load tmod functions
-r.path <- "{{R_COMMON}}"
+r.path <- r_common
 script_f <- file.path(r.path, "..", "..", "external_scripts", "tmod_functions.R")
 source(script_f)
 ```
@@ -200,10 +200,10 @@ rowlabs <- tmod_labels(resU2S$ID, resU2S$Title, max.length=35, nlines=2)
 \n```
 
 
-\n```{r, fig.width=12,fig.height=4 + ceiling(nrow(resU2S)/3)}
+\n```{r, fig.width=12,fig.height=4 + ceiling(nrow(resU2S)/2)}
 tmodPanelPlot(resU2, filter.rows.pval=conf.snip$fig_qval_max, 
                      filter.rows.auc=conf.snip$fig_auc_min, 
-										 pie=piesU, grid='b', row.labels=rowlabs)
+										 pie=piesU, grid='b', row.labels=rowlabs, text.cex=0.7)
 \n```
 "
 }
@@ -320,11 +320,16 @@ for(db_n in names(tmod.res$results)) {
                                        max.n=conf.snip$fig_n_max,
                                        min.n=conf.snip$fig_n_min)
     if(!is.null(res_selection$note)) {
-      cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+      cat(paste("\n\nNo figure produced because there were", res_selection$note, ".\n\n"))
     } else {
-      figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
-      foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
-      cat(foo)
+
+      if(length(res_selection$sel_ids) < 2) {
+        cat(paste("\n\nNo panel plot produced because there was only 1 module to show.\n\n"))
+      } else {
+        figure_t <- template_figure(db_n, db, res, resU, lfcs, pvals, tmod.mapping, res_selection)
+        foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
+        cat(foo)
+      }
 
       n <- conf.snip$n_evid
       .sel <- tmod_mod_sel(resU, qval.thr=conf.snip$fig_qval_max, auc.thr=conf.snip$fig_auc_min, max.n=n, min.n=n)

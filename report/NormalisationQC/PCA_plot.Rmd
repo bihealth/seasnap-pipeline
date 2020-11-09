@@ -28,30 +28,59 @@ pca <- prcomp(mtx[ , sel], scale.=TRUE)
 	 - Because of plot_ly internals, the number of distinct groupings (n_group) must be computed. It is the product between the number of
 	   levels in the colour & shape covariates.
 -->
+
 ```{r nomalisationQCPCA_prepare}
+library(dplyr)
+library(tibble)
+library(purrr)
+
 numplots <- floor(ncol(pca$x)/2)
 numplots <- min(numplots, 6)
 
 covariate_data <- as.data.frame(colData(RLD_BLIND))
 
-intgroups <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
+cov_default <- config$report$snippet_parameters$Normalisation_QC$annotation_columns
+threeD <- config$report$snippet_parameters$Normalisation_QC$threeD %||% FALSE
 
 df <- data.frame(
 	label=rownames(covariate_data),
-	pca$x[rownames(covariate_data),paste("PC", 1:(2*numplots), sep="")],
+	pca$x[rownames(covariate_data), paste("PC", 1:(2*numplots), sep="")],
 	stringsAsFactors=FALSE
 )
 
-n_group <- 1
-if (length(intgroups) > 0) {
-	df <- cbind(df, Color=factor(covariate_data[[intgroups[1]]]))
-	n_level <- length(levels(df$Color))
-	n_group <- n_group * n_level
-	if (length(intgroups) > 1) {
-		df <- cbind(df, Shape=factor(covariate_data[[intgroups[2]]]))
-		n_level <- length(levels(df$Shape))
-		n_group <- n_group * n_level
-	}
+## selecting covariates to use: not all unique and also not only one value
+sel <- apply(covariate_data, 2, function(x) {
+  .u <- unique(x)
+  length(.u) > 1 && length(.u) < nrow(covariate_data)
+})
+
+covariates <- union(cov_default, colnames(covariate_data)[sel])
+covariate_data <- covariate_data[ , covariates, drop=FALSE ]
+
+## we are sure that the order is the same
+df <- cbind(covariate_data, df)
+
+## which covariates are numerical?
+cov_numeric <- covariates[ map_lgl(covariates, ~ is.numeric(df[[.]])) ]
+
+## make sure the covariates are factors
+df <- df %>% mutate_at(setdiff(covariates, cov_numeric), factor)
+
+
+## make the PCA data more terse
+df <- df %>% mutate_at(vars(starts_with("PC")), signif, digits=4)
+
+## auto select default covariates if cov_default is missing
+if(length(cov_default) < 1) {
+  if(length(covariates) > 0) {
+    cov_default <- covariates[1]
+  }
+}
+
+if(length(cov_default) < 2) {
+  if(length(covariates) > 1) {
+    cov_default <- covariates[2]
+  }
 }
 ```
 
@@ -61,77 +90,287 @@ Two distinct output are produced here:
   The filename is PLOTS_DIR/PCA.pdf, there is one page per projection, and the size is the default size of the pdf function.
 - One interactive plotly figure embedded in the report. The user can choose which projection she wants to see,
   and the gene label is shown when the pointer hovers over the point.
-
-3 cases must be manually distinguished: no grouping, grouping by colour only & grouping by colour & shape.
 -->
-```{r normalisationQCPCA_plot, fig.height=7, fig.width=7}
-library(plotly)
+
+```{r normalisationQCPCA_plot_PDF, fig.height=7, fig.width=7}
+## first, the PDF plot.
+pdf_plot_f <- function(df, x, y, cov_default) {
+  require(ggplot2)
+
+  color <- cov_default[1] %||% NULL
+  shape <- cov_default[2] %||% NULL
+
+	ggplot(df, ggplot2::aes_string(x=x, y=y, color=color, shape=shape)) +
+		geom_point() +
+		labs(color=color, shape=shape) +
+		coord_fixed()
+}
 
 fn <- file.path(PLOTS_DIR, "PCA.pdf")
 pdf(fn)
 
-# Print the first two components (shown by default)
-p <- NULL
-if ("Color" %in% names(df)) {
-	if ("Shape" %in% names(df)) {
-		tmp.f <- function(df, x, y, intgroups) {
-			ggplot2::ggplot(df, ggplot2::aes_string(x=x, y=y, color="Color", shape="Shape")) +
-				ggplot2::geom_point() +
-				ggplot2::labs(color=intgroups[1], shape=intgroups[2]) +
-				ggplot2::coord_fixed()
-		}
-		p <- plot_ly(df, type="scatter", mode="markers", x=~PC1, y=~PC2, text=~label, color=~Color, symbol=~Shape)
-	} else {
-		tmp.f <- function(df, x, y, intgroups) {
-			ggplot2::ggplot(df, ggplot2::aes_string(x=x, y=y, color="Color")) +
-				ggplot2::geom_point() +
-				ggplot2::labs(color=intgroups[1]) +
-				ggplot2::coord_fixed()
-		}
-		p <- plot_ly(df, type="scatter", mode="markers", x=~PC1, y=~PC2, text=~label, color=~Color)
-	}
-} else {
-	tmp.f <- function(df, x, y, intgroups) {
-		ggplot2::ggplot(df, ggplot2::aes_string(x=x, y=y)) +
-			ggplot2::geom_point()
-	}
-	p <- plot_ly(df, type="scatter", mode="markers", x=~PC1, y=~PC2, text=~label)
+for (i in 1:numplots) {
+  print(pdf_plot_f(df, paste("PC", 2*i-1, sep=""), paste("PC", 2*i, sep=""), cov_default))
 }
-print(tmp.f(df, "PC1", "PC2", intgroups))
-
-# Print the extra components (hidden by default, displayed at the user's request through updatemenus)
-updatemenus <- NULL
-if (numplots > 1) {
-	updatemenus <- list(
-		list(method="restyle", args=list("visible", rep((1:numplots) == 1, each=n_group)), label="1 vs 2")
-	)
-	for (i in 2:numplots) {
-		print(tmp.f(df, paste("PC", 2*i-1, sep=""), paste("PC", 2*i, sep=""), intgroups))
-		p <- add_markers(
-			p,
-			x=as.formula(paste("~", paste("PC", 2*i-1, sep=""))),
-			y=as.formula(paste("~", paste("PC", 2*i, sep=""))),
-			visible=FALSE
-		)
-		updatemenus <- c(
-			updatemenus,
-			list(list(
-				method="restyle",
-				args=list("visible", rep((1:numplots) == i, each=n_group)),
-				label=paste(2*i-1, 2*i, sep=" vs ")
-			))
-		)
-	}
-}
-
 dev.off()
+```
 
-p %>% layout(
-	title="PCA analysis",
-	xaxis=list(title="Principal component", range=1.1*range(df$PC1)),
-	yaxis=list(title="Principal component", scaleanchor="x"),
-	updatemenus=ifelse(is.null(updatemenus), NULL, list(list(type="buttons", y=1, buttons=updatemenus)))
+```{r normalisationQCPCA_plot_plotly, fig.height=7, fig.width=10}
+library(plotly)
+library(RColorBrewer)
+
+plotly_ids <- paste0("ID", 1:nrow(df))
+
+## First, assign palettes to factor covariates
+## We need to set up coloring manually, because plotly is stupid
+## use palettes from RColorBrewer, preferring the colorblind ones
+palettes <- brewer.pal.info %>% rownames_to_column("palette") %>% filter(category == "qual") %>% arrange(-colorblind)
+palette_names <- palettes[["palette"]]
+
+covariates_fac <- covariates[ sapply(covariates, function(cov) is.factor(df[[cov]])) ]
+if(nrow(palettes) < length(covariates_fac)) {
+  palette_names <- rep(palette_names, ceiling(length(covariates_fac)/nrow(palettes)))
+}
+
+covariates_pal_names <- rlang::set_names(palette_names[1:length(covariates_fac)], covariates_fac)
+
+## get colors for each of the factor covariates
+covariates_col <- lapply(rlang::set_names(covariates_fac), function(cov) {
+  pal.name <- covariates_pal_names[cov]
+  n.col <- length(levels(df[[cov]]))
+  max.col <- subset(palettes, palette == pal.name)$maxcolors[1]
+  .pal <- brewer.pal(n=min(max.col, max(3, n.col)), name=pal.name)
+  if(max.col < n.col) {
+    warning(sprintf("covariate: %s more levels (%d) than colors (%d) in palette (%s)",
+      cov, n.col, max.col, pal.name))
+    .pal <- rep(.pal, ceiling(n.col / max.col))
+  }
+  names(.pal) <- levels(df[[cov]])
+
+  rlang::set_names(.pal[ as.character(df[[cov]]) ], plotly_ids)
+})
+
+cont_pal <- colorRampPalette(c("#440154FF", "#21908CFF", "#FDE725FF"))(32)
+covariates_col_cont <- lapply(rlang::set_names(setdiff(covariates, covariates_fac)), function(cov) {
+  x <- df[[cov]]
+  col_i <- seq(min(x, na.rm=TRUE), max(x, na.rm=TRUE), length.out=33)
+  i <- findInterval(x, col_i, all.inside=TRUE)
+  rlang::set_names(cont_pal[i], plotly_ids)
+})
+
+covariates_col <- c(covariates_col, covariates_col_cont)
+
+
+## Same for symbols
+symbols <- c("circle", "square", "diamond", "cross", "x", "triangle",
+             "pentagon", "hexagram", "star", "diamond", "hourglass",
+             "bowtie", "asterisk", "hash")
+
+cov_symbols <- lapply(rlang::set_names(covariates), function(cov) {
+  lev <- levels(df[[cov]])
+  .s <- symbols
+  if(length(lev) > length(.s)) {
+    # expand symbol list if necessary. Moot, because if there are more
+    # than three symbols it is pointless anyway
+    .s <- rep(.s, ceiling(length(lev) / length(.s)))
+  }
+
+  .s <- .s[1:length(lev)]
+  names(.s) <- lev
+  return(.s)
+})
+
+plotly_ids <- paste0("ID", 1:nrow(df))
+
+## create hovertext as a combination of covariates
+hovertext <- apply(map_dfc(rlang::set_names(covariates), ~ sprintf("%s: %s", ., df[[.]])), 1, paste, collapse="\n")
+hovertext <- paste(hovertext, sprintf("plotlyID: %s", plotly_ids), sep="\n")
+
+## set up default colors and symbols
+
+def_symbol <- def_symbols <- def_color <- def_colors <- NULL
+if(length(cov_default) > 0) {
+  def_color <- df[[ cov_default[1] ]]
+  if(is.factor(def_color)) {
+    levs <- levels(def_color)
+    matches <- match(levs, df[[ cov_default[1] ]])
+    def_colors <- covariates_col[[cov_default[1]]][ matches ]
+    names(def_colors) <- levs
+  } else {
+    def_colors <- covariates_col[[cov_default[1]]]
+  }
+}
+
+
+
+if(length(cov_default) > 1) {
+  def_symbol <- df[[ cov_default[2] ]]
+  def_symbols <- cov_symbols[[ cov_default[2] ]]
+} 
+
+if(threeD) {
+  numplots <- floor(numplots * 2/3)
+}
+
+## create the initial plotly object. We need it to know how plotly cuts up the data into segments
+plotly.args <- list(data=df, type="scatter", mode="markers",
+             x=df$PC1, y=df$PC2,
+             hovertext=hovertext,
+             ids=plotly_ids,
+             marker=list(size=10),
+             visible=TRUE,
+             color= def_color, colors= def_colors,
+             symbol=def_symbol, symbols=def_symbols)
+
+if(threeD) {
+  plotly.args$z <- df$PC3
+  plotly.args$type <- "scatter3d"
+  plotly.args$marker <- list(size=5)
+}
+
+p <- do.call("plot_ly", plotly.args)
+
+
+## if there are more than two components to be shown, we need to add the data
+if(numplots > 1) {
+  if(threeD) {
+    for(i in 2:numplots) {
+      pc1 <- paste0("PC", i * 3 - 2)
+      pc2 <- paste0("PC", i * 3 - 1)
+      pc3 <- paste0("PC", i * 3)
+      p <- p %>% add_trace(data=df, type="scatter3d", mode="markers", x=df[[pc1]], y=df[[pc2]], z=df[[pc3]], visible=FALSE)
+    }
+  } else {
+    for(i in 2:numplots) {
+      pc1 <- paste0("PC", i * 2 - 1)
+      pc2 <- paste0("PC", i * 2)
+      p <- p %>% add_trace(data=df, type="scatter", mode="markers", x=df[[pc1]], y=df[[pc2]], visible=FALSE)
+    }
+  }
+}
+
+
+## here we build the plotly object and dissect it to figure out
+## how plotly cut up the data. Note that plotly is efficient and that if
+## factor levels overlap between factors (i.e. factors are colinear) then
+## there will be fewer blocks than simply length(levels(f1)) * length(levels(f2))
+## Also, we need the IDs in each block to be able to match the correct values
+p.obj <- plotly::plotly_build(p)$x$data
+nblocks <- length(p.obj) / numplots
+p.obj <- p.obj[ 1:nblocks ]
+p.ids <- map(p.obj, ~ .$ids)
+
+## here we build the menu for updating symbol style
+sym_update <- lapply(covariates_fac, function(cov) {
+  sym_pal <- cov_symbols[[cov]]
+
+  ## map levels to symbol
+  syms <- lapply(p.ids, function(ids) {
+    ord <- match(ids, paste0("ID", 1:nrow(df)))
+    var <- df[[cov]][ ord ]
+    sym_pal[ as.character(var) ]
+  })
+
+  list(
+        method="restyle",
+        label=sprintf("Symbol by %s", cov),
+        args=list(list(
+            marker.symbol=syms
+            ))
+      )
+})
+
+## set up update menus for colors
+col_update <- lapply(covariates, function(cov) {
+  cols <- lapply(p.ids, function(ids) {
+    covariates_col[[cov]][ids]
+  })
+  list(
+        method="restyle",
+        label=sprintf("Color by %s", cov),
+        args=list(list(
+            marker.color=cols
+            ))
+      )
+})
+
+## prepare the buttons to change the coordinates
+if(threeD) {
+  pc_update <- lapply(1:numplots, function(i) {
+    pc1 <- paste0("PC", i * 3 - 2)
+    pc2 <- paste0("PC", i * 3 - 1)
+    pc3 <- paste0("PC", i * 3)
+    list(
+      method="update",
+      label=sprintf("PC%d/%d/%d", i * 3 - 2, i * 3 - 1, i * 3),
+      args=list(
+        list(visible=rep((1:numplots) == i, each=nblocks)),
+        list(scene=list(
+            xaxis=list(title=pc1),
+            yaxis=list(title=pc2),
+            zaxis=list(title=pc3)
+          ))
+      ))
+  })
+} else {
+  pc_update <- lapply(1:numplots, function(i) {
+    pc1 <- paste0("PC", i * 2 - 1)
+    pc2 <- paste0("PC", i * 2)
+    list(
+      method="restyle",
+      label=paste(pc1, "vs", pc2),
+      args=list(
+        list(visible=rep((1:numplots) == i, each=nblocks))
+     ))
+  })
+}
+
+
+menus <- list(
+  list(
+    type="buttons",
+    direction="right",
+    y=1.1,
+    yanchor="top",
+    x=0.1,
+    xanchor="left",
+    buttons=pc_update
+  ),
+  list(
+    yanchor="bottom",
+    y=0,
+    x=-.1,
+    xanchor="right",
+    direction="up",
+    buttons=col_update
+  ),
+  list(
+    yanchor="bottom",
+    y=.1,
+    xanchor="right",
+    x=-.1,
+    direction="up",
+    buttons=sym_update
+  )
 )
+
+scene <- list(
+  xaxis=list(title="PC1"),
+  yaxis=list(title="PC2")
+)
+
+if(threeD) {
+  scene$zaxis <- list(title="PC3")
+}
+
+p %>% layout(updatemenus=menus,
+  scene=scene,
+  legend=list(
+    xanchor="right",
+    x=-.1
+  ))
+
+
 ```
 
 [Download plot](`r fn`)

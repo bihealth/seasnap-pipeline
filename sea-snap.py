@@ -18,7 +18,7 @@ CLUSTER_CONFIG = "cluster_config.json"
 
 CLUSTER_START = dict(
 	sge="export /opt/sge/lib/lx-amd64/libdrmaa.so; qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
-	slurm="unset DRMAA_LIBRARY_PATH; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	slurm="unset DRMAA_LIBRARY_PATH; unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
 )
 
 
@@ -105,7 +105,10 @@ def generate_covariate_file(args):
 		cft = CovariateFileTool(*config_files)
 
 		# fill 5 mandatory columns
-		cft.update_covariate_data(step, extension)
+		if args.tpm:
+			cft.update_covariate_data(step, extension, {"tpm": ("tpm_calculator", "tsv")})
+		else:
+			cft.update_covariate_data(step, extension)
 
 		# add custom columns
 		if args.add_cols:
@@ -128,7 +131,9 @@ def show_matrix(args):
 		except yaml.YAMLError as exc:
 			print(exc)
 	design = config_dict["experiment"]["design_formula"]
-	col_names =  re.findall("[^~()/:*+\s]+", design)
+	print(f"design formula: {design}")
+	col_names = re.findall("[^~()/:*+\s0-9\-]+", design)
+	print(f"column names: {str(col_names)}")
 	cov_data = pd.read_csv(args.covariate_file, sep="\t", header=0, dtype=str)
 	expressions = ["-e \"{} <- c('{}')\"".format(col_name, "','".join(cov_data[col_name])) for col_name in col_names]
 	cmd = "Rscript --vanilla {} -e \"model.matrix({})\"".format(" ".join(expressions), design)
@@ -249,6 +254,7 @@ parser_covariate_file.add_argument('extension', nargs='?', help="name of the out
 parser_covariate_file.add_argument('--config_files', nargs='+', default=["DE_config.yaml"], help="config files to be loaded")
 parser_covariate_file.add_argument('--output', default="covariate_file.txt", help="name of covariate file")
 parser_covariate_file.add_argument('--col', nargs='+',   action='append', dest='add_cols', help="add a column, use e.g.: --col NAME gr1:lvl1 gr2:lvl1 gr3:lvl2 ...")
+parser_covariate_file.add_argument('--tpm', action='store_true', help="attach TPM column with output of TPMcalculator for display with DE pipeline")
 parser_covariate_file.set_defaults(func=generate_covariate_file)
 
 #--- parser for select_contrast

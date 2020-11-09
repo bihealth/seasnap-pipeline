@@ -1,2 +1,4 @@
  1. Unit test on user defined database loading
  2. Use global cutoff threshold for significant genes for figures
+ 3. custom modules: either check for three columns or adapt to two columns
+    in the TSV/CSV format
