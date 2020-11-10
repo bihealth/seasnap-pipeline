@@ -19,7 +19,7 @@ source(script_f)
 
 annot.f   <- subset(file_tab, step == "annotation" & extension == "rds")$filename
 annot     <- readRDS(annot.f)
-contrasts.def <- subset(file_tab, step == "contrasts_full" & extension == "rds")
+contrasts.def <- subset(file_tab, step == "contrast" & extension == "rds")
 contrasts.conf <- config$contrasts$contrast_list
 names(contrasts.conf) <- sapply(contrasts.conf, `[[`, "ID")
 ```
