@@ -1,5 +1,6 @@
 id:
   columns:
+    - "Library Name"
     - "Sample Name"
     - "Characteristics\\[Secondary ID\\]"
   value:
@@ -27,3 +28,11 @@ instrument:
     - "Parameter Value\\[Platform\\]"
   value:
     ".*illumina.*": "\\g<0>"
+
+lib_types:
+  columns:
+    - "Parameter Value\\[Library name mRNA\\]"
+    - "Parameter Value\\[Library name sample tag\\]"
+  value:
+    ".*": {"\\g<0>": "\\col_mode: Parameter Value[Library name mRNA]:Gene Expression,Parameter Value[Library name sample tag]:Antibody Capture"}
+  add: true

@@ -1,0 +1,316 @@
+## SeA-SnaP single cell pipeline for RNA-seq analysis
+## version: 0.1
+## author: J.P.Pett (patrick.pett@bihealth.de)
+
+import os, sys, yaml, re, textwrap, pandas as pd
+import tools.pipeline_tools
+from collections import OrderedDict
+from time import asctime, localtime, time
+from pathlib import Path
+from snakemake.utils import report, format as snakemake_format, min_version
+from snakemake.logging import logger
+from tools.pipeline_tools import MappingPipelinePathHandler, ReportTool
+
+min_version("3.7")
+shell.prefix("set -e  pipefail;")
+tools.pipeline_tools.warnings.simplefilter("always")
+yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
+
+# source files
+SNAKEDIR  = Path(workflow.current_basedir)
+SNAKEFILE = workflow.snakefile
+SCRIPTDIR = str(SNAKEDIR / "external_scripts")
+
+# assemble config
+config_file_name = config["file_name"] if "file_name" in config else "sc_config.yaml"
+configfile: str(SNAKEDIR / "defaults" / "sc_config_defaults.yaml")
+configfile: config_file_name
+configfile: "sample_info.yaml"
+if config["organism_defaults"]:
+	configfile: str(SNAKEDIR / "defaults" / config["organism_defaults"])
+	configfile: config_file_name
+
+# create path handler
+conf_ranges = str(SNAKEDIR / "defaults" / "sc_config_ranges.yaml")
+test_config = conf_ranges if config["pipeline_param"]["test_config"] else None
+pph = MappingPipelinePathHandler(workflow, test_config)
+
+# link indices
+pph.link_index(step="cellranger_count", fix="all", subdir="outdir", add_done=True)
+
+# exclude symbols '.' and '/' from wildcards
+wildcard_constraints: 
+	sample="[^./]+",
+	mate  ="[^./]+"
+
+onstart:
+	# draw a dag
+	dag_file = pph.file_path(step="pipeline_report", extension="rule_execution.png", fix="all")
+	os.makedirs(os.path.dirname(dag_file), exist_ok=True)
+	shell("snakemake --quiet --snakefile {} --rulegraph | dot -Tpng > {}".format(SNAKEFILE, dag_file))
+	# info about the pipeline run
+	info_file = pph.file_path(step="pipeline_report", extension="summary.csv", fix="all")
+	os.makedirs(os.path.dirname(info_file), exist_ok=True)
+	shell("snakemake --quiet --snakefile {} --summary | sed 's/\t/, /g' > {}".format(SNAKEFILE, info_file))
+	# save merged config
+	config_file = pph.file_path(step="pipeline_report", extension="yaml", fix="all")
+	with open(config_file, "w") as f: yaml.dump(config, f, default_flow_style=False)
+
+##-------------------- starting point ----------------------------------------------------------------------
+
+def get_inputs_all():
+	inputs = []
+
+	results = config["pipeline_param"]["produce_results"]
+	if "velocyto" in results:
+		if config["pipeline_param"]["input_choice"]["velocyto"][0] == "cellranger_aggr":
+			inputs += [pph.file_path("velocyto_run", "loom", fix="all")]
+		else:
+			inputs += pph.expand_path(step="velocyto_run", extension="loom", fix="!sample")
+	elif "cellranger-aggr" in results:
+		inputs += [pph.file_path(step="cellranger_aggr", extension="done", fix="all")]
+	elif "cellranger" in results:
+		inputs += pph.expand_path(step="cellranger_count", extension="done", fix="!sample")
+
+	return inputs
+
+
+shell("rm -f {}".format(pph.file_path(step="pipeline_report", extension="report.html", fix="all")))
+
+rule all:
+	input:
+		get_inputs_all()
+	output:
+		html = pph.file_path(step="pipeline_report", extension="report.html", fix="all")
+	run:
+		loctime = asctime(localtime(time()))
+		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", fix="all")
+		summary        = pph.file_path("pipeline_report", "summary.csv",        fix="all")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt",   fix="all")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     fix="all")
+		dag = rule_execution.split("/")[-1]
+		shell("conda list > {}".format(version_info))
+		shell("conda info > {}".format(conda_info))
+		report("""
+		===========================
+		RNAseq single cell pipeline
+		===========================
+		
+		**Finished: {loctime}**
+		
+		.. image:: {dag}
+		
+		File status at pipeline start:
+		==============================
+		
+		.. csv-table::
+			:file: {summary}
+			
+		Version info:
+		=============
+		
+		.. include:: {version_info}
+			:literal:
+		
+		Conda info:
+		===========
+		
+		.. include:: {conda_info}
+			:literal:
+		
+		""", output.html, graph = rule_execution, table = summary)
+		
+rule export:
+	input:
+		get_inputs_all()
+	run:
+		pph.export()
+
+##-------------------- CellRanger -------------------------------------------------------------------------------
+
+rule cellranger_count:
+    """ run cellranger count """
+	input:
+		reads = lambda wildcards: pph.get_fastq_pairs(wildcards, mate="*"),
+		transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
+	output:
+		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/cellranger_wd"),
+		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
+		done = touch(pph.file_path(step="cellranger_count", extension="done"))
+	log:
+		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["cellranger_count"]["cmd_opt"],
+		feature_ref = config["pipeline_param"]["feature_ref"]
+	run:
+		# using feature barcodes ?
+		feature_ref = str(Path(params.feature_ref).resolve()) if params.feature_ref else ""
+
+		# create libraries file
+		lib_file_content = ["fastqs, sample, library_type"]
+		prefixes = [p for p, t in config["sample_info"][wildcards.sample]["lib_types"]]
+		pref_dup = len(prefixes) != len(set(prefixes))
+		for lpref, ltype in config["sample_info"][wildcards.sample]["lib_types"]:
+			for lp in lpref.split(","):
+				# in some cases the same prefix is annotated in ISA tab for feature and GEX
+				# in this case use the trick of duplicating links to fastqs and
+				# adding tag_ to the prefix
+				if pref_dup and ltype != "Gene Expression":
+					lib_file_content.append(f"{Path(output.links).resolve()}, tag_{lp}, {ltype}")
+				else:
+					lib_file_content.append(f"{Path(output.links).resolve()}, {lp}, {ltype}")
+		pref_dup = "true" if pref_dup else "false"
+		lib_file_content = "\n".join(lib_file_content)
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		cellranger --version || true
+
+		#----- collect fastq input links
+		mkdir {output.links}
+		ln -sf $(readlink -f {input.reads}) {output.links}
+		# if names are the same for feature and GEX fastqs,
+		# duplicate links with different name:
+		if {pref_dup}; then
+		  for f in {output.links}/*; do
+		    cp -av "$f" "$(dirname $f)/tag_$(basename $f)"
+		  done
+		fi
+
+		#----- Cellranger counting
+		mkdir -p {output.outdir}; cd {output.outdir}; ls -lh
+		#-- write libraries file
+		cat << 'EOF' > "libraries.csv"
+		{lib_file_content}
+		EOF
+		#-- link feature barcodes if present
+		feature_ref="{feature_ref}"
+		if [ "$feature_ref" ]; then
+		  ln -sf $feature_ref "feature_ref.csv"
+		  feature_ref="--feature-ref=feature_ref.csv"
+		fi
+		#-- run cellranger count
+		cellranger count --id="{wildcards.sample}" --libraries="libraries.csv" $feature_ref --transcriptome={input.transcriptome} {params.options}
+		cd -
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="cellranger_count", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+rule cellranger_aggr:
+	input:
+		pph.expand_path(step="cellranger_count", extension="done", fix="mate")
+	output:
+		outdir = directory(pph.out_dir_name(step="cellranger_aggr")+"/cellranger_wd"),
+		done = touch(pph.file_path(step="cellranger_aggr", extension="done"))
+	log:
+		out = pph.file_path(step = "cellranger_aggr", extension="output.log", log=True)
+	run:
+		aggr_csv_content = ["library_id, molecule_h5"]
+		for count_results in input:
+			sample_name = pph.wildcard_values_from(count_results, False)["sample"][0]
+			mol_info = Path(count_results).parent / "cellranger_wd" / sample_name / "outs" / "molecule_info.h5"
+			aggr_csv_content.append(f"{sample_name}, {str(mol_info.resolve())}")
+		aggr_csv_content = "\n".join(aggr_csv_content)
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		cellranger --version || true
+
+		#----- Cellranger counting
+		mkdir -p {output.outdir}; cd {output.outdir}
+		#-- write libraries file
+		cat << 'EOF' > "output_aggr.csv"
+		{aggr_csv_content}
+		EOF
+		#-- run cellranger aggr
+		cellranger aggr --id="cellranger_dir" --csv="output_aggr.csv"
+		cd -
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="cellranger_aggr", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- Velocyto -------------------------------------------------------------------------------
+
+rule velocyto_run:
+	""" run velocyto on 10X Chromium samples """
+	input:
+		gtf = config["organism"]["files"]["cellranger_gtf"],
+		cellranger_done = pph.choose_input(
+			choice_name = "velocyto",
+			options = [
+				dict(step = "cellranger_aggr",  extension = "done"),
+				dict(step = "cellranger_count", extension = "done")
+			]
+		)
+	output:
+		pph.file_path(step="velocyto_run", extension="loom")
+	log:
+		out = pph.file_path(step="velocyto_run", extension="output.log", log=True)
+	params:
+		cellranger_outdir = pph.choose_input(
+			choice_name = "velocyto",
+			func = lambda **kw: os.path.join(pph.out_dir_name(**kw),"cellranger_wd",kw["sample"],"outs"),
+			options = [
+				dict(step = "cellranger_aggr"),
+				dict(step = "cellranger_count")
+			]
+		),
+		mask = config["organism"]["files"]["velocyto_mask_gtf"],
+		options = config["rule_options"]["velocyto_run"]["cmd_opt"]
+	run:	
+		mask = f"-m {params.mask}" if params.mask else ""
+
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		velocyto --version
+
+		#----- run velocyto
+		#velocyto run10x \
+		#{params.cellranger_outdir} \
+		#{input.gtf} \
+		#{params.options}
+		velocyto run -b {params.cellranger_outdir}/filtered_feature_bc_matrix/barcodes.tsv.gz {mask} -o $(dirname {output}) {params.options} {params.cellranger_outdir}/possorted_genome_bam.bam {input.gtf}
+
+		#----- move results
+		mv $(dirname {output})/*.loom {output}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="velocyto_run", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+##-------------------- jupyter nb -------------------------------------------------------------------------------
+
+rule create_ipynb:
+	""" compile a jupyter notebook for second line analysis """
+	input:
+		get_inputs_all()
+	output:
+		pph.file_path("create_ipynb", "ipynb", fix="all")
+	run:
+		rt = ReportTool(pph, profile="sc_analysis")
+		report_text = rt.generate_report()
+
+		text_sub = dict(file_tab="", config="")
+		for tag, num, path in ((tag, num, path) for tag, paths in rt.use_results.items() for num, path in enumerate(paths)):
+			file_table  = pph.file_path("create_ipynb",  "tsv", fix="all", path_pattern=path)
+			config_file = pph.file_path("pipeline_report", "yaml", fix="all", path_pattern=path)
+			pph.log_generated_files(save_to=file_table, path_pattern=path)
+
+			id_suffix, _ = rt.get_id_suffix(tag, num)
+			text_sub["file_tab"] += f'file_tab{id_suffix} = pd.read_csv("{file_table}", sep="\\t")\n'
+			text_sub["config"]   += (
+				f'with open("{config_file}", "r") as stream:\n'
+				f'\tconfig{id_suffix} = yaml.safe_load(stream)\n'
+			)
+
+		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
+		report_text = report_text.replace("{{LOAD_FILE_TABLE}}", text_sub["file_tab"])
+		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
+
+		with open(output[0], "w") as f: f.write(report_text)
