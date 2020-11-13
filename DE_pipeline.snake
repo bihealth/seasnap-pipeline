@@ -1390,7 +1390,7 @@ rule report:
 			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
 
 		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
-		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"R_common"))
+		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"../R_common"))
 		report_text = report_text.replace("{{LOAD_FILE_TABLE}}", text_sub["file_tab"])
 		report_text = report_text.replace("{{LOAD_CONFIG_FILE}}", text_sub["config"])
 		

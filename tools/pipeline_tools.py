@@ -1537,10 +1537,6 @@ class ReportTool(PipelinePathHandler):
 		else:
 			self.report_snippet_base_dir = Path(sys.path[0]) / "report"
 
-		self.snippet_path = [ self.report_snippet_base_dir ]
-		if config_dict["report"]["path"]:
-			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + self.snippet_path 
-
 		self.use_results = self._make_use_results_dict(config_dict)
 		self.merge_mode  = bool(config_dict["report"]["merge"]) if "merge" in config_dict["report"] else False
 		self.config = config_dict
@@ -1576,6 +1572,11 @@ class ReportTool(PipelinePathHandler):
 
 		if config_dict["pipeline_param"]["report_snippets"]:
 			self.report_snippet_base_dir = Path(config_dict["pipeline_param"]["report_snippets"])
+
+		self.snippet_path = [ self.report_snippet_base_dir ]
+		if config_dict["report"]["path"]:
+			self.snippet_path=[ Path(p) for p in config_dict["report"]["path"].split(os.pathsep) ] + self.snippet_path 
+
 
 		self._id_cache = {}
 

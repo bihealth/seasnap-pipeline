@@ -1,0 +1,195 @@
+<!--  common abbreviations: 
+This is the snippet for summary of cluster profiler results
+January Weiner
+
+    cps, cluster profiler summary
+    cp, cluster profiler 
+-->
+
+
+## Cluster profiler summary overview by database
+
+
+### Overview
+
+
+
+
+```{r cps_configuration}
+require(tidyverse)
+require(pander)
+require(tmod)
+require(orthomapper)
+require(glue)
+
+if(packageVersion("tmod") < "0.43") 
+  stop("tmod version required: at least 0.43. Please install newer tmod from https://github.com/january3/tmod")
+
+# load tmod functions
+r.path <- r_common
+script_f <- file.path(r.path, "..", "..", "..", "external_scripts", "tmod_functions.R")
+source(script_f)
+
+## config is defined in the main report template
+if(is.null(config$contrasts$contrast_list)) stop("No contrasts defined")
+
+contrasts <- sapply(config$contrasts$contrast_list, `[[`, "ID")
+```
+
+
+```{r cps_load_data}
+## load cluster profiler data
+cp_data <- lapply(contrasts, function(.c) {
+  fn <- subset(file_tab, contrast == .c & step == "cluster_profiler" & extension == "rds")$filename
+  unlist(readRDS(fn), recursive=FALSE)
+})
+names(cp_data) <- contrasts
+
+sel <- sapply(cp_data, function(x) !is.null(x) && length(x) > 0)
+cp_data <- cp_data[sel]
+
+cps_db_names <- unique(unlist(lapply(cp_data, names)))
+
+## cp_data will now hold one element per each unique database name (e.g.
+## MSigdb.H) and each of these elements has the results of enrichment
+## analysis for each contrast for which it was run
+cp_data <- lapply(cps_db_names, function(.n) {
+  ret <- lapply(cp_data, `[[`, .n)
+  ret[!(sapply(ret, is.null))]
+})
+names(cp_data) <- cps_db_names
+```
+
+
+
+
+```{r cps_deseq2_results}
+message("Loading deseq2 results")
+tmp <- subset(file_tab, step=="contrasts_full" & extension == "rds")
+tmp2 <- lapply(tmp$filename, readRDS)
+names(tmp2) <- tmp$contrast
+
+.gl <- rownames(tmp2[[1]])
+tmp2 <- lapply(tmp2, function(x) x[ .gl, ])
+
+lfcs <- sapply(tmp2, `[[`, "log2FoldChange")
+pvals <- sapply(tmp2, `[[`, "padj")
+pvals[ is.na(pvals) ] <- 1
+lfcs[ is.na(lfcs) ] <- 0
+rownames(lfcs) <- .gl
+rownames(pvals) <- .gl
+```
+
+**Table.** Overview of the databases for which gene set enrichment using
+`cluster_profiler` was performed.
+
+```{r cps_dbs_overview_table}
+
+```
+
+
+```{r cps_db_output_templates}
+## Note: the `\n` character precedes the ```, because otherwise 
+## knitr gets confused!
+template_summary <- function(res, db_n) {
+"
+
+### `r db_n`
+
+"
+}
+
+template_figure <- function(res, resS, db_n, effect.col) {
+
+if(effect.col == "NES") { ret <-
+"
+**Fig.** Panel plot showing results for the database `r db_n`. Effect size
+is the normalized enrichment score (NES). Blue color indicates negative
+enrichment score, red color indicates positive NES. Size of the dots
+corresponds to the magnitude of NES as shown in the legend. Color intensity
+indicates p-value.
+
+\n```{r, fig.width=9,fig.height=ceiling(4 + nrow(resS) / 2)}
+labs <- tmod_labels(resS$ID, resS$Title, max.length=25, nlines=2)
+
+tmodPanelPlot(resS, min.e=-3, max.e=3, filter.rows.auc=-Inf, pie.style='dotsymm', pval.thr=.05, row.labels=labs, text.cex=0.7)
+\n```
+"
+} else { ret <-
+"
+**Fig.** Panel plot showing results for the database `r db_n`. Effect size
+is the relative enrichment score (E) defined as (b/n)/(B/N), where 
+b is the number of significant genes in the given gene set, n is total
+number of genes in the given gene set, B is the total number of significant
+genes and N is the total number of genes.  Size of the dots corresponds to
+the magnitude of E as shown in the legend. Color intensity indicates
+p-value.
+
+\n```{r, fig.width=9,fig.height=ceiling(4 + nrow(resS) / 2)}
+labs <- tmod_labels(resS$ID, resS$Title, max.length=35, nlines=2)
+
+ln <- names(labs)
+labs <- sprintf('%s (%s)', labs, names(labs))
+names(labs) <- ln
+tmodPanelPlot(resS, filter.rows.auc=-Inf, pval.thr=.05, row.labels=labs, max.e=NULL, min.e=1, text.cex=0.7)
+\n```
+"
+}
+
+return(ret)
+}
+
+```
+
+```{r cps_results,results="asis"}
+## Here, we knit the template for each database
+
+for(db_n in names(cp_data)) {
+  res <- lapply(cp_data[[db_n]], function(x) { x <- x@result ; x$Title <- x$Description ; x })
+  message(glue("generating plots for {db_n}"))
+
+  if(length(res) < 2) {
+    cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+  } else {
+
+ 
+  ## results with the "sort type" level flattened
+  ## so instead of res$contrasts_name$pval$... we have res$contrasts_name.pval$...
+  summary_t <- template_summary(res, db_n)
+  foo <- knitr::knit_child(text=summary_t, quiet=TRUE)
+  cat(foo)
+ 
+  if("NES" %in% colnames(res[[1]])) {
+    effect.col <- "NES"
+  } else {
+    effect.col <- "E"
+    res <- lapply(res, function(x) {
+      b <- as.numeric(gsub("/.*", "", x$GeneRatio))
+      n <- as.numeric(gsub(".*/", "", x$GeneRatio))
+      B <- as.numeric(gsub("/.*", "", x$BgRatio))
+      N <- as.numeric(gsub(".*/", "", x$BgRatio))
+      x$E <- ((b/n)/(B/N))
+      x
+    })
+  }
+    
+  res_selection <- tmod_mod_sel(res, qval.thr=0.05, auc.thr=0, effect.col=effect.col, pval.col='p.adjust')
+  res <- lapply(res, function(x) x[ x$ID %in% res_selection$sel_ids, , drop=FALSE ])
+  resS <- tmodSummary(res, effect.col=effect.col, pval.col='p.adjust')
+
+  if(!is.null(res_selection$note)) {
+    cat(paste("\n\nNo figure produced because there were", res_selection$note, "enrichment results.\n\n"))
+  } else {
+    figure_t <- template_figure(res, resS, db_n, effect.col)
+    foo <- knitr::knit_child(text=figure_t, quiet=TRUE)
+    cat(foo)
+  }
+  }
+}
+```
+
+
+
+
+
+
