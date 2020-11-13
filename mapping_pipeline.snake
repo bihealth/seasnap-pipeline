@@ -110,6 +110,7 @@ def get_inputs_all():
   # ATAC-seq
 	if "ATAC_Seq" in config["pipeline_param"]:
 		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
+		inputs += pph.expand_path("bwa", "bam", fix="!sample")
 		if "macs2" in atacseq_choices:
 			inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
 	
@@ -353,7 +354,8 @@ rule bw_from_bam:
 ## -----------------------------------------------------------------------------------
 rule macs2:
 	input:
-		bam = pph.file_path(step="star", extension="bam"),
+		#bam = pph.file_path(step="star", extension="bam"),
+		bam = pph.file_path(step="bwa", extension="bam")
 	output:
 		bed=pph.file_path(step="macs2", extension="summits.bed"),
 		pn=pph.file_path(step="macs2", extension="peaks.narrowPeak")

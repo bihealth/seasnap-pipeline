@@ -24,6 +24,7 @@ experiment:
   covariate_file:
     salmon: covariate_file.txt
     star: covariate_file.txt
+    macs2: covariate_file.txt
   design_formula: "~ group"
   #columns: null
       

@@ -95,7 +95,7 @@ def generate_covariate_file(args):
 
 	for step in steps:
 		if not extension:
-			default_ext = dict(star="gene_counts.tab", salmon="sf", feature_counts="feature_counts")
+			default_ext = dict(star="gene_counts.tab", salmon="sf", feature_counts="feature_counts", macs2="narrowPeak")
 			if step in default_ext:
 				extension = default_ext[step]
 			else:
@@ -108,7 +108,9 @@ def generate_covariate_file(args):
 		cft = CovariateFileTool(*config_files)
 
 		# fill 5 mandatory columns
-		if args.tpm:
+		if args.atac:
+			cft.update_covariate_data(step, extension, {"macs2": ("macs2", "peaks.narrowPeak"), "bam": ("star", "bam")})
+		elif args.tpm:
 			cft.update_covariate_data(step, extension, {"tpm": ("tpm_calculator", "tsv")})
 		else:
 			cft.update_covariate_data(step, extension)
@@ -266,6 +268,7 @@ parser_covariate_file.add_argument('--config_files', nargs='+', default=["DE_con
 parser_covariate_file.add_argument('--output', default="covariate_file.txt", help="name of covariate file")
 parser_covariate_file.add_argument('--col', nargs='+',   action='append', dest='add_cols', help="add a column, use e.g.: --col NAME gr1:lvl1 gr2:lvl1 gr3:lvl2 ...")
 parser_covariate_file.add_argument('--tpm', action='store_true', help="attach TPM column with output of TPMcalculator for display with DE pipeline")
+parser_covariate_file.add_argument('--atac', action='store_true', help="attach columns required for ATAC-seq (BAM and macs2 files)")
 parser_covariate_file.set_defaults(func=generate_covariate_file)
 
 #--- parser for select_contrast

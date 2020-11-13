@@ -1,6 +1,7 @@
 # Exported files
 
 ```{r export_files_setup}
+require(tibble)
 require(dplyr)
 require(writexl)
 require(purrr)
