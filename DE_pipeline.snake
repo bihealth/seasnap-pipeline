@@ -61,7 +61,8 @@ def get_inputs_all():
 	#contrasts
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	
-	#functional annotation
+	#scores & functional annotation
+	inputs.append(pph.file_path(step = "scores", extension = "rds", contrast = "all", if_set=dict(scores=True)))
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
 	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
@@ -564,7 +565,96 @@ rule DESeq2:
 		script_file = pph.log(log.out, snakemake_format(script), step="DESeq2", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 		
-		
+##-------------------- scores -------------------------------------------------------------------------------
+
+rule scores:
+	"""Compute scores by ssGSEA"""
+	input:
+		counts = pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
+	output:
+		scores = pph.file_path("scores", "rds", contrast = "all")
+	log:
+		out = pph.file_path("scores", "output.log", contrast = "all", log=True)
+	params:
+		genome    = config["organism"]["files"]["genome"],
+		gtf       = config["organism"]["files"]["gtf"],
+		annot_pkg = config["organism"]["R"]["annotations"],
+		gene_list = config["scores"]["path"],
+		id_class  = config["scores"]["id_class"],
+		kcdf      = config["scores"]["kcdf"],
+		min_n     = config["scores"]["min_n"]
+	run:
+		categories = "NULL"
+		if "categories" in config["scores"].keys():
+			categories = 'c("' + '", "'.join(config["scores"]["categories"]) + '")'
+
+		script = textwrap.dedent(r"""
+		library(parallel)
+		library(mclust)
+		library(quantreg)
+		library(magrittr)
+
+		{R_SESSION_INFO}
+
+		#----- prepare
+		categories <- {categories}
+
+		#----- exon locii
+		gtf <- rtracklayer::import.gff("{params.gtf}", format="gtf", genome=NA, feature.type="exon")
+		grl <- S4Vectors::split(gtf, GenomicRanges::elementMetadata(gtf)$gene_id)
+		grl <- GenomicRanges::reduce(grl)
+		reduced <- unlist(grl, use.names=TRUE)
+		GenomicRanges::elementMetadata(reduced)$gene_id <- rep(names(grl), S4Vectors::elementNROWS(grl))
+
+		#----- genome sequence
+		genome <- Biostrings::readDNAStringSet("{params.genome}")
+		names(genome) <- sub(" .*", "", names(genome))
+
+		#----- GC content (add G & C)
+		v <- BSgenome::getSeq(genome, reduced)
+		GenomicRanges::elementMetadata(reduced)$nGC <- as.vector(Biostrings::letterFrequency(v, letters="GC"))
+		gc_content <- as.data.frame(reduced)
+		gc_content <- gc_content %>% dplyr::group_by(gene_id) %>% dplyr::summarize(length=sum(width), GC_content=sum(nGC)/sum(width)) %>% as.data.frame()
+
+		#----- convert ids
+		ann <- getFromNamespace("{params.annot_pkg}", ns="{params.annot_pkg}")
+		ids <- AnnotationDbi::mapIds(ann, keys=sub("\\.[0-9]+$", "", gc_content[["gene_id"]]),
+                                     keytype="ENSEMBL", column="{params.id_class}", multiVals="first")
+		ids <- ids[!is.na(ids)]
+		ids <- ids[!duplicated(ids)]
+
+		#----- read counts
+		counts <- DESeq2::counts(readRDS("{input.counts}"), norm=TRUE)
+		rownames(counts) <- sub("\\.[0-9]+$", "", rownames(counts))
+		counts <- counts[rownames(counts) %in% names(ids),]
+		rownames(counts) <- ids[rownames(counts)]
+
+		#----- change gc_contents ids
+		rownames(gc_content) <- sub("\\.[0-9]+$", "", gc_content$gene_id)
+		gc_content <- gc_content[rownames(gc_content) %in% names(ids),]
+		rownames(gc_content) <- ids[rownames(gc_content)]
+		gc_content <- gc_content[rownames(counts),]
+
+		#----- read gene lists
+		gene_lists <- read.table("{params.gene_list}", sep="\t", header=1, stringsAsFactors=FALSE)
+		gene_lists <- gene_lists %>% dplyr::mutate(GENE=as.character(GENE))
+		if (!is.null(categories)) gene_lists <- gene_lists %>% dplyr::filter(CATEGORY %in% categories)
+		gene_lists <- gene_lists %>% dplyr::filter(GENE %in% rownames(counts))
+		gene_lists <- gene_lists %>% dplyr::group_by(TERM) %>% dplyr::filter(dplyr::n() >= {params.min_n}) %>% dplyr::ungroup()
+
+		#----- Normalise counts
+		counts_cqn <- cqn::cqn(counts, lengths=gc_content$length, x=gc_content$GC_content)
+
+		#----- Compute scores
+		ssGSEA <- GSVA::gsva(expr=counts_cqn$y + counts_cqn$offset, gset.idx.list=split(gene_lists$GENE, gene_lists$TERM),
+                             method="gsva", kcdf="{params.kcdf}", parallel.sz=0, min.sz=5)
+
+		#----- Save scores
+		saveRDS(ssGSEA, file="{output.scores}")
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="scores", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
 ##-------------------- contrasts ----------------------------------------------------------------------------
 
 rule contrast:
