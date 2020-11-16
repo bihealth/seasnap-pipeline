@@ -10,6 +10,7 @@ from time import asctime, localtime, time
 from pathlib import Path
 from snakemake.utils import report, format as snakemake_format
 from tools.pipeline_tools import DEPipelinePathHandler, ReportTool
+from glob import glob
 
 yaml.add_representer(OrderedDict, lambda dumper, data: dumper.represent_dict(dict(data)))
 
@@ -61,14 +62,17 @@ def get_inputs_all():
 	#contrasts
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	inputs.append(pph.expand_path(step="contrasts_full", extension="rds"))
-	inputs.append(pph.expand_path(step="motif_search_meme", extension="dreme.up_dir", if_set = dict(meme=dict(run=True))))
+	#inputs.append(pph.expand_path(step="test_contrast", extension="rds"))
+	#inputs.append(pph.expand_path(step="peak_seq", extension="dreme_input_done"))
+	#inputs.append(pph.expand_path(step="motif_search_meme", extension="dreme_output_dir", if_set = dict(meme=dict(run=True))))
+	inputs.append(pph.expand_path(step="motif_search_meme", extension="done", if_set = dict(meme=dict(run=True))))
+	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
+	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	
 	#functional annotation
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
 
-	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
-	#inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	#inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	#inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
 	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
@@ -245,8 +249,8 @@ rule import_macs2:
 		# ----------------------------------------
 
 		pkdba <- readRDS(input.rds)
-		pkids <- with(pkdba$peaks[[1]], paste(Chr, Start, End, sep="."))
-		stopifnot(all(map_lgl(pkdba$peaks, ~ all(with(.x, paste(Chr, Start, End, sep=".")) == pkids))))
+		pkids <- with(pkdba$peaks[[1]], sprintf("%s.%d.%d", Chr, Start, End))
+		stopifnot(all(map_lgl(pkdba$peaks, ~ all(with(.x, sprintf("%s.%d.%d", Chr, Start, End)) == pkids))))
 		count_dat <- map_dfc(pkdba$peaks, `[[`, "Reads") %>% data.matrix
 		rownames(count_dat) <- pkids
 		colnames(count_dat) <- pkdba$samples$SampleID
@@ -728,6 +732,8 @@ rule contrast:
 		script_file = pph.log(log.out, snakemake_format(script), step="contrast", extension="R", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
+
+	
 ## ------------------------ annotation ---------------------------
 ## Annotation rule produces a table with mapping between the Primary IDs
 ## (ENSEMBL usually) and other potentially useful IDs as well as gene
@@ -771,6 +777,7 @@ rule annotation:
 			## but peak IDs and we need to annotate them to matching genes
 			if(config$pipeline_param$input_choice$mapping == "import_macs2") {{
 				require(ChIPseeker)
+				require(GenomicRanges)
 				res <- data.frame(PrimaryID=gene_ids,
 					chr=             gsub("(.*)\\.[0-9]*\\.[0-9]*$", "\\1", gene_ids),
 					start=as.numeric(gsub(".*\\.([0-9]*)\\.[0-9]*$", "\\1", gene_ids)),
@@ -779,11 +786,9 @@ rule annotation:
 				peak_gr <- with(res, GRanges(res$chr, IRanges(res$start, res$end)))
 				txdb    <- loadDb(txdb_f)
 				peak_anno <- as.data.frame(annotatePeak(peak=peak_gr, TxDb=txdb))
-				peak_anno$PrimaryID <- with(peak_anno, paste(seqnames, start, end, sep="."))
-				res <- merge(res, peak_anno, by="ID", all.x=TRUE)
+				res <- cbind(PrimaryID=with(peak_anno, paste(seqnames, start, end, sep=".")), peak_anno)
 				res <- res[ match(gene_ids, res$PrimaryID), ]
-				res <- res %>% dplyr::rename(ENSEMBL=geneId)
-
+				res <- res %>% dplyr::rename(ENSEMBL=geneId, chr=seqnames)
 			}} else {{
 				res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
 			}}
@@ -942,22 +947,45 @@ rule tmod_dbs:
 
 ## ------------------------ motif finding for ATAC-seq     ---------------------------
 
-rule motif_search_meme:
-	"""Extract peak sequences based on contrast information"""
+rule motif_search_meme_old:
+	"""Search for motifs in peak sequences"""
 	input:
-	  peaks_sign_up = pph.file_path(step = "peak_seq", extension = "sign.up.fasta"),
-	  peaks_sign_dw = pph.file_path(step = "peak_seq", extension = "sign.dw.fasta"),
-	  peaks_ns      = pph.file_path(step = "peak_seq", extension = "ns.fasta")
+		dreme_input_dir  = pph.file_path(step="peak_seq", extension="dreme_input_dir"),
+		marker           = pph.file_path(step="peak_seq", extension="dreme_input_done")
 	output:
-	  dreme_up_dir   = directory(pph.file_path(step = "motif_search_meme", extension = "dreme.up_dir")),
-	  dreme_dw_dir   = directory(pph.file_path(step = "motif_search_meme", extension = "dreme.dw_dir"))
+	  dreme_output_dir = directory(pph.file_path(step = "motif_search_meme", extension = "dreme_output_dir"))
 	log:
 		out = pph.file_path(step = "motif_search_meme", extension = "output.log", log=True)
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		script = textwrap.dedent(r"""
-			dreme -oc {output.dreme_up_dir} -p {input.peaks_sign_up} -n {input.peaks_ns} -mink 8 -maxk 14 -png &
-			dreme -oc {output.dreme_dw_dir} -p {input.peaks_sign_dw} -n {input.peaks_ns} -mink 8 -maxk 14 -png
+		  
+
+			output_dir="{output.dreme_output_dir}"
+			input_dir="{input.dreme_input_dir}"
+			marker_f="{input.marker}"
+
+			# ----------------------------------------
+			# No Snakemake wildcards beyond this point
+			# ----------------------------------------
+
+			profiles=$(cat $marker_f)
+
+			for p in $profiles ; do
+				outpath=$output_dir/$p
+				mkdir -p $outpath
+				updir=$outpath/up
+				dwdir=$outpath/dw
+
+				input_sign_up=$input_dir/$p/sign_up.fasta
+				input_sign_dw=$input_dir/$p/sign_dw.fasta
+				input_peaks_ns=$input_dir/$p/nsign.fasta
+				echo dreme -oc $updir -p $input_sign_up -n $input_peaks_ns -mink 8 -maxk 14 -png
+				dreme -oc $updir -p $input_sign_up -n $input_peaks_ns -mink 8 -maxk 14 -png
+				echo dreme -oc $dwdir -p $input_sign_dw -n $input_peaks_ns -mink 8 -maxk 14 -png
+				dreme -oc $dwdir -p $input_sign_dw -n $input_peaks_ns -mink 8 -maxk 14 -png
+			done
+
 			""")
 		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension="R", **wildcards)
 
@@ -965,30 +993,70 @@ rule motif_search_meme:
 		shell("bash '{script_file}' &>> '{log.out}'")
 
 
+rule motif_search_meme:
+	"""Collect output from dreme"""
+	input:
+		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/up/dreme.txt" for p in config["meme"]["profiles"] ],
+		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/dw/dreme.txt" for p in config["meme"]["profiles"] ]
+	output:
+		marker = pph.file_path("motif_search_meme", "done")
+	log:
+		out = pph.file_path("motif_search_meme", "output.log", log=True)
+	shell:
+		"touch {output.marker}"
+
+rule one_dreme:
+	input:
+		sign=pph.file_path("peak_seq", "dreme_input_dir") + "/{profile}/sign_{updown}.fasta",
+		nsign=pph.file_path("peak_seq", "dreme_input_dir") + "/{profile}/nsign.fasta"
+	output:
+		out_done=pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/dreme.txt",
+		out_dir = directory(pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/")
+	log:
+		out = pph.file_path(step = "motif_search_meme", extension="{profile}_{updown}_output.log", log= True)
+	run:
+		prof=wildcards.profile
+		updown=wildcards.updown
+		script      = textwrap.dedent(r"""
+		mkdir -p {output.out_dir}
+		echo dreme -oc {output.out_dir} -p {input.sign} -n {input.nsign}  -mink 8 -maxk 14 -png
+		dreme -oc {output.out_dir} -p {input.sign} -n {input.nsign}  -mink 8 -maxk 14 -png
+		echo "Everything is fine"
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension=prof + "_" + updown + ".sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
 	
 rule peak_seq:
 	"""Extract peak sequences based on contrast information"""
 	input:
-		rds = pph.file_path("contrasts_full", "rds")
+		rds = pph.file_path("contrasts_full", "rds"),
+		annot = pph.file_path(step="annotation", extension="rds", contrast="all")
 	output:
-	  peaks_sign_up = pph.file_path(step = "peak_seq", extension = "sign.up.fasta"),
-	  peaks_sign_dw = pph.file_path(step = "peak_seq", extension = "sign.dw.fasta"),
-	  peaks_ns      = pph.file_path(step = "peak_seq", extension = "ns.fasta")
+	  marker = pph.file_path(step = "peak_seq", extension = "dreme_input_done"),
+		out_dir      = directory(pph.file_path(step="peak_seq", extension="dreme_input_dir")),
+		out_fasta_up = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/sign_dw.fasta" for p in config["meme"]["profiles"] ],
+		out_fasta_dw = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/sign_up.fasta" for p in config["meme"]["profiles"] ],
+		out_fasta_ns = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/nsign.fasta" for p in config["meme"]["profiles"] ]
 	log:
 		out = pph.file_path(step = "peak_seq", extension = "output.log", log=True)
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
-		script = textwrap.dedent(r"""
+		contrast    = pph.get_contrast(wildcards.contrast)
+		script      = textwrap.dedent(r"""
 			require(BSgenome)
 			require(Biostrings)
+			require(GenomeRanges)
+			require(writexl)
+			require(dplyr)
 
 			{R_SESSION_INFO}
 			config_file <- "{config_file}"
+			out_dir <- "{output.out_dir}"
+			out_marker <- "{output.marker}"
 			
-			output.peaks_sign_up <- "{output.peaks_sign_up}"
-			output.peaks_sign_dw <- "{output.peaks_sign_dw}"
-			output.peaks_ns      <- "{output.peaks_ns}"
 			input.rds            <- "{input.rds}"
+			annot_f   <- "{input.annot}"
 
 			pval.sign.thr <- 0.05
 			lfc.sign.thr  <- 0.5
@@ -1000,41 +1068,58 @@ rule peak_seq:
 			# ----------------------------------------
 
 			config <- yaml::yaml.load_file(config_file)
+			meme_conf <- config$meme
+			profiles <- meme_conf$profiles
 
-			ctr <- readRDS(input.rds)
-			peak_ids <- rownames(ctr)
-			peak_pos <- data.frame(ID=peak_ids,
-				chr=             gsub("(.*)\\.[0-9]*\\.[0-9]*$", "\\1", peak_ids),
-				start=as.numeric(gsub(".*\\.([0-9]*)\\.[0-9]*$", "\\1", peak_ids)),
-				end=  as.numeric(gsub(".*\\.[0-9]*\\.([0-9]*)$", "\\1", peak_ids)), 
-				stringsAsFactors=FALSE)
+			ctr <- as.data.frame(readRDS(input.rds))
+			annot  <- readRDS(annot_f)
+			ctr <- merge(annot, ctr, by.x="PrimaryID", by.y=0)
 
-			notna <- !is.na(ctr$log2FoldChange) & !is.na(ctr$pvalue)
-			sign.up <- notna & ctr$log2FoldChange >  lfc.sign.thr & ctr$pvalue < pval.sign.thr
-			sign.dw <- notna & ctr$log2FoldChange < -lfc.sign.thr & ctr$pvalue < pval.sign.thr
-
-			ns <- notna & !sign.up & !sign.dw
-			
-			if(!is.null(pval.ns.thr)) {{ ns <- ns & ctr$pvalue > pval.ns.thr }} 
-			if(!is.null(lfc.ns.thr))  {{ ns <- ns & abs(ctr$log2FoldChange) < lfc.ns.thr }}
-
-			peak_gr_sign_up <- with(peak_pos[sign.up, ], GRanges(chr, IRanges(start, end)))
-			peak_gr_sign_dw <- with(peak_pos[sign.dw, ], GRanges(chr, IRanges(start, end)))
-			peak_gr_ns      <- with(peak_pos[ns, ],      GRanges(chr, IRanges(start, end)))
-
+			message("Loading genome...")
 			genome <- readDNAStringSet(config$organism$files$genome)
 			names(genome) <- gsub(" .*", "", names(genome))
 
-			peak_seq_sign_up <- getSeq(genome, peak_gr_sign_up)
-			peak_seq_sign_dw <- getSeq(genome, peak_gr_sign_dw)
-			peak_seq_ns      <- getSeq(genome, peak_gr_ns)
-			names(peak_seq_sign_up) <- peak_ids[sign.up]
-			names(peak_seq_sign_dw) <- peak_ids[sign.dw]
-			names(peak_seq_ns)      <- peak_ids[ns]
+			for(p in 1:length(profiles)) {{
+				prof <- profiles[[p]]
+				sel <- ctr$distanceToTSS < as.numeric(prof$end) & ctr$distanceToTSS > as.numeric(prof$start)
 
-			writeXStringSet(peak_seq_sign_up, filepath=output.peaks_sign_up)
-			writeXStringSet(peak_seq_sign_dw, filepath=output.peaks_sign_dw)
-			writeXStringSet(peak_seq_ns,      filepath=output.peaks_ns)
+				notna <- !is.na(ctr$log2FoldChange) & !is.na(ctr$pvalue)
+
+				sign.up <- notna & ctr$log2FoldChange >  lfc.sign.thr & ctr$pvalue < pval.sign.thr & sel
+				sign.dw <- notna & ctr$log2FoldChange < -lfc.sign.thr & ctr$pvalue < pval.sign.thr & sel
+
+				ns <- !sign.up & !sign.dw & sel
+				
+				if(!is.null(pval.ns.thr)) {{ ns <- ns & ctr$pvalue > pval.ns.thr }} 
+				if(!is.null(lfc.ns.thr))  {{ ns <- ns & abs(ctr$log2FoldChange) < lfc.ns.thr }}
+
+				peak_gr_sign_up <- with(ctr[sign.up, ], GRanges(chr, IRanges(start, end)))
+				peak_gr_sign_dw <- with(ctr[sign.dw, ], GRanges(chr, IRanges(start, end)))
+				peak_gr_ns      <- with(ctr[ns, ],      GRanges(chr, IRanges(start, end)))
+
+				peak_seq_sign_up <- getSeq(genome, peak_gr_sign_up)
+				peak_seq_sign_dw <- getSeq(genome, peak_gr_sign_dw)
+				peak_seq_ns      <- getSeq(genome, peak_gr_ns)
+				names(peak_seq_sign_up) <- ctr$PrimaryID[sign.up]
+				names(peak_seq_sign_dw) <- ctr$PrimaryID[sign.dw]
+				names(peak_seq_ns)      <- ctr$PrimaryID[ns]
+
+				prof_out_dir <- file.path(out_dir, prof$title)
+				dir.create(prof_out_dir, recursive=TRUE, showWarnings=TRUE)
+
+				message("writing to ", prof_out_dir)
+				writeXStringSet(peak_seq_sign_up, filepath=file.path(prof_out_dir, "sign_up.fasta"))
+				writeXStringSet(peak_seq_sign_dw, filepath=file.path(prof_out_dir, "sign_dw.fasta"))
+				writeXStringSet(peak_seq_ns,      filepath=file.path(prof_out_dir, "nsign.fasta"))
+				fileConn <- file(file.path(prof_out_dir, "dreme.input"))
+				writeLines(c("this is dreme input"), fileConn)
+				close(fileConn)
+				write_xlsx(list(sign_up=ctr[sign.up, ], sign_dw=ctr[sign.dw, ], nonsign=ctr[ns, ]), path=file.path(prof_out_dir, "peaks.xlsx"))
+			}}
+
+			fileConn <- file(out_marker)
+			writeLines(sapply(profiles, `[[`, "title"), fileConn)
+			close(fileConn)
 
 			""")
 		script_file = pph.log(log.out, snakemake_format(script), step="peak_seq", extension="R", **wildcards)
