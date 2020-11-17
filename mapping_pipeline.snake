@@ -107,7 +107,7 @@ def get_inputs_all():
 		if "bw_from_bam"      in qc_choices:
 			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
-  # ATAC-seq
+	# ATAC-seq
 	if "ATAC_Seq" in config["pipeline_param"]:
 		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
 		inputs += pph.expand_path("bwa", "bam", fix="!sample")
@@ -174,10 +174,18 @@ rule all:
 		""", output.html, graph = rule_execution, table = summary)
 		
 rule export:
+	""" export files for upload to SODAR """
 	input:
 		get_inputs_all()
 	run:
 		pph.export()
+
+rule UCSC_export:
+	""" export files for UCSC track hub """
+	input:
+		get_inputs_all()
+	run:
+		pph.export(config_key = "UCSC_export")
 
 ##-------------------- fastqc -------------------------------------------------------------------------------
 
@@ -679,7 +687,8 @@ rule feature_counts:
 	log:
 		out = pph.file_path(step="feature_counts", extension="output.log", log=True)
 	params:
-		nsrt_bam = pph.file_path(step="feature_counts", extension="name_sorted.bam")
+		nsrt_bam = pph.file_path(step="feature_counts", extension="name_sorted.bam"),
+                options = config["rule_options"]["feature_counts"]["cmd_opt"]
 	threads: 2
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
@@ -694,7 +703,7 @@ rule feature_counts:
 		samtools sort -n -@ $(expr {threads} \* 2) -m $(expr 2500 / {threads})M -T $(dirname {output})/sort -o {params.nsrt_bam} {input.bam}
 		
 		#----- feature counts
-		featureCounts -T {threads} -t exon -g gene_id -a {input.gtf} -s {protocol} {paired} -o {output} {params.nsrt_bam}
+		featureCounts {params.options} -T {threads} -t exon -g gene_id -a {input.gtf} -s {protocol} {paired} -o {output} {params.nsrt_bam}
 		
 		#----- clean up
 		rm {params.nsrt_bam}

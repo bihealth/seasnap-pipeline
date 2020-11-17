@@ -105,6 +105,14 @@ export:
     - files: {step: salmon, extension: sf}
 
 
+UCSC_export:
+  blueprint: false
+  path_pattern:
+    - my_UCSC_track_hub/{GENOME}/{files:mapped_reads}.{step}.{sample}.{extension}
+  mapped_reads:
+    - files: {step: star, mate: all_mates, extension: bam}
+    - files: {step: star, mate: all_mates, extension: bam.bai}
+
 #---------------------------------------- circRNA report
 circRNA_report:
   snippet_parameters: {}
