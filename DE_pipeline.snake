@@ -65,7 +65,7 @@ def get_inputs_all():
 	#inputs.append(pph.expand_path(step="test_contrast", extension="rds"))
 	#inputs.append(pph.expand_path(step="peak_seq", extension="dreme_input_done"))
 	#inputs.append(pph.expand_path(step="motif_search_meme", extension="dreme_output_dir", if_set = dict(meme=dict(run=True))))
-	inputs.append(pph.expand_path(step="motif_search_meme", extension="done", if_set = dict(meme=dict(run=True))))
+	inputs.append(pph.expand_path(step="motif_search_meme", extension="rds", if_set = dict(meme=dict(run=True))))
 	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	
@@ -947,65 +947,81 @@ rule tmod_dbs:
 
 ## ------------------------ motif finding for ATAC-seq     ---------------------------
 
-rule motif_search_meme_old:
-	"""Search for motifs in peak sequences"""
+
+rule motif_search_meme:
+	"""Collect output from dreme/tomtom"""
 	input:
-		dreme_input_dir  = pph.file_path(step="peak_seq", extension="dreme_input_dir"),
-		marker           = pph.file_path(step="peak_seq", extension="dreme_input_done")
+		dreme_up =[ pph.file_path("motif_search_meme", "dreme_output_dir")  + "/" + p["title"] + "/up/dreme.txt"  for p in config["meme"]["profiles"] ],
+		dreme_dw =[ pph.file_path("motif_search_meme", "dreme_output_dir")  + "/" + p["title"] + "/dw/dreme.txt"  for p in config["meme"]["profiles"] ],
+		tomtom_up=[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/up/tomtom.tsv" for p in config["meme"]["profiles"] ],
+		tomtom_dw=[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/dw/tomtom.tsv" for p in config["meme"]["profiles"] ]
 	output:
-	  dreme_output_dir = directory(pph.file_path(step = "motif_search_meme", extension = "dreme_output_dir"))
+		rds = pph.file_path("motif_search_meme", "rds"),
+		xlsx_dreme  = pph.file_path("motif_search_meme", "dreme.xlsx"),
+		xlsx_tomtom = pph.file_path("motif_search_meme", "tomtom.xlsx")
 	log:
-		out = pph.file_path(step = "motif_search_meme", extension = "output.log", log=True)
+		out   = pph.file_path("motif_search_meme", "output.log", log=True)
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
-		script = textwrap.dedent(r"""
-		  
+		contrast    = yaml.dump(pph.get_contrast(wildcards.contrast))
+		dreme_dir   = pph.file_path("motif_search_meme", "dreme_output_dir",  contrast=wildcards.contrast)
+		tomtom_dir  = pph.file_path("motif_search_meme", "tomtom_output_dir", contrast=wildcards.contrast)
+		script      = textwrap.dedent(r"""
+			library(dplyr)
+			library(purrr)
+			library(writexl)
 
-			output_dir="{output.dreme_output_dir}"
-			input_dir="{input.dreme_input_dir}"
-			marker_f="{input.marker}"
+			{R_SESSION_INFO}
+			script.d    <- "{SCRIPTDIR}"
+			config_file <- "{config_file}"
+			output.rds  <- "{output.rds}"
+			out.d.xlsx  <- "{output.xlsx_dreme}"
+			out.t.xlsx  <- "{output.xlsx_tomtom}"
+			contrast    <- yaml::yaml.load("{contrast}")
+			dreme_dir   <- "{dreme_dir}"
+			tomtom_dir  <- "{tomtom_dir}"
 
 			# ----------------------------------------
 			# No Snakemake wildcards beyond this point
 			# ----------------------------------------
 
-			profiles=$(cat $marker_f)
+			config    <- yaml::yaml.load_file(config_file)
+			meme_conf <- config$meme
+			profile_t <- map(meme_conf$profiles, `[[`, "title")
+			jaspar_d  <- meme_conf$motif_annotations
 
-			for p in $profiles ; do
-				outpath=$output_dir/$p
-				mkdir -p $outpath
-				updir=$outpath/up
-				dwdir=$outpath/dw
+			source(file.path(script.d, "motif_search.R"))
 
-				input_sign_up=$input_dir/$p/sign_up.fasta
-				input_sign_dw=$input_dir/$p/sign_dw.fasta
-				input_peaks_ns=$input_dir/$p/nsign.fasta
-				echo dreme -oc $updir -p $input_sign_up -n $input_peaks_ns -mink 8 -maxk 14 -png
-				dreme -oc $updir -p $input_sign_up -n $input_peaks_ns -mink 8 -maxk 14 -png
-				echo dreme -oc $dwdir -p $input_sign_dw -n $input_peaks_ns -mink 8 -maxk 14 -png
-				dreme -oc $dwdir -p $input_sign_dw -n $input_peaks_ns -mink 8 -maxk 14 -png
-			done
+			## ----------- read tomtom and dreme results
+			dreme_res <- map(set_names(profile_t), ~ {{
+				p <- .x
+				map(set_names(c("up", "dw")), ~ read_dreme(file.path(dreme_dir, p, .x, "dreme.txt")))
+			}})
 
-			""")
+			tomtom_res <- map(set_names(profile_t), ~ {{
+				p <- .x
+				map(set_names(c("up", "dw")), ~ read_tomtom(file.path(tomtom_dir, p, .x, "tomtom.tsv"), jaspar.dir=jaspar_d))
+			}})
+
+			## ----------- save XLSX files
+			dreme_res_xlsx <- map(dreme_res, ~ {{
+				imap_dfr(.x, ~ .x %>% dplyr::mutate(Direction=.y)) %>% dplyr::arrange(E)
+			}})
+			write_xlsx(dreme_res_xlsx, path=out.d.xlsx)
+
+			tomtom_res_xlsx <- map(tomtom_res, ~ {{
+				imap_dfr(.x, ~ .x %>% dplyr::mutate(Direction=.y)) %>% dplyr::arrange(p.value)
+			}})
+			write_xlsx(tomtom_res_xlsx, path=out.t.xlsx)
+
+			## ----------- save RDS object
+			saveRDS(list(dreme=dreme_res, tomtom=tomtom_res), file=output.rds)
+		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension="R", **wildcards)
 
 		# run R
-		shell("bash '{script_file}' &>> '{log.out}'")
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
-
-rule motif_search_meme:
-	"""Collect output from dreme/tomtom"""
-	input:
-		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/up/dreme.txt" for p in config["meme"]["profiles"] ],
-		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/dw/dreme.txt" for p in config["meme"]["profiles"] ],
-		[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/up/tomtom.tsv" for p in config["meme"]["profiles"] ],
-		[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/dw/tomtom.tsv" for p in config["meme"]["profiles"] ]
-	output:
-		marker = pph.file_path("motif_search_meme", "done")
-	log:
-		out = pph.file_path("motif_search_meme", "output.log", log=True)
-	shell:
-		"touch {output.marker}"
 
 rule one_tomtom:
 	"""Run dreme once. Uses motif_search_meme step for output."""
