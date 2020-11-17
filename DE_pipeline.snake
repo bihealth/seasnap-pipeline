@@ -994,10 +994,12 @@ rule motif_search_meme_old:
 
 
 rule motif_search_meme:
-	"""Collect output from dreme"""
+	"""Collect output from dreme/tomtom"""
 	input:
 		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/up/dreme.txt" for p in config["meme"]["profiles"] ],
-		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/dw/dreme.txt" for p in config["meme"]["profiles"] ]
+		[ pph.file_path("motif_search_meme", "dreme_output_dir") + "/" + p["title"] + "/dw/dreme.txt" for p in config["meme"]["profiles"] ],
+		[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/up/tomtom.tsv" for p in config["meme"]["profiles"] ],
+		[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/dw/tomtom.tsv" for p in config["meme"]["profiles"] ]
 	output:
 		marker = pph.file_path("motif_search_meme", "done")
 	log:
@@ -1005,7 +1007,30 @@ rule motif_search_meme:
 	shell:
 		"touch {output.marker}"
 
+rule one_tomtom:
+	"""Run dreme once. Uses motif_search_meme step for output."""
+	input:
+		dreme=pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/dreme.txt"
+	output:
+		out_done=           pph.file_path("motif_search_meme", "tomtom_output_dir") + "/{profile}/{updown}/tomtom.tsv",
+		out_dir = directory(pph.file_path("motif_search_meme", "tomtom_output_dir") + "/{profile}/{updown}/")
+	log:
+		out = pph.file_path(step = "motif_search_meme", extension="{profile}_{updown}_output.log", log= True)
+	run:
+		prof=wildcards.profile
+		updown=wildcards.updown
+		database=config["meme"]["tomtom_database"]
+		script      = textwrap.dedent(r"""
+		mkdir -p {output.out_dir}
+		tomtom -oc {output.out_dir} -png -no-ssc -thresh 10 -evalue {input.dreme} {database}
+		echo "Everything is fine"
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension="tomtom" + prof + "_" + updown + ".sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+	
 rule one_dreme:
+	"""Run dreme once. Uses motif_search_meme step for output."""
 	input:
 		sign=pph.file_path("peak_seq", "dreme_input_dir") + "/{profile}/sign_{updown}.fasta",
 		nsign=pph.file_path("peak_seq", "dreme_input_dir") + "/{profile}/nsign.fasta"
@@ -1083,14 +1108,14 @@ rule peak_seq:
 				prof <- profiles[[p]]
 				sel <- ctr$distanceToTSS < as.numeric(prof$end) & ctr$distanceToTSS > as.numeric(prof$start)
 
-				notna <- !is.na(ctr$log2FoldChange) & !is.na(ctr$pvalue)
+				notna <- !is.na(ctr$log2FoldChange) & !is.na(ctr$padj)
 
-				sign.up <- notna & ctr$log2FoldChange >  lfc.sign.thr & ctr$pvalue < pval.sign.thr & sel
-				sign.dw <- notna & ctr$log2FoldChange < -lfc.sign.thr & ctr$pvalue < pval.sign.thr & sel
+				sign.up <- notna & ctr$log2FoldChange >  lfc.sign.thr & ctr$padj < pval.sign.thr & sel
+				sign.dw <- notna & ctr$log2FoldChange < -lfc.sign.thr & ctr$padj < pval.sign.thr & sel
 
 				ns <- !sign.up & !sign.dw & sel
 				
-				if(!is.null(pval.ns.thr)) {{ ns <- ns & ctr$pvalue > pval.ns.thr }} 
+				if(!is.null(pval.ns.thr)) {{ ns <- ns & ctr$padj > pval.ns.thr }} 
 				if(!is.null(lfc.ns.thr))  {{ ns <- ns & abs(ctr$log2FoldChange) < lfc.ns.thr }}
 
 				peak_gr_sign_up <- with(ctr[sign.up, ], GRanges(chr, IRanges(start, end)))

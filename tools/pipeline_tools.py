@@ -305,7 +305,7 @@ class PipelinePathHandler:
 
 		glob_pattern = re.sub("{[^}./]+}", "*", input_pattern)
 		wildcards = re.findall("{([^}./]+)}", input_pattern)
-		input_files = iglob(glob_pattern + ("*" if glob_pattern[-1] != "*" else ""), recursive=True)
+		input_files = glob(glob_pattern + ("*" if glob_pattern[-1] != "*" else ""), recursive=True)
 
 		if verbose:
 			print("\ninput files:\n{}".format("\n".join(input_files)))
@@ -1221,7 +1221,7 @@ class CovariateFileTool(PipelinePathHandler):
 		:param step:  Snakemake rule name for which the files are searched
 		:param extension: file extension of the searched files
 		"""
-		files = sorted(self._get_mapping_input(step, extension, wildcards={}))
+		files = self._get_mapping_input(step, extension, wildcards={})
 		extra_files = {}
 		if other is not None:
 			for col, (a_step, a_ext) in other.items():
@@ -1240,7 +1240,7 @@ class CovariateFileTool(PipelinePathHandler):
 
 		self.covariate_data = pd.DataFrame(
 			{"filename":files, "md5":md5, "group":group, "replicate":replicate, "label":label, **extra_files}
-		)
+		).sort_values("label")
 
 	def add_column(self, name, levels):
 		"""

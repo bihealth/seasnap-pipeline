@@ -327,7 +327,7 @@ rule star:
 ## -----------------------------------------------------------------------------------
 rule bw_from_bam:
 	input:
-		bam = pph.file_path(step="star", extension="bam"),
+		bam = pph.file_path(step="sorted_bam", extension="bam"),
 	output:
 		pph.file_path(step="bw_from_bam", extension="bw")
 	log:
@@ -341,6 +341,28 @@ rule bw_from_bam:
 
 		#----- run bamCoverage
 		bamCoverage --bam {input.bam} --outFileFormat bigwig --outFileName {output} --effectiveGenomeSize {genome_size} --extendReads --normalizeUsing RPGC
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+## We need to sort the BWA bams for bamCoverage. We need BWA because MACS2
+## doesn't work with STAR for some reason.
+rule sorted_bam:
+	input:
+		bam = pph.file_path(step="bwa", extension="bam"),
+	output:
+		bam = pph.file_path(step="sorted_bam", extension="bam")
+	log:
+		out = pph.file_path(step="sorted_bam", extension="output.log", log=True)
+	threads: 6
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+
+		samtools sort -@ {threads} -O bam -o {output.bam} {input.bam}
+		samtools index {output.bam}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
