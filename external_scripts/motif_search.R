@@ -95,6 +95,17 @@ read_tomtom_result <- function(path, jaspar.dir) {
 read_tomtom <- function(file, jaspar.dir=NULL) {
   require(dplyr)
 
+ fi <- file.info(file)
+ if(fi$size[1] == 0) {
+   warning("TOMTOM file empty, returning no rows")
+   return(NULL)
+   cols <- c("Query_ID", "Target_ID", "Optimal_offset", "p.value", "E.value", "q.value", "Overlap", 
+             "Query_consensus", "Target_consensus", "Orientation", "Annotation", "Direction")
+
+
+
+ }
+
  res <- read.table(file, comment.char="#", sep="\t", header=TRUE, stringsAsFactors=FALSE) 
  if(!is.null(jaspar.dir)) {
    res$Annotation <- map_chr(res$Target_ID, ~ read_motif(file.path(jaspar.dir, paste0(.x, ".meme")))[3])
@@ -106,22 +117,20 @@ read_tomtom <- function(file, jaspar.dir=NULL) {
 
 #' Compile dreme and tomtom output
 #'
-motifsearch_summary <- function(dreme_res, tomtom_res, motif.dir, enr.thr=2) {
+motifsearch_summary <- function(dreme_res, tomtom_res, enr.thr=2, annot.thr=0.05, work_dir=".") {
 
   dreme_sel <- dreme_res %>% dplyr::filter(Enrichment > enr.thr) %>% 
-    mutate(Logo=sprintf("![%s](%s)", Motif, Logo)) %>% 
-    dplyr::select(Contrast, Direction, Motif, Pval, Logo=Logo)
+    mutate(Logo=sprintf("![%s](%s)", Motif, file.path(work_dir, Logo))) %>% 
+    dplyr::select(Direction, Motif, Enrichment, Pval, E, Logo=Logo)
 
   dreme_sel$Annotation <- sapply(1:nrow(dreme_sel), function(i) {
-    ann <- tomtom_res %>% dplyr::filter(Contrast == dreme_sel$Contrast[i],
-    Direction == dreme_sel$Direction[i], Query == dreme_sel$Motif[i]) %>%
+    ann <- tomtom_res %>% 
+    dplyr::filter(Direction == dreme_sel$Direction[i], q.value < annot.thr, Query_ID == dreme_sel$Motif[i]) %>%
     pull(Annotation) %>% unique %>% paste(collapse = ", ")
 
   })
 
-  dreme_sel <- dreme_sel %>% dplyr::filter(Annotation != "") %>% 
-    mutate(Direction = ifelse(duplicated(paste0(Contrast, Direction)), ",,", Direction),
-           Contrast  = ifelse(duplicated(Contrast), ",,", Contrast))
+  dreme_sel <- dreme_sel %>% dplyr::filter(Annotation != "") 
 
 
 }
@@ -260,15 +269,30 @@ coverageTSS <- function(reads, genes, width=3000, chromosome="chr20", plot=TRUE,
 #' @param file file with the results
 read_dreme <- function(file) {
   require(dplyr)
+  message("Reading from file ", file)
   con <- file(file)
   rl <- readLines(con)
   close(con)
 
+  tot_pos <- rl[ grep("^# *positives: *", rl)[1] ]
+  tot_pos <- gsub("^# *positives: *([0-9]+) *from.*", "\\1", tot_pos) %>% as.numeric()
+  tot_neg <- rl[ grep("^# *negatives: *", rl)[1] ]
+  tot_neg <- gsub("^# *negatives: *([0-9]+) *from.*", "\\1", tot_neg) %>% as.numeric()
+
   rl.motifs <- rl[ grep("^MOTIF", rl) ] %>% map_chr(~ strsplit(.x, split=" ")[[1]][2])
+  if(length(rl.motifs) < 1) {
+    warning("no motifs found, returning NULL")
+    return(NULL)
+  }
   rl.no <- rl[ grep("^MOTIF", rl) ] %>% map_chr(~ strsplit(.x, split=" ")[[1]][3])
   rl.matches <- rl[ grep("^# BEST", rl) ] %>% { gsub("^# BEST  *", "", .) } %>% { read.table(text=.) } %>% as_tibble
   colnames(rl.matches) <- c("Best", "RCWord", "Pos", "Neg", "Pval", "E")
-  rl.matches <- rl.matches %>% mutate(Motif=rl.motifs, No=rl.no) %>% dplyr::select(Motif, Best:E, No)
+  rl.matches <- rl.matches %>% mutate(Motif=rl.motifs, No=rl.no) %>% dplyr::select(Motif, Best:E, No) %>%
+    mutate(No=as.numeric(gsub("DREME-", "", No)), Pos=as.numeric(Pos), Neg=as.numeric(Neg)) %>%
+    mutate(tot_Positives=tot_pos, tot_Negatives=tot_neg) %>%
+    mutate(Pos_frac=Pos/tot_pos, Neg_frac=Neg/tot_neg, Enrichment=Pos_frac/Neg_frac) %>%
+    mutate(Logo=file.path(dirname(file), sprintf("m%02dnc_%s.png", as.numeric(No), Motif))) 
+
   rl.matches
 }
 

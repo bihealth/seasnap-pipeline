@@ -62,9 +62,6 @@ def get_inputs_all():
 	#contrasts
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	inputs.append(pph.expand_path(step="contrasts_full", extension="rds"))
-	#inputs.append(pph.expand_path(step="test_contrast", extension="rds"))
-	#inputs.append(pph.expand_path(step="peak_seq", extension="dreme_input_done"))
-	#inputs.append(pph.expand_path(step="motif_search_meme", extension="dreme_output_dir", if_set = dict(meme=dict(run=True))))
 	inputs.append(pph.expand_path(step="motif_search_meme", extension="rds", if_set = dict(meme=dict(run=True))))
 	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
@@ -74,9 +71,9 @@ def get_inputs_all():
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
 
 	#inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
-	#inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
+	inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
 	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
-	#inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
+	inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
 
 	#time series
 	for ts in config["time_series"]:
@@ -507,42 +504,6 @@ rule import_sf:
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 ##-------------------- export_raw_counts -------------------------------------------------------------------------------
-## XXX: this should be added to export_raw_counts 
-##	# ----- Normalised expression values
-##	rld_blind <- switch("{normalized_expression}",
-##		"rld"=rlog(dds, blind=TRUE),
-##		"vst"=vst(dds, blind=TRUE)
-##	)
-##	rld_model <- switch("{normalized_expression}",
-##		"rld"=rlog(dds, blind=FALSE),
-##		"vst"=vst(dds, blind=FALSE)
-##	)
-##
-##	#----- save as rds
-##	saveRDS(dds, file="{output.dds}")
-##	saveRDS(rld_blind, file="{output.rld_blind}")
-##	saveRDS(rld_model, file="{output.rld_model}")
-##
-##
-##	write.table(data.frame(
-##		gene_id=rownames(rld_model),
-##		assay(rld_model),
-##		symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-##		              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
-##		entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-##		              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
-##		check.names=FALSE
-##		), file="{output.rld_model_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
-##	write.table(data.frame(
-##		gene_id=rownames(rld_blind),
-##		assay(rld_blind),
-##		symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-##		              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
-##		entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-##		              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
-##		check.names=FALSE
-##		), file="{output.rld_blind_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
-
 rule export_raw_counts:
 	""" export DESeq2 raw counts from the DESeq2 object as XLSX"""
 	input:
@@ -591,11 +552,11 @@ rule DESeq2:
 		dict(step = "import_macs2",         extension = "rds", contrast = "all")
 		])
 	output:
-		dds           = pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
-#		rld_blind     = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
-#		rld_model     = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
-#		rld_blind_csv = pph.file_path("DESeq2", "rld.blind.csv", contrast = "all"),
-#		rld_model_csv = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
+		dds           = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
+		rld_blind     = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
+		rld_model     = pph.file_path("DESeq2", "rld.model.rds", contrast = "all"),
+		rld_blind_csv = pph.file_path("DESeq2", "rld.blind.csv", contrast = "all"),
+		rld_model_csv = pph.file_path("DESeq2", "rld.model.csv", contrast = "all")
 	log:
 		out = pph.file_path("DESeq2", "output.log", contrast = "all", log=True)
 	params:
@@ -641,6 +602,43 @@ rule DESeq2:
 
 		#----- save other files
 		writeLines(resultsNames(dds), "{params.coef_names}")
+
+		# ----- Normalised expression values
+		rld_blind <- switch("{normalized_expression}",
+			"rld"=rlog(dds, blind=TRUE),
+			"vst"=vst(dds, blind=TRUE)
+		)
+		rld_model <- switch("{normalized_expression}",
+			"rld"=rlog(dds, blind=FALSE),
+			"vst"=vst(dds, blind=FALSE)
+		)
+	
+		#----- save as rds
+		saveRDS(dds, file="{output.dds}")
+		saveRDS(rld_blind, file="{output.rld_blind}")
+		saveRDS(rld_model, file="{output.rld_model}")
+	
+		write.table(data.frame(
+			gene_id=rownames(rld_model),
+			assay(rld_model),
+			# symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			#               column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+			# entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			#               column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+			check.names=FALSE
+			), file="{output.rld_model_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+
+		write.table(data.frame(
+			gene_id=rownames(rld_blind),
+			assay(rld_blind),
+			# symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			#               column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+			# entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+			#               column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+			check.names=FALSE
+			), file="{output.rld_blind_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+
+
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="DESeq2", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -995,24 +993,28 @@ rule motif_search_meme:
 			## ----------- read tomtom and dreme results
 			dreme_res <- map(set_names(profile_t), ~ {{
 				p <- .x
-				map(set_names(c("up", "dw")), ~ read_dreme(file.path(dreme_dir, p, .x, "dreme.txt")))
+				imap_dfr(set_names(c("up", "dw")), ~ {{
+					res <- read_dreme(file.path(dreme_dir, p, .x, "dreme.txt"))
+					if(!is.null(res)) {{
+						res <- res %>% dplyr::mutate(Direction=.y)
+					}}
+				}})
 			}})
 
 			tomtom_res <- map(set_names(profile_t), ~ {{
 				p <- .x
-				map(set_names(c("up", "dw")), ~ read_tomtom(file.path(tomtom_dir, p, .x, "tomtom.tsv"), jaspar.dir=jaspar_d))
+				imap_dfr(set_names(c("up", "dw")), ~ {{
+					res <- read_tomtom(file.path(tomtom_dir, p, .x, "tomtom.tsv"), jaspar.dir=jaspar_d)
+					if(!is.null(res)) {{
+						res <- res %>% dplyr::mutate(Direction=.y)
+					}} 
+					return(res)
+				}})
 			}})
 
 			## ----------- save XLSX files
-			dreme_res_xlsx <- map(dreme_res, ~ {{
-				imap_dfr(.x, ~ .x %>% dplyr::mutate(Direction=.y)) %>% dplyr::arrange(E)
-			}})
-			write_xlsx(dreme_res_xlsx, path=out.d.xlsx)
-
-			tomtom_res_xlsx <- map(tomtom_res, ~ {{
-				imap_dfr(.x, ~ .x %>% dplyr::mutate(Direction=.y)) %>% dplyr::arrange(p.value)
-			}})
-			write_xlsx(tomtom_res_xlsx, path=out.t.xlsx)
+			write_xlsx(dreme_res, path=out.d.xlsx)
+			write_xlsx(tomtom_res, path=out.t.xlsx)
 
 			## ----------- save RDS object
 			saveRDS(list(dreme=dreme_res, tomtom=tomtom_res), file=output.rds)
@@ -1031,7 +1033,7 @@ rule one_tomtom:
 		out_done=           pph.file_path("motif_search_meme", "tomtom_output_dir") + "/{profile}/{updown}/tomtom.tsv",
 		out_dir = directory(pph.file_path("motif_search_meme", "tomtom_output_dir") + "/{profile}/{updown}/")
 	log:
-		out = pph.file_path(step = "motif_search_meme", extension="{profile}_{updown}_output.log", log= True)
+		out = pph.file_path(step = "motif_search_meme", extension="tomtom_{profile}_{updown}_output.log", log= True)
 	run:
 		prof=wildcards.profile
 		updown=wildcards.updown
@@ -1039,6 +1041,7 @@ rule one_tomtom:
 		script      = textwrap.dedent(r"""
 		mkdir -p {output.out_dir}
 		tomtom -oc {output.out_dir} -png -no-ssc -thresh 10 -evalue {input.dreme} {database}
+		touch {output.out_dir}/tomtom.tsv
 		echo "Everything is fine"
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension="tomtom" + prof + "_" + updown + ".sh", **wildcards)
@@ -1054,7 +1057,7 @@ rule one_dreme:
 		out_done=pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/dreme.txt",
 		out_dir = directory(pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/")
 	log:
-		out = pph.file_path(step = "motif_search_meme", extension="{profile}_{updown}_output.log", log= True)
+		out = pph.file_path(step = "motif_search_meme", extension="dreme_{profile}_{updown}_output.log", log= True)
 	run:
 		prof=wildcards.profile
 		updown=wildcards.updown
@@ -1078,7 +1081,8 @@ rule peak_seq:
 		out_dir      = directory(pph.file_path(step="peak_seq", extension="dreme_input_dir")),
 		out_fasta_up = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/sign_dw.fasta" for p in config["meme"]["profiles"] ],
 		out_fasta_dw = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/sign_up.fasta" for p in config["meme"]["profiles"] ],
-		out_fasta_ns = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/nsign.fasta" for p in config["meme"]["profiles"] ]
+		out_fasta_ns = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/nsign.fasta"   for p in config["meme"]["profiles"] ],
+		out_xlsx     = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/peaks.xlsx"     for p in config["meme"]["profiles"] ]
 	log:
 		out = pph.file_path(step = "peak_seq", extension = "output.log", log=True)
 	run:
@@ -1099,11 +1103,6 @@ rule peak_seq:
 			input.rds            <- "{input.rds}"
 			annot_f   <- "{input.annot}"
 
-			pval.sign.thr <- 0.05
-			lfc.sign.thr  <- 0.5
-			pval.ns.thr <- NULL
-			lfc.ns.thr  <- NULL
-
 			# ----------------------------------------
 			# No Snakemake wildcards beyond this point
 			# ----------------------------------------
@@ -1111,6 +1110,12 @@ rule peak_seq:
 			config <- yaml::yaml.load_file(config_file)
 			meme_conf <- config$meme
 			profiles <- meme_conf$profiles
+
+			pval.sign.thr <- as.numeric(meme_conf$true_positive_pval)
+			lfc.sign.thr  <- as.numeric(meme_conf$true_positive_lfc)
+			pval.ns.thr   <- NULL
+			lfc.ns.thr    <- NULL
+
 
 			ctr <- as.data.frame(readRDS(input.rds))
 			annot  <- readRDS(annot_f)
