@@ -60,6 +60,7 @@ def generate_sample_info(args):
 	generate a sample info file before running the mapping pipeline
 	"""
 	config_files = args.config_files
+	print(f"\nloading config files: {', '.join(config_files)}\n")
 	
 	sit = SampleInfoTool(*config_files)
 
