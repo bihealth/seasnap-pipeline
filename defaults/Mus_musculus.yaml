@@ -11,6 +11,10 @@ organism:
     genome: /fast/projects/cubit/18.12/static_data/reference/GRCm38/p5.chr_scaff/GRCm38.p5.genome.chr_scaff.fa
     transcriptome: ""
     gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.gtf
+
+    cellranger_transcriptome: ""
+    cellranger_gtf: ""
+    velocyto_mask_gtf: ""
     
     bed: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.bed                                   # required for infer_experiment
     seqc_gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.no_genes.protein_coding.rRNA.gtf # required for qc
@@ -18,6 +22,7 @@ organism:
   star_index: null
   salmon_index: null
   bwa_index: null
+  cellranger_count: null
     
   R:
     annotations: org.Mm.eg.db
