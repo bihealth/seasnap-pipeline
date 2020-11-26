@@ -15,8 +15,8 @@ organism:
     bed: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/25/GRCh38/gencode.v25.chr_scaff.annotation.bed                                   # required for infer_experiment
     seqc_gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/25/GRCh38/gencode.v25.chr_scaff.annotation.no_genes.protein_coding.rRNA.gtf # required for qc
 
-    cellranger_transcriptome: ""
-    cellranger_gtf: ""
+    cellranger_transcriptome: /fast/projects/cubit/20.05/static_data/app_support/CellRanger/exp/3.1.0/GRCh38-and-mm10/
+    cellranger_gtf: /fast/projects/cubit/20.05/static_data/app_support/CellRanger/exp/3.1.0/GRCh38-and-mm10/genes/genes.gtf
     velocyto_mask_gtf: ""
 
   star_index: null
