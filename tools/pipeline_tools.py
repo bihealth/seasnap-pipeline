@@ -41,7 +41,8 @@ class PipelinePathHandler:
 
 	def __init__(self, workflow, test_config=False, test_allowed_wildcards=True):
 		self.test_config = self._load_test_config(test_config)
-		if self.test_config: self._test_config_general(workflow.config, self.test_config)
+		if self.test_config:
+			self._test_config_general(workflow.config, self.test_config)
 
 		self.snakemake_workflow = workflow
 
@@ -61,7 +62,8 @@ class PipelinePathHandler:
 		self.input_choice = self._set_input_choice(self.snakemake_workflow.config)
 
 		# check consistency of loaded input and output patterns
-		self._test_config_input(test_allowed_wildcards)
+		if self.test_config:
+			self._test_config_input(test_allowed_wildcards)
 
 		# wildcard values
 		self.wildcard_values = self._get_wildcard_values_from_input(self.in_path_pattern)
@@ -771,11 +773,22 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 			)
 
 		# test if all wildcards used in outdir path pattern
-		if not set(self.out_path_wildcards) == set(self.outdir_path_wildcards) | set(["extension"]):
+		if not set(self.out_path_wildcards) == set(self.outdir_path_wildcards) | {"extension"}:
 			raise ValueError(
 				"Error in config file: all wildcards of out and log dir should be used in folder names (exception: {{extension}}), otherwise "
 				"different rules might compute output in the same folder, which can lead to mixed or deleted intermediate files. "
 				"in folder name: {}, all: {}".format(set(self.outdir_path_wildcards), set(self.out_path_wildcards))
+			)
+
+		# test if mate wildcard used if multiple read extensions are used
+		if all([
+				any(len(val["paired_end_extensions"]) > 1 for _, val in self.samples.items()),
+				"mate" not in self.in_path_wildcards,
+			]
+		):
+			raise ValueError(
+				"Error in config file: some samples have more than one 'paired end extension' "
+				"set in the sample info file, but {mate} wildcard in the in_path_pattern is not set. "
 			)
 
 	def _get_wildcard_combinations_per_sample(self, wildcard_values):
