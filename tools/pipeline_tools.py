@@ -6,7 +6,6 @@ import sys, os, re, shutil, hashlib, itertools, yaml, pandas as pd
 from builtins import isinstance, TypeError
 from collections.abc import Mapping, Iterable
 from collections import namedtuple, OrderedDict
-from types import SimpleNamespace
 from contextlib import contextmanager
 from copy import deepcopy
 from time import strftime
@@ -308,16 +307,16 @@ class PipelinePathHandler:
 
 		glob_pattern = re.sub("{[^}./]+}", "*", input_pattern)
 		wildcards = re.findall("{([^}./]+)}", input_pattern)
-		input_files = glob(glob_pattern + ("*" if glob_pattern[-1] != "*" else ""), recursive=True)
-		match_tup = self._get_match_pattern_and_wildcards(input_pattern, unix_style)
+		input_files = iglob(glob_pattern + ("*" if glob_pattern[-1] != "*" else ""), recursive=True)
 
 		if verbose:
 			print("\ninput files:\n{}".format("\n".join(input_files)))
-			print(f"\nmatch pattern:\n{match_tup[0]}")
 
 		wildcard_values = {w: [] for w in wildcards}
 		for inp in input_files:
-			self._get_wildcard_values_from_file_path(inp, match_tup=match_tup, wildc_val=wildcard_values)
+			self._get_wildcard_values_from_file_path(
+				inp, input_pattern, wildc_val=wildcard_values, unix_style=unix_style, verbose=verbose
+				)
 		return wildcard_values
 
 	def _wildc_replace(self, matchobj):
@@ -330,20 +329,15 @@ class PipelinePathHandler:
 		else:
 			return "([^}./]+)"
 
-	def _get_wildcard_values_from_file_path(
-			self, filename, input_pattern=None, match_tup=None, wildc_val=None, unix_style=True, verbose=False
-		):
-		"""
-		get values matching wildcards from given file path
-		:param match_tup: tuple of (match_pattern, wildcards)
-		"""
-		if not input_pattern and not match_tup:
-			raise ValueError("Need either 'input_pattern' or 'match_tup' as argument.")
+	def _get_wildcard_values_from_file_path(self, filename, input_pattern, wildc_val={}, unix_style=True,
+											verbose=False):
+		""" get values matching wildcards from given file path """
 
-		if match_tup:
-			match_pattern, wildcards = match_tup
-		else:
-			match_pattern, wildcards = self._get_match_pattern_and_wildcards(input_pattern, unix_style)
+		match_pattern = re.sub("\\\\{([^}./]+)\\\\}", self._wildc_replace, re.escape(input_pattern))
+		wildcards = re.findall("{([^}./]+)}", input_pattern)
+		if unix_style:
+			match_pattern = re.sub(r"\\\*\\\*", "[^{}]*", match_pattern)
+			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*", "[^{}./]*", match_pattern)
 
 		if verbose:
 			print(f"\nmatch pattern:\n{match_pattern}")
@@ -367,14 +361,6 @@ class PipelinePathHandler:
 
 		return found, wildcard_values
 
-	def _get_match_pattern_and_wildcards(self, input_pattern, unix_style):
-		match_pattern = re.sub("\\\\{([^}./]+)\\\\}", self._wildc_replace, re.escape(input_pattern))
-		if unix_style:
-			match_pattern = re.sub(r"\\\*\\\*", "[^{}]*", match_pattern)
-			match_pattern = re.sub(r"(?<!\[\^{}\]\*)\\\*", "[^{}./]*", match_pattern)
-		wildcards = re.findall("{([^}./]+)}", input_pattern)
-		return match_pattern, wildcards
-
 	def _collect_generated_files(self, path_pattern=None):
 		if not path_pattern: path_pattern = self.out_path_pattern
 
@@ -384,7 +370,7 @@ class PipelinePathHandler:
 		table_cols = {w: [] for w in wildcards}
 		table_cols["filename"] = []
 		for inp in input_files:
-			found, _ = self._get_wildcard_values_from_file_path(inp, input_pattern=path_pattern, wildc_val=table_cols)
+			found, _ = self._get_wildcard_values_from_file_path(inp, path_pattern, wildc_val=table_cols)
 			if found:
 				table_cols["filename"].append(inp)
 		assert all([len(val) == len(table_cols["filename"]) for val in table_cols.values()])
@@ -472,9 +458,9 @@ class PipelinePathHandler:
 		:returns: a dict of wildcard names to values
 		"""
 		if in_path_pattern:
-			return self._get_wildcard_values_from_file_path(filepath, input_pattern=self.in_path_pattern)[1]
+			return self._get_wildcard_values_from_file_path(filepath, self.in_path_pattern)[1]
 		else:
-			return self._get_wildcard_values_from_file_path(filepath, input_pattern=self.out_path_pattern)[1]
+			return self._get_wildcard_values_from_file_path(filepath, self.out_path_pattern)[1]
 
 	@staticmethod
 	def get_r_repr(data, to_type=None, round_float=None):
@@ -657,7 +643,7 @@ class PipelinePathHandler:
 
 						get_wc = self._get_wildcard_values_from_file_path
 						target = [
-							pat.format(**{**wc_in_dct, extra_wc: get_wc(src, input_pattern=search_pat)[1][extra_wc][0]})
+							pat.format(**{**wc_in_dct, extra_wc: get_wc(src, search_pat)[1][extra_wc][0]})
 							for src in sourcef
 							]
 					else:
@@ -689,7 +675,7 @@ class PipelinePathHandler:
 											print(extra_wc)
 											extra_wc_val = self._get_wildcard_values_from_file_path(
 												sourcef[i],
-												input_pattern=os.path.join(self.out_dir_pattern, "**"),
+												os.path.join(self.out_dir_pattern, "**"),
 												unix_style=True
 											)[1]
 											print(extra_wc_val)
@@ -1214,7 +1200,7 @@ class CovariateFileTool(PipelinePathHandler):
 				combinations.append(WildcardComb(**{key: wildcard_values[key][index] for key in wildcard_values}))
 		return combinations
 
-	def _get_mapping_input(self, step, extension, wildcards, verbose=False):
+	def _get_mapping_input(self, step, extension, wildcards):
 		"""
 		Generate paths to input files from read mapping, e.g. from STAR or Salmon.
 		
@@ -1225,13 +1211,8 @@ class CovariateFileTool(PipelinePathHandler):
 
 		if not wildcard_combs:
 			raise ValueError(f"No files found with combination of wildcards 'step': '{step}', 'extension': '{extension}'")
-
-		if verbose:
-			print(
-				"\nextracted combinations:\n{}".format(
-					"\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)
-				)
-			)
+		print("\nextracted combinations:\n{}".format(
+			"\n".join("\t".join(i) for i in [wildcard_combs[0]._fields] + wildcard_combs)))
 
 		wildcard_placeholders = {"sample": "{sample}", **self.opt_wildcard_placeholders}
 
@@ -1257,17 +1238,13 @@ class CovariateFileTool(PipelinePathHandler):
 		:param step:  Snakemake rule name for which the files are searched
 		:param extension: file extension of the searched files
 		"""
-		files = sorted(
-			self._get_mapping_input(step, extension, SimpleNamespace(), verbose=True)
-		)
-		files_wildcards = {
-			f: self._get_wildcard_values_from_file_path(f, input_pattern=self.in_path_pattern)[1]
-			for f in files
-		}
-
-		# add md5, group, replicate, label per file
+		files = sorted(self._get_mapping_input(step, extension, wildcards={}))
+		extra_files = {}
+		if other is not None:
+			for col, (a_step, a_ext) in other.items():
+				extra_files[col] = self._get_mapping_input(a_step, a_ext, wildcards={})
 		md5   = [self._md5(f) for f in files]
-		group = [files_wildcards[f]["sample"][0] for f in files]
+		group = [self._get_wildcard_values_from_file_path(f,self.in_path_pattern)[1]["sample"][0] for f in files]
 
 		replicate, num_g = [], {}
 		for g in group:
@@ -1278,28 +1255,6 @@ class CovariateFileTool(PipelinePathHandler):
 			replicate.append(num_g[g])
 		label = ["{}_{}".format(a,b) for a,b in zip(group, replicate)]
 
-		# add any extra files if given
-		extra_files = {}
-		if other:
-			for col, (a_step, a_ext) in other.items():
-				self._get_mapping_input(a_step, a_ext, SimpleNamespace(), verbose=True)  # for printing
-				add_paths = []
-				for f in files:
-					wildcards = {
-						k: v[0]
-						for k, v in files_wildcards[f].items()
-						if k not in ["step", "extension"]
-					}
-					add_p = self._get_mapping_input(a_step, a_ext, SimpleNamespace(**wildcards))
-					if not len(add_p) == 1:
-						raise ValueError(
-							f"There should be only one file with these wildcards: \n{str(wildcards)}\n"
-							f"found: \n{str(add_p)}"
-						)
-					add_paths.append(add_p[0])
-				extra_files[col] = add_paths
-
-		# create data frame
 		self.covariate_data = pd.DataFrame(
 			{"filename":files, "md5":md5, "group":group, "replicate":replicate, "label":label, **extra_files}
 		)
@@ -1381,7 +1336,7 @@ class SampleInfoTool(PipelinePathHandler):
 		wildcard_values = {w: [] for w in wildcards}
 		for inp in input_files:
 			self._get_wildcard_values_from_file_path(
-				inp, input_pattern=self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style
+				inp, self.in_path_pattern, wildc_val=wildcard_values, unix_style=unix_style
 			)
 
 		return {
