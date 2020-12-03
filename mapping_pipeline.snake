@@ -107,11 +107,8 @@ def get_inputs_all():
 		if "bw_from_bam"      in qc_choices:
 			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
 
-	# ATAC-seq
-	if "ATAC_Seq" in config["pipeline_param"]:
-		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
-		if "macs2" in atacseq_choices:
-			inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
+	if "run_arcas" in config["pipeline_param"]:
+		inputs += pph.expand_path("arcasHLA", "arcasHLA_output", fix="!sample")
 	
 	return inputs
 
@@ -357,30 +354,27 @@ rule bw_from_bam:
 
 
 ## -----------------------------------------------------------------------------------
-## Run macs2 to detect peaks in ATAC-Seq
+## Run arcasHLA to determine the genotype
 ## -----------------------------------------------------------------------------------
-rule macs2:
+rule arcasHLA:
 	input:
 		bam = pph.file_path(step="star", extension="bam"),
 	output:
-		bed=pph.file_path(step="macs2", extension="summits.bed"),
-		pn=pph.file_path(step="macs2", extension="peaks.narrowPeak")
+		outdir=directory(step="arcasHLA", extension="arcasHLA_output")
 	log:
-		out = pph.file_path(step="macs2", extension="output.log", log=True)
+		out = pph.file_path(step="arcasHLA", extension="output.log", log=True)
 	run:
-		genome_abbr=config["organism"]["abbreviation"]
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
-		macs2 --version
 
-		#----- run macs2
-		macs2 callpeak -t {input.bam} -f BAMPE --outdir $(dirname {output.bed}) --name $(basename {output.bed} .summits.bed) -g {genome_abbr}
-		mv $(dirname {output.bed})/$(basename {output.bed} .summits.bed)_summits.bed {output.bed}
-		mv $(dirname {output.pn})/$(basename {output.pn} .peaks.narrowPeak)_peaks.narrowPeak {output.pn}
+		#----- run arcasHLA
+		mkdir -p {output.outdir}
+		arcasHLA extract {input.bam} -t 8 -v -o {output.outdir}
+		arcasHLA genotype {output.outdir}/$(basename {input.bam} .bam).extracted.fq.gz -o {output.outdir} -t 8 -v 
 		""")
 
-		script_file = pph.log(log.out, snakemake_format(script), step="macs2", extension="sh", **wildcards)
+		script_file = pph.log(log.out, snakemake_format(script), step="arcasHLA", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
 
