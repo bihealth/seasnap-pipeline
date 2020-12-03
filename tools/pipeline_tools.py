@@ -740,6 +740,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 
 		self.samples = self.snakemake_workflow.config["sample_info"]
 		self.sample_ids = list(self.samples.keys())
+		self._test_config_samples()
 
 		# wildcard value-combinations parsed from input directory
 		self.wildcard_combs = self._get_wildcard_combinations_per_sample(self.wildcard_values)
@@ -780,6 +781,7 @@ class MappingPipelinePathHandler(PipelinePathHandler):
 				"in folder name: {}, all: {}".format(set(self.outdir_path_wildcards), set(self.out_path_wildcards))
 			)
 
+	def _test_config_samples(self):
 		# test if mate wildcard used if multiple read extensions are used
 		if all([
 				any(len(val["paired_end_extensions"]) > 1 for _, val in self.samples.items()),
