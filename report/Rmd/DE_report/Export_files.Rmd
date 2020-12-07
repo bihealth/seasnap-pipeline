@@ -81,10 +81,10 @@ export_ft <- data.frame(
 export_ft_2 <- tmod_ft %>%
   mutate(Description=sprintf("Results of gene enrichment analysis with tmod for contrast %s", contrast),
          File=sprintf("[%s](%s)", basename(filename), file.path(export_dir, basename(filename)))) %>%
-  select(Description, File)
+  dplyr::select(Description, File)
 
 export_ft <- rbind(export_ft, export_ft_2)
-pander(export_ft)
+pander(export_ft, split.tables=Inf)
 ```
 
 
