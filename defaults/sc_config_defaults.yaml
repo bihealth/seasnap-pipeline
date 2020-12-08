@@ -9,6 +9,7 @@ pipeline_param:
   report_snippets: ""
 
   feature_ref: ""
+  cellranger_executable: "cellranger"  # default assuming cellranger is in the PATH
 
   # adjust which results are produced
   produce_results:

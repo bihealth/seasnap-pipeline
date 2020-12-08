@@ -4,6 +4,10 @@ pipeline_param:
   log_path_pattern: \S+
   in_path_pattern: \S+
 
+  cellranger_executable: \S+
+  feature_ref: .*
+  test_config: {__opt__: [true, false]}
+
 #---------------------------------------- organism annotation
 organism_defaults:
   __opt__: [null, \S*]

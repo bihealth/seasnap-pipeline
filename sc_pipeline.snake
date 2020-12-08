@@ -141,7 +141,8 @@ rule cellranger_count:
 		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["cellranger_count"]["cmd_opt"],
-		feature_ref = config["pipeline_param"]["feature_ref"]
+		feature_ref = config["pipeline_param"]["feature_ref"],
+		cellranger_exec = config["pipeline_param"]["cellranger_executable"]
 	run:
 		# using feature barcodes ?
 		feature_ref = str(Path(params.feature_ref).resolve()) if params.feature_ref else ""
@@ -165,7 +166,7 @@ rule cellranger_count:
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
-		cellranger --version || true
+		{params.cellranger_exec} --version || true
 
 		#----- collect fastq input links
 		mkdir {output.links}
@@ -191,7 +192,7 @@ rule cellranger_count:
 		  feature_ref="--feature-ref=feature_ref.csv"
 		fi
 		#-- run cellranger count
-		cellranger count --id="{wildcards.sample}" --libraries="libraries.csv" $feature_ref --transcriptome={input.transcriptome} {params.options}
+		{params.cellranger_exec} count --id="{wildcards.sample}" --libraries="libraries.csv" $feature_ref --transcriptome={input.transcriptome} {params.options}
 		cd -
 		""")
 
@@ -207,6 +208,8 @@ rule cellranger_aggr:
 		done = touch(pph.file_path(step="cellranger_aggr", extension="done"))
 	log:
 		out = pph.file_path(step = "cellranger_aggr", extension="output.log", log=True)
+	params:
+	    cellranger_exec = config["pipeline_param"]["cellranger_executable"]
 	run:
 		aggr_csv_content = ["library_id, molecule_h5"]
 		for count_results in input:
@@ -218,7 +221,7 @@ rule cellranger_aggr:
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
-		cellranger --version || true
+		{params.cellranger_exec} --version || true
 
 		#----- Cellranger counting
 		mkdir -p {output.outdir}; cd {output.outdir}
@@ -227,7 +230,7 @@ rule cellranger_aggr:
 		{aggr_csv_content}
 		EOF
 		#-- run cellranger aggr
-		cellranger aggr --id="cellranger_dir" --csv="output_aggr.csv"
+		{params.cellranger_exec} aggr --id="cellranger_dir" --csv="output_aggr.csv"
 		cd -
 		""")
 
