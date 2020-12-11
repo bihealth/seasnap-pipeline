@@ -53,6 +53,8 @@ rule_options:
     run_stats: yes
   bwa_index:
     cmd_opt: ""
+  feature_counts:
+    cmd_opt: ""
 
 #---------------------------------------- parameters for the report
 report:
