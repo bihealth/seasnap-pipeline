@@ -1,6 +1,8 @@
 RNA SeA-SnaP   <img align="right" width="140" src="documentation/pictures/SeA-SnaP_logo.svg" />
 ============
 
+*This is the release candidate branch of SeA-SnaP*
+
 RNA SeA-SnaP is a RNA-(Se)q (A)nalysis (Sna)kemake (P)ipeline tool and combines two tasks:
 
 - A sub-pipeline mapping fastq files to a reference genome/transcriptome using `STAR` or `Salmon` and including extensive quality control (`Fastqc`, `Dupradar`, `Qualimap`, `RNASeQC`, `Preseq`, `infer_experiment`, `Multiqc`)
