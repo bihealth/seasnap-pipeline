@@ -48,10 +48,6 @@ parameters can be configured:
 
 |Parameter      |Default value  |Explanation                                                      |
 |------         |-------        |---------------------                                            |
-|`qval_max`     |0.01           |Maximal q-value when reporting significant enrichments           |
-|`auc_min`      |0.65           |Minimal effect size (AUC) when reporting sign. enrichments       |
-|`n_max`        |Inf            |Maximum number of enrichments to report in the results table     |
-|`n_max_fig`    |25             |Maximum number of significant enrichments to be shown on a plot  |
 |`sort_by`      |pval           |Sorting key: what to sort the genes by. Possible values: pval, lfc, optionally with the suffix \_p (only positively regulated) or \_n (only negatively regulated). Sorting keys may be combined using comma (,). If more than one key is provided, the enrichments will be calculating for each sorting key.|
 |`tmod_db_path` | `./`          |Path prefix to where the database files are stored. By default paths will be relative to the main directory.    |
 |`databases`    | see below     |Specification of the databases to be used (see below)            |
@@ -59,6 +55,34 @@ parameters can be configured:
 Notes:
 
  * If you set `tmod_db_path`, then this path will be prefixed to all files explicitely mentioned in the tmod block.
+
+## Snippet configuration
+
+There are several parameters that control how the results of tmod
+enrichment analyses are displayed. First, there are parameters that conrol
+the output in the individual contrast sections.
+These are set up in the `DE_config.yaml`
+file, section `snippet_parameters: tmod_contrast:`
+
+|Parameter                        |Default value|Explanation |
+|-----------                      |--------     |---------   |
+|`res_auc_thr`|0.65  |Minimum AUC value to be reported in the results table|
+|`res_pval_thr`|0.01 |Maximum p-value to be reported in the results table|
+
+If you wish to see more results, increase `res_pval_thr` and decrease
+`res_auc_thr`.
+
+The enrichment results for all contrasts are summarised in the functional
+analysis section.  These are set up in the `DE_config.yaml`
+file, section `snippet_parameters: tmod:`
+
+|Parameter                        |Default value|Explanation |
+|-----------                      |--------     |---------   |
+|`fig_qval_max`| 0.01 |Maximum q-value to be shown on the panel plots|
+|`fig_auc_min` | 0.55 | Minimum AUC value to be shown on the panel plots|
+|`fig_n_max`   | 35   |Maximum number of gene sets to be shown on the panel plots|
+|`fig_n_min`   | 10   |Minimum number of gene sets to be shown on the panel plots|
+|`n_evid`      | 5    | Number of top gene sets to be shown on the evidence plots|
 
 
 # Databases in tmod

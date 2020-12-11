@@ -231,7 +231,7 @@ brightness indicates whether genes are significantly regulated (at q < 0.05).
 
 
 
-\n```{r fig.width=4*length(glU), fig.height=4*n}
+\n```{r fig.width=3 + 5 * length(glU), fig.height=3 + 4 * n}
 
 par(mfrow=c(n, length(glU)))
 
@@ -263,6 +263,7 @@ if('SYMBOL' %in% colnames(annot)) {
 	gsymbols[is.na(gsymbols)] <- ''
 }
 	
+max_labs <- conf.snip$evidence_plot_max_labs
 
 for(id in ids) {
   for(.c in names(gl)) {
@@ -275,6 +276,11 @@ for(id in ids) {
 				gene_labs <- glabs
 			}
 			names(gene_labs) <- glabs
+      mm <- match(glabs, gl[[.c]][[.s]])
+      gene_labs <- gene_labs[order(mm)]
+      if(!is.null(max_labs)) {
+        gene_labs <- gene_labs[1:(min(length(gene_labs), max_labs))]
+      }
 
     	evidencePlot(gl[[.c]][[.s]], 
 				m=id, 
