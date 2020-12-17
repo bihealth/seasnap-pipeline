@@ -62,8 +62,21 @@ write_xlsx(c(list(Annotation=annotation), gene_expr_res),
 tmod_ft <- file_tab %>% filter(step == "tmod" & extension == "xlsx") %>%
   mutate(ID=gsub(".*_", "", contrast)) %>% arrange(ID)
 for(f in tmod_ft %>% pull(filename)) {
-  file.copy(f, export_dir)
+  file.copy(f, export_dir, overwrite=TRUE)
 }
+
+dreme_ft <- file_tab %>% filter(extension == "dreme.xlsx") %>%
+  mutate(ID=gsub(".*_", "", contrast)) %>% arrange(ID)
+for(f in dreme_ft %>% pull(filename)) {
+  file.copy(f, export_dir, overwrite=TRUE)
+}
+
+tomtom_ft <- file_tab %>% filter(extension == "tomtom.xlsx") %>%
+  mutate(ID=gsub(".*_", "", contrast)) %>% arrange(ID)
+for(f in tomtom_ft %>% pull(filename)) {
+  file.copy(f, export_dir, overwrite=TRUE)
+}
+
 
 ```
 
@@ -75,15 +88,31 @@ export_ft <- data.frame(
   Description=c(
     "Raw counts, log CPM and rlog counts",
     "Results of differential expression analysis for all contrasts"),
-  File=sprintf("[%s](%s)", basename(.f), .f),
-  stringsAsFactors=FALSE)
+    contrast="all", filename=.f, stringsAsFactors=FALSE)
      
-export_ft_2 <- tmod_ft %>%
-  mutate(Description=sprintf("Results of gene enrichment analysis with tmod for contrast %s", contrast),
-         File=sprintf("[%s](%s)", basename(filename), file.path(export_dir, basename(filename)))) %>%
-  dplyr::select(Description, File)
+export_ft <- export_ft %>% rbind(tmod_ft %>%
+  mutate(Description="Results of gene enrichment analysis with tmod") %>%
+  mutate(filename=file.path(export_dir, basename(filename))) %>%
+  dplyr::select(Description, contrast, filename)
+  )
 
-export_ft <- rbind(export_ft, export_ft_2)
+export_ft <- export_ft %>% rbind(dreme_ft %>%
+  mutate(Description="Results of DREME de novo motif search") %>%
+  mutate(filename=file.path(export_dir, basename(filename))) %>%
+  dplyr::select(Description, contrast, filename)
+  )
+
+export_ft <- export_ft %>% rbind(tomtom_ft %>%
+  mutate(Description="Results of TOMTOM motif annotation search") %>%
+  mutate(filename=file.path(export_dir, basename(filename))) %>%
+  dplyr::select(Description, contrast, filename)
+  )
+
+export_ft <- export_ft %>% 
+  mutate(File=sprintf("[%s](%s)", basename(filename),filename)) %>%
+  rename(Contrast=contrast) %>%
+  dplyr::select(Description, Contrast, File)
+
 pander(export_ft, split.tables=Inf)
 ```
 
