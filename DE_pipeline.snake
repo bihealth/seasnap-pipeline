@@ -189,15 +189,6 @@ rule import_gene_counts:
 		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
-		column_filter = ""
-		if config["filters"]["experiment_whitelist"]:
-			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
-								for k,v in config["filters"]["experiment_whitelist"].items())
-		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
-								for k,v in config["filters"]["experiment_blacklist"].items())
-		if column_filter == "":
-			column_filter = "TRUE"
 
 		r_gene_list = ("'"+config["filters"]["gene_list"]["file"]+"'") if config["filters"]["gene_list"]["file"] else "NULL"
 		r_gene_list_type = config["filters"]["gene_list"]["type"] or "NULL"
@@ -294,16 +285,6 @@ rule import_featurecounts:
 	log:
 		out = pph.file_path("import_featurecounts", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = ""
-		if config["filters"]["experiment_whitelist"]:
-			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
-								for k,v in config["filters"]["experiment_whitelist"].items())
-		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) )
-								for k,v in config["filters"]["experiment_blacklist"].items())
-		if column_filter == "":
-			column_filter = "TRUE"
-								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list  = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
 		
@@ -315,7 +296,6 @@ rule import_featurecounts:
 		
 		#----- import data
 		sample_df <- read.table("{input.samples}", header=TRUE)
-		sample_df  <- sample_df[{column_filter},]
 		files     <- as.character(sample_df$filename); print(files)
 		samples   <- as.character(sample_df$label)
 
@@ -352,16 +332,6 @@ rule import_sf:
 	log:
 		out = pph.file_path("import_sf", "output.log", contrast = "all", log=True)
 	run:
-		column_filter = ""
-		if config["filters"]["experiment_whitelist"]:
-			column_filter += "&".join("is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
-								for k,v in config["filters"]["experiment_whitelist"].items())
-		if config["filters"]["experiment_blacklist"]:
-			column_filter += "&".join("!is.element(sample_df${},{})".format( k, "c({})".format(",".join('"'+l+'"' for l in v)) ) 
-								for k,v in config["filters"]["experiment_blacklist"].items())
-		if column_filter == "":
-			column_filter = "TRUE"
-								
 		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
 		level_list = "list({})".format(",".join("{}=c({})".format( k, ",".join('"'+l+'"' for l in v) ) for k,v in column_lvl.items()))
 		
@@ -380,8 +350,7 @@ rule import_sf:
 		tx2gene <- select(TxDb, k, "GENEID", "TXNAME")
 		
 		#----- use tximport on input files
-		sample_df  <- read.table("{input.samples}", header=TRUE)
-		sample_df  <- sample_df[{column_filter},]
+		sample_df  <- read.table("{input.samples}", sep="\t", header=1, stringsAsFactors=FALSE)
 		files      <- as.character(sample_df$filename); print(files)
 		txi        <- tximport(files, type = "salmon", tx2gene = tx2gene)
 		
@@ -437,16 +406,96 @@ rule export_raw_counts:
 		script_file = pph.log(log.out, snakemake_format(script), step="export_raw_counts", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
+##-------------------- gene filters -------------------------------------------------------------------------
+
+rule filter:
+	""" filter experiment & genes before normalisation, based on counts and/or GTF property"""
+	input:
+		rds = pph.choose_input(choice_name = "mapping", options = [
+		dict(step = "import_gene_counts",   extension = "rds", contrast = "all"),
+		dict(step = "import_featurecounts", extension = "rds", contrast = "all"),
+		dict(step = "import_sf",            extension = "rds", contrast = "all")
+		])
+	output:
+		dds = pph.file_path("filter", "rds", contrast = "all")
+	log:
+		out = pph.file_path("filter", "output.log", contrast = "all", log=True)
+	run:
+		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
+		script = textwrap.dedent(r"""
+		#----- import packages
+		library(DESeq2)
+		library(AnnotationDbi)
+		
+		{R_SESSION_INFO}
+
+		conf.f   <- "{config_file}"
+
+		#----- load config
+		config <- yaml::yaml.load_file(conf.f)
+		
+		#----- read counts in dds format
+		dds <- readRDS("{input.rds}")
+		sample_df <- as.data.frame(SummarizedExperiment::colData(dds))
+		rownames(sample_df) <- as.character(sample_df$label)
+
+		#----- Filter experiments
+		if (!is.null(config$filters$experiment_in)  && length(config$filters$experiment_in)>0 &&
+			!is.null(config$filters$experiment_out) && length(config$filters$experiment_out)>0) {{
+			stop("Can't process both in & out list for filtering experiments")
+		}}
+		if (!is.null(config$filters$experiment_in) && length(config$filters$experiment_in)>0) {{
+			keep <- rep(FALSE, nrow(sample_df))
+			for (my_col in names(config$filters$experiment_in)) {{
+				keep <- keep | (as.character(sample_df[[my_col]]) %in% config$filters$experiment_in[[my_col]])
+			}}
+			dds <- dds[,keep]
+			sample_df <- sample_df[keep,]
+		}}
+		if (!is.null(config$filters$experiment_out) && length(config$filters$experiment_out)>0) {{
+			keep <- rep(TRUE, nrow(sample_df))
+			for (my_col in names(config$filters$experiment_out)) {{
+				keep <- keep & !(as.character(sample_df[[my_col]]) %in% config$filters$experiment_out[[my_col]])
+			}}
+			dds <- dds[,keep]
+			sample_df <- sample_df[keep,]
+		}}
+
+		#----- Gene filtering based on counts
+		keep <- rowSums(counts(dds)) >= config$filters$low_counts
+
+		if(!is.null(config$filters$min_counts) && !is.null(config$filters$min_count_n)) {{
+			rs <- rowSums(counts(dds) > config$filters$min_counts)
+			keep <- keep & rs >= config$filters$min_count_n
+		}}
+
+		#----- Gene filtering using GTF
+		if (!is.null(config$filters$gtf) && config$filters$gtf!="") {{
+			gene_names <- rownames(dds)
+			gtf <- rtracklayer::import(config$organism$files$gtf)
+			g <- GenomicRanges::as.data.frame(gtf[gtf$type=="gene"])
+			stopifnot("gene_id" %in% colnames(g))
+			stopifnot(all(gene_names %in% g$gene_id))
+			g <- g[match(gene_names, g$gene_id),]
+			attach(g)
+			filtered <- eval(parse(text=config$filters$gtf))
+			detach(g)
+			keep <- keep & filtered
+		}}
+
+		dds  <- dds[keep,]; print(dds)
+
+		saveRDS(dds, file="{output.dds}")
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="filter", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
 ##-------------------- DESeq2 -------------------------------------------------------------------------------
 
 rule DESeq2:
 	""" run DESeq2 on a count matrix """
 	input:
-		pph.choose_input(choice_name = "mapping", options = [
-		dict(step = "import_gene_counts",   extension = "rds", contrast = "all"),
-		dict(step = "import_featurecounts", extension = "rds", contrast = "all"),
-		dict(step = "import_sf",            extension = "rds", contrast = "all")
-		])
+		pph.file_path("filter", "rds", contrast = "all")
 	output:
 		dds           = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
 		rld_blind     = pph.file_path("DESeq2", "rld.blind.rds", contrast = "all"),
@@ -460,8 +509,6 @@ rule DESeq2:
 		rld_names  = pph.file_path("DESeq2", "rld.model.csv", contrast = "all"),
 		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
-		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
-		count_threshold       = config["filters"]["low_counts"]
 		normalized_expression = config["normalization"]["normalized_expression"]
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -471,24 +518,8 @@ rule DESeq2:
 		
 		{R_SESSION_INFO}
 
-		conf.f   <- "{config_file}"
-
-		#----- load config
-		config <- yaml::yaml.load_file(conf.f)
-
 		#----- load DESeqDataSet
 		dds <- readRDS("{input}")
-		
-		#----- pre-filtering
-		keep <- rowSums(counts(dds)) >= {count_threshold}
-
-		## at least min_counts in at least min_count_n number of samples
-		if(!is.null(config$filters$min_counts) && !is.null(config$filters$min_count_n)) {{
-		  rs <- rowSums(counts(dds) > config$filters$min_counts)
-		  keep <- keep & rs >= config$filters$min_count_n
-		}}
-
-		dds  <- dds[keep,]; print(dds)
 		
 		#----- DESeq2
 		dds <- DESeq(dds, betaPrior=FALSE, test="Wald")
