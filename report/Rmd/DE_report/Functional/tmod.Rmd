@@ -89,7 +89,7 @@ names(genelists) <- dbs
 ```{r deseq2_results}
 ## Load the deseq2 results. We need them to visualize the data.
 message("Loading deseq2 results")
-tmp <- subset(file_tab, step=="contrasts_full" & extension == "rds")
+tmp <- subset(file_tab, step=="contrast" & extension == "rds")
 tmp2 <- lapply(tmp$filename, readRDS)
 names(tmp2) <- tmp$contrast
 

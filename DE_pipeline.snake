@@ -718,96 +718,96 @@ rule annotation:
 ## Same as contrasts, but saves all results from DESeq2
 ## everything named contrasts_full for consistency
 
-rule contrasts_full:
-	""" make all contrasts (full version) """
-	input:
-		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
-	output:
-		rds = pph.file_path("contrasts_full", "rds"),
-		csv = pph.file_path("contrasts_full", "csv")
-	log:
-		out           = pph.file_path("contrasts_full", "output.log",  log=True),
-	params:
-		annot_pkg  = config["organism"]["R"]["annotations"]
-	run:
-		contrast = pph.get_contrast(wildcards.contrast)
-		#with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
-		
-		# variants of contrast definition
-		contrast_column, contrast_ref = "group", ""
-		if "coef" in contrast:
-			contrast_type          = "coef"
-			arg_val                = '="{}"'.format(contrast["coef"])
-			contrast_def, lfc_def  = "name" + arg_val, "coef" + arg_val
-		elif "ratio" in contrast:
-			contrast_type, ratio   = "ratio", contrast["ratio"]
-			contrast_column, contrast_num, contrast_ref = ratio["column"], ratio["numerator"], ratio["denominator"]
-			contrast_def = lfc_def = 'contrast=c("{}", "{}", "{}")'.format(contrast_column, contrast_num, contrast_ref)
-		elif "vector" in contrast:
-			contrast_type          = "vector"
-			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(map(str, contrast["vector"])))
-		else:
-			raise ValueError("Error in contrast: no valid contrast definition! must be one of {}".format(["coef:", "ratio:", "vector:"]))
-		
-		# parameters
-		cutoff_FDR           =           contrast["max_p_adj"]
-		lfcThreshold         =           contrast["results_parameters"]["lfcThreshold"]
-		altHypothesis        =           contrast["results_parameters"]["altHypothesis"]
-		independentFiltering = "TRUE" if contrast["results_parameters"]["independentFiltering"] else "FALSE"
-		lfc_shrink_type      =           contrast["lfcShrink_parameters"]["type"]
-		rank_by              =           contrast["ranking_by"]
-		rank_order           =           contrast["ranking_order"].replace("x", "res$"+rank_by)
-		
-		script = textwrap.dedent(r"""
-		#----- import packages
-		library(AnnotationDbi)
-		library(DESeq2)
-		library({params.annot_pkg})
-		
-		{R_SESSION_INFO}
-
-    
-		
-		#----- load DESeqDataSet
-		dds <- readRDS("{input}")
-		
-		#----- contrast
-		if ("{contrast_type}" == "ratio") {{
-			dds${contrast_column} = relevel(dds${contrast_column}, ref="{contrast_ref}")
-			dds <- nbinomWaldTest(dds)
-		}}
-		res <- results(dds, {contrast_def}, # alpha={cutoff_FDR}, lfcThreshold={lfcThreshold}, 
-		               altHypothesis="{altHypothesis}") #, independentFiltering={independentFiltering})
-
-		#----- log-fold-change shrinkage
-		#res$lfcShrunk   <- res$log2FoldChange
-		#res$lfcShrunkSE <- res$lfcSE
-		if ("{lfc_shrink_type}"!="none"){{
-			lfc <- lfcShrink(dds, {lfc_def}, # lfcThreshold={lfcThreshold}, 
-				type="{lfc_shrink_type}")
-			res$log2FoldChange_orig <- res$log2FoldChange
-			res$log2FoldChange      <- lfc$log2FoldChange
-			res$lfcSE_orig          <- res$lfcSE
-			res$lfcSE               <- lfc$lfcSE
-		}}
-		
-		#----- ranking
-		res <- res[order({rank_order}),]
-		
-		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
-		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
-		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
-		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
-		
-		#----- save as rds & csv
-		saveRDS(res, file="{output.rds}")
-		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
-		""")
-		
-		script_file = pph.log(log.out, snakemake_format(script), step="contrasts_full", extension="R", **wildcards)
-		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
-
+# rule contrasts_full:
+# 	""" make all contrasts (full version) """
+# 	input:
+# 		pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
+# 	output:
+# 		rds = pph.file_path("contrasts_full", "rds"),
+# 		csv = pph.file_path("contrasts_full", "csv")
+# 	log:
+# 		out           = pph.file_path("contrasts_full", "output.log",  log=True),
+# 	params:
+# 		annot_pkg  = config["organism"]["R"]["annotations"]
+# 	run:
+# 		contrast = pph.get_contrast(wildcards.contrast)
+# 		#with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+# 		
+# 		# variants of contrast definition
+# 		contrast_column, contrast_ref = "group", ""
+# 		if "coef" in contrast:
+# 			contrast_type          = "coef"
+# 			arg_val                = '="{}"'.format(contrast["coef"])
+# 			contrast_def, lfc_def  = "name" + arg_val, "coef" + arg_val
+# 		elif "ratio" in contrast:
+# 			contrast_type, ratio   = "ratio", contrast["ratio"]
+# 			contrast_column, contrast_num, contrast_ref = ratio["column"], ratio["numerator"], ratio["denominator"]
+# 			contrast_def = lfc_def = 'contrast=c("{}", "{}", "{}")'.format(contrast_column, contrast_num, contrast_ref)
+# 		elif "vector" in contrast:
+# 			contrast_type          = "vector"
+# 			contrast_def = lfc_def = 'contrast=c({})'.format(", ".join(map(str, contrast["vector"])))
+# 		else:
+# 			raise ValueError("Error in contrast: no valid contrast definition! must be one of {}".format(["coef:", "ratio:", "vector:"]))
+# 		
+# 		# parameters
+# 		cutoff_FDR           =           contrast["max_p_adj"]
+# 		lfcThreshold         =           contrast["results_parameters"]["lfcThreshold"]
+# 		altHypothesis        =           contrast["results_parameters"]["altHypothesis"]
+# 		independentFiltering = "TRUE" if contrast["results_parameters"]["independentFiltering"] else "FALSE"
+# 		lfc_shrink_type      =           contrast["lfcShrink_parameters"]["type"]
+# 		rank_by              =           contrast["ranking_by"]
+# 		rank_order           =           contrast["ranking_order"].replace("x", "res$"+rank_by)
+# 		
+# 		script = textwrap.dedent(r"""
+# 		#----- import packages
+# 		library(AnnotationDbi)
+# 		library(DESeq2)
+# 		library({params.annot_pkg})
+# 		
+# 		{R_SESSION_INFO}
+# 
+#    
+# 		
+# 		#----- load DESeqDataSet
+# 		dds <- readRDS("{input}")
+# 		
+# 		#----- contrast
+# 		if ("{contrast_type}" == "ratio") {{
+# 			dds${contrast_column} = relevel(dds${contrast_column}, ref="{contrast_ref}")
+# 			dds <- nbinomWaldTest(dds)
+# 		}}
+# 		res <- results(dds, {contrast_def}, # alpha={cutoff_FDR}, lfcThreshold={lfcThreshold}, 
+# 		               altHypothesis="{altHypothesis}") #, independentFiltering={independentFiltering})
+# 
+# 		#----- log-fold-change shrinkage
+# 		#res$lfcShrunk   <- res$log2FoldChange
+# 		#res$lfcShrunkSE <- res$lfcSE
+# 		if ("{lfc_shrink_type}"!="none"){{
+# 			lfc <- lfcShrink(dds, {lfc_def}, # lfcThreshold={lfcThreshold}, 
+# 				type="{lfc_shrink_type}")
+# 			res$log2FoldChange_orig <- res$log2FoldChange
+# 			res$log2FoldChange      <- lfc$log2FoldChange
+# 			res$lfcSE_orig          <- res$lfcSE
+# 			res$lfcSE               <- lfc$lfcSE
+# 		}}
+# 		
+# 		#----- ranking
+# 		res <- res[order({rank_order}),]
+# 		
+# 		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
+# 		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+# 		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+# 		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+# 		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+# 		
+# 		#----- save as rds & csv
+# 		saveRDS(res, file="{output.rds}")
+# 		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+# 		""")
+# 		
+# 		script_file = pph.log(log.out, snakemake_format(script), step="contrasts_full", extension="R", **wildcards)
+# 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+# 
 
 
 ## ------------------------ preparation of the tmod databases ---------------------------
@@ -861,7 +861,7 @@ rule tmod_dbs:
 rule tmod:
 	""" Gene set enrichment with tmod and MSigDB """
 	input:
-		rds = pph.file_path("contrasts_full", "rds"),
+		rds = pph.file_path("contrast", "rds"),
 		dbs = pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"),
 		map = pph.file_path(step = "tmod_dbs", extension = "mapping.rds", contrast="all")
 	output:
