@@ -95,7 +95,7 @@ def generate_covariate_file(args):
 
 	for step in steps:
 		if not extension:
-			default_ext = dict(star="gene_counts.tab", salmon="sf", feature_counts="feature_counts", macs2="narrowPeak")
+			default_ext = dict(star="gene_counts.tab", salmon="sf", feature_counts="feature_counts", macs2="peaks.narrowPeak")
 			if step in default_ext:
 				extension = default_ext[step]
 			else:

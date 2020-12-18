@@ -373,7 +373,7 @@ rule sorted_bam:
 		samtools index {output.bam}
 		""")
 
-		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
+		script_file = pph.log(log.out, snakemake_format(script), step="sorted_bam", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
 

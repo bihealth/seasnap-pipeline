@@ -19,7 +19,7 @@ pipeline_param:
     - rna_seqc
     - preseq_c_curve
     - preseq_lc_extrap
-    #- bw_from_bed
+    #- bw_from_bam
     
   #ATAC_Seq:
   #  - macs2
@@ -52,6 +52,8 @@ rule_options:
     trim: yes
     run_stats: yes
   bwa_index:
+    cmd_opt: ""
+  feature_counts:
     cmd_opt: ""
 
 #---------------------------------------- parameters for the report

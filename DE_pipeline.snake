@@ -200,7 +200,7 @@ rule pk_dba:
 
 		sample_df <- read.table(sample_f, header=TRUE) 
 		pksamples <- sample_df %>% 
-		  dplyr::select(SampleID=label, Tissue=strain, Treatment=strain, bamReads=bam, Peaks=macs2) %>% 
+		  dplyr::select(SampleID=label, Tissue=group, Treatment=group, bamReads=bam, Peaks=macs2) %>% 
 			mutate(PeakFormat="narrow")
 		pkdba <- dba(sampleSheet=pksamples, minOverlap=3)
 		pkdba$config$cores <- 6
