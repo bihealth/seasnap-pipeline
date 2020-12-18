@@ -1,0 +1,14 @@
+<!--
+This is the snippet for a plot of ssGSEA scores
+-->
+
+
+# ssGSEA scores
+
+
+```{r scores}
+scores.f   <- subset(file_tab, step == "scores" & extension == "rds")$filename
+scores     <- readRDS(scores.f)
+
+pheatmap::pheatmap(scores)
+```

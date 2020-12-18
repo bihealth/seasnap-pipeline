@@ -53,6 +53,12 @@ normalization:
     min_mu: {"__num__": [0, null]}
   normalized_expression: vst|rld
 
+#---------------------------------------- ssGSEA scores
+scores:
+  id_class: {"__opt__": ["ENSEMBL", "ENTREZID", "SYMBOL"]}
+  kcdf: {"__opt__": ["Poisson", "Gaussian"]}
+  min_n: {"__num__": [0, null]}
+
 #---------------------------------------- description of contrasts
 contrasts:
   defaults:

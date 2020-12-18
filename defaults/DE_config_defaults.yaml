@@ -52,6 +52,13 @@ normalization:
     min_mu: 0
   normalized_expression: vst
 
+#---------------------------------------- ssGSEA scores
+scores:
+  path: ""
+  id_class: "ENTREZID"
+  kcdf: "Poisson"
+  min_n: 5
+
 #---------------------------------------- description of contrasts
 contrasts:
   defaults:
@@ -177,6 +184,7 @@ report:
   report_snippets:
     - Covariate_table.Rmd
     - NormalisationQC: __defaults__
+    #- Scores.Rmd
     - contrast: __defaults__
     #- time_series: __defaults__
     #- time_series_comparison: __defaults__
