@@ -606,8 +606,7 @@ rule contrast:
 		altHypothesis        =           contrast["results_parameters"]["altHypothesis"]
 		independentFiltering = "TRUE" if contrast["results_parameters"]["independentFiltering"] else "FALSE"
 		lfc_shrink_type      =           contrast["lfcShrink_parameters"]["type"]
-		rank_by              =           contrast["ranking_by"]
-		rank_order           =           contrast["ranking_order"].replace("x", "res$"+rank_by)
+		ranking              =           contrast["ranking"]
 		
 		script = textwrap.dedent(r"""
 		#----- import packages
@@ -640,7 +639,11 @@ rule contrast:
 		}}
 		
 		#----- ranking
-		res <- res[order({rank_order}),]
+		r <- as.data.frame(res)
+		attach(r)
+		i <- eval(parse(text="order({ranking})"))
+		detach(r)
+		res <- res[i,]
 		
 		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
 		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
@@ -869,20 +872,25 @@ rule tmod:
 		tmod_gl   = pph.file_path(step = "tmod", extension = "gl.rds"),
 		tmod_xlsx = pph.file_path(step = "tmod", extension = "xlsx")
 	log:
-		out = pph.file_path(step = "tmod", extension = "output.log", log=True)
+		out = pph.file_path(step = "tmod", extension = "output.log", log=True),
+		contrast_yaml = pph.file_path(step = "tmod", extension = "contrast.yaml", log=True)
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
+		contrast = pph.get_contrast(wildcards.contrast)
+		with open(log.contrast_yaml, "w") as f: yaml.dump(contrast, f, default_flow_style=False)
+
 		script = textwrap.dedent(r"""
 			{R_SESSION_INFO}
 
-			script.d <- "{SCRIPTDIR}"
-			conf.f   <- "{config_file}"
-			de.input <- "{input.rds}"
-			map.f    <- "{input.map}"
-			dbs.f    <- "{input.dbs}"
-			res.file <- "{output.tmod_res}"
-			res.xlsx <- "{output.tmod_xlsx}"
-			res.gl.f <- "{output.tmod_gl}"
+			script.d   <- "{SCRIPTDIR}"
+			conf.f     <- "{config_file}"
+			contrast.f <- "{log.contrast_yaml}"
+			de.input   <- "{input.rds}"
+			map.f      <- "{input.map}"
+			dbs.f      <- "{input.dbs}"
+			res.file   <- "{output.tmod_res}"
+			res.xlsx   <- "{output.tmod_xlsx}"
+			res.gl.f   <- "{output.tmod_gl}"
 			 
 			## ------------------------------
 			## no wildcards beyond this point
@@ -893,15 +901,19 @@ rule tmod:
       library(purrr)
 			
 			config <- yaml::yaml.load_file(conf.f)
+			contrast.config <- yaml::yaml.load_file(contrast.f)
 			source(file.path(script.d, "tmod_functions.R"))
 
 			dbs <- readRDS(dbs.f)
 			db.map <- readRDS(map.f)
 			de.res <- readRDS(de.input)
 
+			## filter out genes with unreliable differential expression
+			de.res <- de.res[!is.na(de.res$padj),]
+
 			## create ordered gene lists for every database
 			message(paste0("Starting tmod for contrast ", de.input))
-			ordered_genelist <- get_ordered_genelist(de.res, config)
+			ordered_genelist <- get_ordered_genelist(de.res, contrast.config$ranking)
 			genelists <- lapply(dbs, map_genelists, ordered_genelist, db.map)
 			saveRDS(genelists, file=res.gl.f)
 			

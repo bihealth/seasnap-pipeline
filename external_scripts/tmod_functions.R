@@ -668,10 +668,21 @@ get_msd <- function(de, ci=.95) {
 #' config and the default parameter; the first non-null value from these three
 #' sources is used.
 #' @param de differential expression data frame (form DESeq2)
-#' @param config main sea-snap config object (a list)
+#' @param sort_by expression to be parsed for sorting the de data frame
 #' @return a list with one element for each sort key
 #' @export
-get_ordered_genelist <- function(de, config, default="pval") {
+get_ordered_genelist <- function(de, sort_by="pvalue") {
+
+  df <- as.data.frame(de)
+  attach(df)
+  x <- eval(parse(text=sort_by))
+  detach(df)
+
+  i <- order(x)
+  i <- i[!is.na(x)]
+  ret <- list(rownames(de)[i])
+  names(ret) <- sort_by
+  return(ret)
 
   ## take the first non-NULL value
   sort_by  <- c(config$tmod$sort_by, default)[1]

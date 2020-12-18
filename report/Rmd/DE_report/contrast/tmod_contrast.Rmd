@@ -48,7 +48,7 @@ tmod_res <- readRDS(tmod_res.f)
 
 
 **Table.** Summary of the results for contrast `r c_name` shows number of
-significant gene sets at various significance levels and for AUC > 0.65.
+significant gene sets at various significance levels and for AUC > `r res_auc_thr`.
 
 ```{r tmod_summary_table{{ENTRY_ID}}, results="asis"}
 pval.thr <- c(.01, .001, 1e-4, 1e-6)
@@ -58,7 +58,7 @@ tmp <- purrr::imap_dfr(tmod_res, ~ {
   .rn <- .y
   ret <- t(sapply(.r, function(.s) {
     sapply(pval.thr, function(.pt) {
-      sum(.s$adj.P.Val < .pt & .s$AUC > 0.65, na.rm=TRUE)
+      sum(.s$adj.P.Val < .pt & .s$AUC > res_auc_thr, na.rm=TRUE)
     })
   }))
   data.frame(DB=.y, ret)
@@ -124,7 +124,7 @@ template <- '
 
     if(!is.null(.res)) {
       .res <- .res[ order(.res$P.Value), ]
-      .res <- .res[ .res$adj.P.Val < .01 & .res$AUC > .6, ]
+      .res <- .res[ .res$adj.P.Val < res_pval_thr & .res$AUC > res_auc_thr, ]
       if(nrow(.res) > 20) .res <- .res[1:20, ]
     }
 
@@ -148,4 +148,61 @@ cat("\n##### {-}\n")
 
 ```
 
+**Fig. Evidence plots.**
 
+```{r tmod_evidence_plot_{{ENTRY_ID}},fig.width=14,fig.height=9,results="asis"}
+
+res <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
+gl  <- readRDS(subset(file_tab, step=="tmod" & extension=="gl.rds" & contrast=="{{ENTRY_ID}}")$filename)
+
+conf.snip <- config$report$snippet_parameters
+
+res <- res[!is.na(res$padj),]
+
+cat("\n##### {.tabset}\n")
+
+template <- '
+\n```{r, results="asis"}
+    par(mfrow=c((conf.snip$tmod$n_evid-1)%/%3 + 1, 3))
+    cat(sprintf("\n###### %s\n", paste0(db, ".", .resn)))
+
+    .res <- tmod_res[[db]][[.resn]]
+
+    if(!is.null(.res)) {
+      .res <- .res[ order(.res$P.Value), ]
+      .res <- .res[ .res$adj.P.Val < res_pval_thr & .res$AUC > res_auc_thr, ]
+      if(nrow(.res) > conf.snip$tmod$n_evid) .res <- .res[1:conf.snip$tmod$n_evid, ]
+    }
+
+    if(is.null(.res) || nrow(.res) < 1) {
+      cat("<br>Too few results to generate upset plot.<br><br>\n")
+    } else {
+	  
+	  gene_colors <- ifelse(res$log2FoldChange<0,
+							  ifelse(res$padj<res_pval_thr, "blue", "#000066"),
+							  ifelse(res$padj<res_pval_thr, "red",  "#660000"))
+	  gene_colors <- gene_colors[names(gl[[db]][[.resn]])]
+	  names(gene_colors) <- NULL
+
+	  ids <- .res$ID
+	  mlabs <- tmod_labels(ids, tmod.dbs[[db]]$dbobj$MODULES[ids, "Title"], max.length=35, nline=2)
+
+      #TODO- deal with databases which primary id is not SYMBOL
+	  for (id in ids) {
+          evidencePlot(gl[[db]][[.resn]], m=id, mset=tmod.dbs[[db]]$dbobj,
+		    		   gene.colors=gene_colors, gene.labels=if (length(tmod.dbs[[db]]$dbobj$MODULES2GENES[[id]])<=100) TRUE else NULL, main=mlabs[id])
+	  }
+    }
+\n```
+
+'
+for(db in names(tmod_res)) {
+  for(.resn in names(tmod_res[[db]])) {
+    out <- knitr::knit_child(text=template, quiet=TRUE)
+    cat(out)
+  }
+}
+
+cat("\n##### {-}\n")
+
+```
