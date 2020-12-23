@@ -63,6 +63,7 @@ def get_inputs_all():
 	inputs = pph.expand_path(step="contrast", extension="rds")
 	inputs.append(pph.expand_path(step="contrasts_full", extension="rds"))
 	inputs.append(pph.expand_path(step="motif_search_meme", extension="rds", if_set = dict(meme=dict(run=True))))
+	inputs.append(pph.file_path(step="isizes", extension="rds", contrast = "all"))
 	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	
@@ -1069,6 +1070,48 @@ rule one_dreme:
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension=prof + "_" + updown + ".sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+rule isizes:
+	"""Calculate the insert sizes from each BAM"""
+	input:
+		samples = config["experiment"]["covariate_file"]["macs2"]
+	output:
+		rds = pph.file_path(step = "isizes", extension = "rds", contrast = "all")
+	log:
+		out = pph.file_path(step = "isizes", extension = "log", contrast = "all", log=True)
+	run:
+		script   = textwrap.dedent(r"""
+	  	{R_SESSION_INFO}
+			output_rds  <- "{output.rds}"
+			sample_f    <- "{input.samples}"
+			
+			# ----------------------------------------
+			# No Snakemake wildcards beyond this point
+			# ----------------------------------------
+			#
+		  # First, we run samtools
+			#
+			# stop("dupa!")
+			sample_df <- read.table(sample_f, header=TRUE) 
+
+			ret <- lapply(sample_df[["bam"]], function(file) {{
+				file <- gsub(".bam$", ".csv", file)
+				isizes <- abs(read.csv(file, colClasses="integer", header=FALSE, stringsAsFactors=FALSE)[,1])
+				isizes <- isizes[ isizes < 550 ]
+				table(isizes)
+			}})
+
+			names(ret) <- sample_df[["label"]]
+			saveRDS(ret, file=output_rds)
+""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="isizes", contrast = "all", extension="R", **wildcards)
+
+		# run R
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 	
 rule peak_seq:

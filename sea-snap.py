@@ -109,7 +109,7 @@ def generate_covariate_file(args):
 
 		# fill 5 mandatory columns
 		if args.atac:
-			cft.update_covariate_data(step, extension, {"macs2": ("macs2", "peaks.narrowPeak"), "bam": ("star", "bam")})
+			cft.update_covariate_data(step, extension, {"macs2": ("macs2", "peaks.narrowPeak"), "bam": ("sorted_bam", "bam")})
 		elif args.tpm:
 			cft.update_covariate_data(step, extension, {"tpm": ("tpm_calculator", "tsv")})
 		else:
