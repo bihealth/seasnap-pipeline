@@ -18,6 +18,7 @@ dir.create(export_dir, showWarnings=FALSE)
 
 counts_f        <- file.path(export_dir, "counts.xlsx")
 gene_expr_res_f <- file.path(export_dir, "differential_expression_results.xlsx")
+tmod_annotation_f <- file.path(export_dir, "gene_set_annotation_significant.xlsx")
 ```
 
 
@@ -65,6 +66,44 @@ for(f in tmod_ft %>% pull(filename)) {
   file.copy(f, export_dir)
 }
 
+## Export module annotations
+
+tmod_res <- file_tab %>% dplyr::filter(step == "tmod" & extension == "rds") %>% pull(filename) %>% map(readRDS)
+
+tmod_db_ids <- tmod_res %>% map(names) %>% unlist %>% unique %>% purrr::set_names()
+
+tmod_dbs <- file_tab %>% filter(step == "tmod_dbs" & extension == "rds") %>% pull(filename) %>% readRDS
+tmod_map <- file_tab %>% filter(step == "tmod_dbs" & extension == "mapping.rds") %>% pull(filename) %>% readRDS
+annot    <- file_tab %>% filter(step == "annotation" & extension == "rds") %>% pull(filename) %>% readRDS
+
+tmod_mods <- map(tmod_db_ids, ~ {
+  .id <- .x
+  ids <- tmod_res %>% map(`[[`, .id) %>% unlist(recursive=FALSE) %>% map(~ .x %>% dplyr::filter(adj.P.Val < 0.05)) %>% map(`[[`, "ID") %>% unlist %>% unique
+
+  if(length(ids) < 1) {
+    return(NULL)
+  }
+  db <- tmod_dbs[[.id]]$dbobj
+
+  df <- db$MODULES %>% dplyr::filter(ID %in% ids)
+  genes <- map(df$ID, ~ db$MODULES2GENES[[.]])
+  mapping <- tmod_map$maps[[ tmod_map$dbs[.id] ]]
+  genes <- map(genes, ~ names(mapping)[ mapping %in% .x ])
+  if("SYMBOL" %in% colnames(annot)) {
+    genes <- map(genes, ~ {
+      sym <- annot$SYMBOL[ match(.x, annot$PrimaryID) ]
+      ifelse(is.na(sym), genes, sym)
+    })
+  }
+  genes <- map_chr(genes, paste, collapse=",")
+  df$Genes <- genes
+  return(df)
+})
+
+tmod_mods <- tmod_mods[!map_lgl(tmod_mods, is.null)]
+write_xlsx(tmod_mods, path=tmod_annotation_f)
+
+
 ```
 
 **Table.** Following files have been exported to the `r export_dir` directory.
@@ -81,7 +120,7 @@ export_ft <- data.frame(
 export_ft_2 <- tmod_ft %>%
   mutate(Description=sprintf("Results of gene enrichment analysis with tmod for contrast %s", contrast),
          File=sprintf("[%s](%s)", basename(filename), file.path(export_dir, basename(filename)))) %>%
-  select(Description, File)
+  dplyr::select(Description, File)
 
 export_ft <- rbind(export_ft, export_ft_2)
 pander(export_ft)

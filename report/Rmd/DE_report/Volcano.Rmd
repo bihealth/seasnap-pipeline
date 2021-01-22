@@ -22,6 +22,9 @@ annot     <- readRDS(annot.f)
 contrasts.def <- subset(file_tab, step == "contrast" & extension == "rds")
 contrasts.conf <- config$contrasts$contrast_list
 names(contrasts.conf) <- sapply(contrasts.conf, `[[`, "ID")
+
+p.t <- .05
+l.t <- 1
 ```
 
 
@@ -38,13 +41,19 @@ n.row <- ceiling(cntr.n / n.col)
 message(sprintf("Volcano plots: %d x %d", n.row, n.col))
 ```
 
-
+**Fig.** Volcano plots. Vertical axis is the -(log~10~) of the p-value
+adjusted for multiple testing (p~adj~). Significantly regulated genes are shown in
+color: genes with higher expression in a contrast are shown in red, genes with lower expression
+are shown in blue. Significant regulation is defined by the absolute log~2~ fold change 
+greater than 
+`r l.t` 
+and p~adj~ smaller than
+`r p.t`.
 
 ```{r volcano_fig,fig.width=5*n.col, fig.height=5*n.row}
+pdir <- PLOTS_BASE_DIR
 par(mfrow=c(n.row, n.col), bty="n")
 
-p.t <- .05
-l.t <- 1
 
 maxlfc <- max(sapply(cntr, function(x) max(abs(x$log2FoldChange), na.rm=TRUE)))
 xlim <- c(-maxlfc, maxlfc)
@@ -66,5 +75,36 @@ for(cc in names(contrasts.conf)) {
   abline(v=0, col="#33333333")
 }
 
-
+dev.copy2pdf(file=file.path(pdir, "volcano_plots.pdf"), out.type="cairo")
 ```
+
+```{r volcano_fig_single,include=FALSE}
+pdir <- PLOTS_BASE_DIR
+
+maxlfc <- max(sapply(cntr, function(x) max(abs(x$log2FoldChange), na.rm=TRUE)))
+xlim <- c(-maxlfc, maxlfc)
+minpval <- min(sapply(cntr, function(x) min(x$padj, na.rm=TRUE)))
+if(minpval < 1e-26) minpval <- 1e-26
+ylim <- c(1, minpval)
+
+## we use a fast but effective plotting function, nothing fancy
+for(cc in names(contrasts.conf)) {
+  fname <- file.path(pdir, paste0("volcano_plot_", cc, ".pdf"))
+  cairo_pdf(file=fname)
+  x <- cntr[[cc]]
+  x$color <- ifelse(x$log2FoldChange < 0, "#3333cc33", "#cc333333")
+  x$color[ x$padj > p.t | abs(x$log2FoldChange) < l.t ] <- "#33333333"
+  plot(x$log2FoldChange, -log10(x$padj), pch=19, col=x$color,
+    xlab="log2 FC", ylab="-log10(p value)", 
+    xlim=xlim,
+    ylim=-log10(ylim),
+    main=contrasts.conf[[cc]]$title)
+  abline(h=-log10(p.t), col="#33333333")
+  abline(v=0, col="#33333333")
+  dev.off()
+}
+```
+
+
+
+
