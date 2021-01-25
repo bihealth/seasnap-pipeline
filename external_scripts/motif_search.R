@@ -117,9 +117,10 @@ read_tomtom <- function(file, jaspar.dir=NULL) {
 
 #' Compile dreme and tomtom output
 #'
-motifsearch_summary <- function(dreme_res, tomtom_res, enr.thr=2, annot.thr=0.05, work_dir=".") {
+motifsearch_summary <- function(dreme_res, tomtom_res, enr.thr=2, annot.thr=0.05, work_dir=".", min.enr=5) {
 
-  dreme_sel <- dreme_res %>% dplyr::filter(Enrichment > enr.thr) %>% 
+  dreme_sel <- dreme_res %>% mutate(..n=1:n()) %>%
+    dplyr::filter(Enrichment > enr.thr | ..n < min.enr) %>% 
     mutate(Logo=sprintf("![%s](%s)", Motif, file.path(work_dir, Logo))) %>% 
     dplyr::select(Direction, Motif, Enrichment, Pval, E, Logo=Logo)
 
@@ -130,8 +131,8 @@ motifsearch_summary <- function(dreme_res, tomtom_res, enr.thr=2, annot.thr=0.05
 
   })
 
-  dreme_sel <- dreme_sel %>% dplyr::filter(Annotation != "") 
-
+  #dreme_sel <- dreme_sel %>% dplyr::filter(Annotation != "") 
+  return(dreme_sel)
 
 }
 

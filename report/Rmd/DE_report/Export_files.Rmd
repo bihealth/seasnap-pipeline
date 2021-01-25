@@ -35,7 +35,7 @@ rld <- file_tab %>% filter(extension == "rld.blind.rds") %>%
   pull(filename) %>% readRDS
 
 annot <- file_tab %>% filter(step=="annotation" & extension == "rds") %>% 
-  pull(filename) %>% readRDS %>% slice(match(rownames(rld), PrimaryID))
+  pull(filename) %>% readRDS %>% dplyr::slice(match(rownames(rld), PrimaryID))
 
 write_xlsx(list("Raw counts"=as.data.frame(counts(ds)) %>% rownames_to_column("PrimaryID"), 
                 "RLD"=as.data.frame(assay(rld)) %>% rownames_to_column("PrimaryID"),
@@ -110,7 +110,7 @@ export_ft <- export_ft %>% rbind(tomtom_ft %>%
 
 export_ft <- export_ft %>% 
   mutate(File=sprintf("[%s](%s)", basename(filename),filename)) %>%
-  rename(Contrast=contrast) %>%
+  dplyr::rename(Contrast=contrast) %>%
   dplyr::select(Description, Contrast, File)
 
 pander(export_ft, split.tables=Inf)
