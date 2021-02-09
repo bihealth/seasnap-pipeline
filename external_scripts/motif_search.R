@@ -119,6 +119,10 @@ read_tomtom <- function(file, jaspar.dir=NULL) {
 #'
 motifsearch_summary <- function(dreme_res, tomtom_res, enr.thr=2, annot.thr=0.05, work_dir=".", min.enr=5) {
 
+  if(nrow(dreme_res) < 1) {
+    return(NULL)
+  }
+
   dreme_sel <- dreme_res %>% mutate(..n=1:n()) %>%
     dplyr::filter(Enrichment > enr.thr | ..n < min.enr) %>% 
     mutate(Logo=sprintf("![%s](%s)", Motif, file.path(work_dir, Logo))) %>% 
