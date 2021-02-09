@@ -1,0 +1,90 @@
+#REQUIRE {{motif_search_meme-rds-{{ENTRY_ID}}}}
+
+<!---
+Summarize the results of motif search
+-->
+
+
+### Motif search for contrast {{ENTRY_NAME}}
+
+For each peak set, significant peaks were defined as those for which 
+adjusted p value in differential binding analysis is smaller than
+`r format.pval(config$meme$true_positive_pval, digits=2)`
+and the absolute log~2~ fold change is greater than
+`r format(config$meme$true_positive_lfc, digits=2)`.
+
+
+```{r {{ENTRY_ID}}_motif_overview,include=FALSE}
+script_f <- file.path(r.path, "..", "..", "..", "external_scripts", "motif_search.R")
+source(script_f)
+
+require(tibble)
+require(pander)
+require(dplyr)
+require(purrr)
+res <- file_tab %>% filter(contrast==CONTRAST_ID & extension=="rds" & step=="motif_search_meme") %>% 
+  pull(filename) %>% readRDS()
+
+enr.thr <- 2
+annot.thr <- 0.05
+
+profiles <- names(res$dreme)
+# these wildcards will also be filled:
+#{{WORKING_DIRECTORY}} # the path to the working directory during pipeline execution
+#{{R_COMMON}}          # the path to a folder with generic R functions to be used in snippets
+# only in snippet sub-folders:
+#{{ENTRY_NAME}}
+#{{ENTRY_ID}}
+
+
+
+```
+
+
+**Table: summary of the results from DREME and TOMTOM.** Only motifs with enrichment $>$ 
+`r enr.thr` are shown. Annotations are derived from TOMTOM motif search and
+are shown only if adjusted p-value $<$ 
+`r annot.thr`. *Direction*: "up" - the analysed peaks were up-regulated in the contrast; "dw" - 
+the analysed peaks were down-regulated in the contrast. *Motif*: the motif as identified by DREME. 
+*Enrichment:*  the relative enrichment of the motif occurence in up- or down-regulated peaks compared to 
+peaks which are not significantly regulated. *Pval*, raw p-value reported by DREME; *E*, expected number 
+motifs as reported by DREME; *Logo*, the motif identified by DREME
+represented as sequence logo; *Annotation*, top hits from TOMTOM matching
+the reported motif (separated by commas). For detailed results, please view the files
+`r basename(file_tab %>% filter(contrast == CONTRAST_ID & extension == "dreme.xlsx") %>% pull(filename))`
+and
+`r basename(file_tab %>% filter(contrast == CONTRAST_ID & extension == "tomtom.xlsx") %>% pull(filename))`.
+
+```{r {{ENTRY_ID}}_motif_summary,results="asis"}
+template <- "
+\n```{r}
+datatable(mytab, extensions=c('Buttons','FixedColumns'), rownames=FALSE, escape=FALSE,
+        options = list(scrollX=TRUE, fixedColumns=list(leftColumns=1), dom='Bfrtip', buttons=c('excel', 'csv'))) 
+
+\n```
+"
+
+cat("\n##### {.tabset}\n")
+
+for(p in profiles) {
+
+  cat(sprintf("\n###### %s\n", p))
+  .dreme_res <- res$dreme[[p]]
+  .tomtom_res <- res$tomtom[[p]]
+  mytab <- motifsearch_summary(.dreme_res, .tomtom_res, work_dir=working_dir, enr.thr=enr.thr, annot.thr=annot.thr)
+
+  if(!is.null(mytab) && nrow(mytab) > 0) {
+    #out <- knitr::knit_child(text=template, quiet=TRUE)
+    out <- pandoc.table.return(mytab, split.tables=Inf, split.cells=Inf)
+    cat(out)
+  } else {
+    cat("**No results at the specified thresholds**\n")
+  }
+}
+```
+
+
+
+
+
+
