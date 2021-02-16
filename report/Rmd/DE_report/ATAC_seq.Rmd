@@ -21,15 +21,20 @@ require(tibble)
 require(dplyr)
 
 #' Calculate and plot autocorrelation for fragment size distribution
-autoCplot <- function(sizes=NULL, sizes.t=NULL, frag.min=50, frag.max=1000, lag.max=1000, log=TRUE, plot=TRUE, title="Fragment size distribution", ...) {
+autoCplot <- function(sizes=NULL, sizes.t=NULL, frag.min=75, frag.max=1000, lag.max=1000, min.count.fract=5e-3, log=TRUE, plot=TRUE, title="Fragment size distribution", ...) {
   
   if(is.null(sizes.t)) {
     sizes.t <- table(sizes)
   }
+
   sizes.n <- as.numeric(names(sizes.t))
   sizes.v <- as.numeric(sizes.t)
 
   sel <- sizes.n %in% frag.min:frag.max
+  if(!is.na(min.count.fract)) {
+    sel <- sel & sizes.v > max(sizes.v) * min.count.fract
+  }
+
 
   if(log) sizes.v <- log(sizes.v)
   trend <- lm(sizes.v[sel] ~ sizes.n[sel])
