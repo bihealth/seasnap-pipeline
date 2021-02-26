@@ -729,11 +729,11 @@ class PipelinePathHandler:
 class MappingPipelinePathHandler(PipelinePathHandler):
 	""" path handler for mapping pipeline """
 
-	allowed_wildcards = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "library"]
+	allowed_wildcards = ["step", "extension", "sample", "mate", "batch", "flowcell", "lane", "library", "lib_type"]
 	required_wildcards_out_log = ["step", "extension", "sample"]
 	required_wildcards_in = ["sample"]
 	wildcard_fix_values = dict(sample="all_samples", mate="all_mates", batch="all_batches", flowcell="all_flowcells",
-							   lane="all_lanes", library="all_libraries")
+							   lane="all_lanes", library="all_libraries", lib_type="all_libtypes")
 
 	def __init__(self, workflow, test_config=False, **kwargs):
 		super().__init__(workflow, test_config, **kwargs)
