@@ -48,7 +48,7 @@ tmod_res <- readRDS(tmod_res.f)
 
 
 **Table.** Summary of the results for contrast `r c_name` shows number of
-significant gene sets at various significance levels and for AUC > 0.65.
+significant gene sets at various significance levels and for AUC > `r res_auc_thr`.
 
 ```{r tmod_summary_table{{ENTRY_ID}}, results="asis"}
 pval.thr <- c(.01, .001, 1e-4, 1e-6)
@@ -58,7 +58,7 @@ tmp <- purrr::imap_dfr(tmod_res, ~ {
   .rn <- .y
   ret <- t(sapply(.r, function(.s) {
     sapply(pval.thr, function(.pt) {
-      sum(.s$adj.P.Val < .pt & .s$AUC > 0.65, na.rm=TRUE)
+      sum(.s$adj.P.Val < .pt & .s$AUC > res_auc_thr, na.rm=TRUE)
     })
   }))
   data.frame(DB=.y, ret)
