@@ -8,7 +8,7 @@ require(DESeq2)
 require(edgeR)
 require(pander)
 
-export_dir <- config$report$snippets$Export_files$export_dir
+export_dir <- config$report$snippet_parameters$Export_files$export_dir
 if(is.null(export_dir)) {
   export_dir <- "export_files"
   warning("config report:snippet_parameters:Export_files:export_dir not found, using export_files/")
@@ -18,6 +18,7 @@ dir.create(export_dir, showWarnings=FALSE)
 
 counts_f        <- file.path(export_dir, "counts.xlsx")
 gene_expr_res_f <- file.path(export_dir, "differential_expression_results.xlsx")
+covariate_f     <- file.path(export_dir, "covariate_file.xlsx")
 ```
 
 
@@ -34,12 +35,15 @@ ds <- file_tab %>% filter(extension == "deseq2.rds") %>%
 rld <- file_tab %>% filter(extension == "rld.blind.rds") %>% 
   pull(filename) %>% readRDS
 
+covar <- colData(rld) %>% as.data.frame()
+
 annot <- file_tab %>% filter(step=="annotation" & extension == "rds") %>% 
   pull(filename) %>% readRDS %>% slice(match(rownames(rld), PrimaryID))
 
 write_xlsx(list("Raw counts"=as.data.frame(counts(ds)) %>% rownames_to_column("PrimaryID"), 
                 "RLD"=as.data.frame(assay(rld)) %>% rownames_to_column("PrimaryID"),
-                "Annotation"=annot),
+                "Annotation"=annot,
+                "Covariates"=covar),
            path=counts_f)
 
 ## export DE analysis data
@@ -54,9 +58,10 @@ gene_expr_res <- map(files, readRDS) %>% map(as.data.frame) %>%
 annotation <- file_tab %>% filter(step=="annotation" & extension=="rds") %>%
  pull("filename") %>% readRDS()
 
-write_xlsx(c(list(Annotation=annotation), gene_expr_res), 
+write_xlsx(c(list(Annotation=annotation), gene_expr_res, list(Covariates=covar)), 
   path=gene_expr_res_f)
 
+write_xlsx(list(Covariates=covar), path=covariate_f)
 
 ## Export tmod results
 tmod_ft <- file_tab %>% filter(step == "tmod" & extension == "xlsx") %>%
@@ -70,9 +75,10 @@ for(f in tmod_ft %>% pull(filename)) {
 **Table.** Following files have been exported to the `r export_dir` directory.
 
 ```{r export_files_filetab,results="markdown"}
-.f <- c(counts_f, gene_expr_res_f)
+.f <- c(covariate_f, counts_f, gene_expr_res_f)
 export_ft <- data.frame(
   Description=c(
+    "Covariate file",
     "Raw counts, log CPM and rlog counts",
     "Results of differential expression analysis for all contrasts"),
   File=sprintf("[%s](%s)", basename(.f), .f),
