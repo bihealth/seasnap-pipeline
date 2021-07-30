@@ -116,7 +116,7 @@ cat("\n##### {-}\n")
 cat("\n##### {.tabset}\n")
 
 template <- '
-\n```{r, results="asis"}
+\n```{r, dev="svg",results="asis"}
     par(mar=rep(1, 4))
     cat(sprintf("\n###### %s\n", paste0(db, ".", .resn)))
 

@@ -200,7 +200,7 @@ rowlabs <- tmod_labels(resU2S$ID, resU2S$Title, max.length=35, nlines=2)
 \n```
 
 
-\n```{r, fig.width=12,fig.height=4 + ceiling(nrow(resU2S)/2)}
+\n```{r, dev='svg',fig.width=12,fig.height=4 + ceiling(nrow(resU2S)/2)}
 tmodPanelPlot(resU2, filter.rows.pval=conf.snip$fig_qval_max, 
                      filter.rows.auc=conf.snip$fig_auc_min, 
 										 pie=piesU, grid='b', row.labels=rowlabs, text.cex=0.7)
@@ -231,7 +231,7 @@ brightness indicates whether genes are significantly regulated (at q < 0.05).
 
 
 
-\n```{r fig.width=3 + 5 * length(glU), fig.height=3 + 4 * n}
+\n```{r dev='svg',fig.width=3 + 5 * length(glU), fig.height=3 + 4 * n}
 
 par(mfrow=c(n, length(glU)))
 
