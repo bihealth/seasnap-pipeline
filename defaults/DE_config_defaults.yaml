@@ -244,7 +244,7 @@ tmod:
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
       primaryID: ENTREZID
-      subset: "Category=C5,Subcategory=BP"
+      subset: "Category=C5,Subcategory=GO:BP"
        
 
 #---------------------------------------- configuration for export
