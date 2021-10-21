@@ -68,7 +68,7 @@ def get_inputs_all():
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
 	inputs.append(pph.file_path(step = "tmod_dbs", extension = "rds", contrast="all"))
-	inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
+	#inputs.append(pph.file_path(step = "tmod_pca", extension = "rds", contrast="all", if_set=dict(tmod_pca=True)))
 	inputs.append(pph.expand_path(step = "tmod", extension = "rds", if_set = dict(tmod=True)))
 
 	#time series
@@ -412,7 +412,8 @@ rule export_raw_counts:
 		dict(step = "import_sf",            extension = "rds", contrast = "all")
 		])
 	output:
-		xlsx = pph.file_path("export_raw_counts", "xlsx", contrast = "all")
+		xlsx = pph.file_path("export_raw_counts", "xlsx", contrast = "all"),
+		csv  = pph.file_path("export_raw_counts", "csv", contrast = "all")
 	log:
 		out = pph.file_path("export_raw_counts", "output.log", contrast = "all", log=True)
 	run:
@@ -420,19 +421,24 @@ rule export_raw_counts:
 		#----- import packages
 		library(DESeq2)
 		library(writexl)
+    library(tibble)
+    library(readr)
 
 		{R_SESSION_INFO}
 
 		#----- variables
 		output_xlsx <- "{output.xlsx}"
+		output_csv  <- "{output.csv}"
 		input_rds   <- "{input.rds}"
 
 		#----- read RDS object, extract count data, save as XLSX
 		dds <- readRDS(input_rds)
-		count_dat <- as.data.frame(assay(dds))
+    count_dat <- assay(dds)
+		count_dat <- as.data.frame(count_dat) %>% rownames_to_column("PrimaryID")
 		col_dat <- colData(dds)
-		colnames(count_dat) <- col_dat$label
-    	write_xlsx(count_dat, path=output_xlsx)
+		colnames(count_dat)[-1] <- col_dat$label
+    write_csv(count_dat, path=output_csv)
+    write_xlsx(count_dat, path=output_xlsx)
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="export_raw_counts", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
