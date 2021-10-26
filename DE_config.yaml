@@ -37,10 +37,12 @@ pipeline_param:
   ## You should be able to safely leave the predefined {out,log}_path_pattern[s].
 
   # define choices for choose_input()
+  # select the one that suits you
   input_choice:
     mapping:
       - import_gene_counts
       - import_sf
+      - import_feature_counts
 
 
 
@@ -51,6 +53,8 @@ experiment:
   
   design_formula: ### FILL HERE ###  (e.g. "~ group")
 
+## the following allows you define the orders of levels in the factor
+## variables
   columns: ### FILL HERE ###
 ## example:
 #  columns:
@@ -67,9 +71,10 @@ experiment:
 contrasts:
   __options__: [defaults, contrast_list]
 
-  ## by default: run tmod, goseq and cluster_profiler
+  ## by default: run tmod and cluster_profiler, but not tmod_pca
   defaults:
     tmod: true 
+    tmod_pca: false
     cluster_profiler:
       run: true
   
@@ -156,4 +161,69 @@ report:
       - tmod.Rmd
       - cluster_profiler_summary.Rmd
       # - Disco.Rmd
- 
+      
+# ---------------------------------------- configuration for tmod
+# the following defines the gene set enrichment gene sets
+tmod:
+  tmod_db_path: "./"
+  sort_by: pval 
+# for sorting order, you can also use pval_n and/or pval_p
+# (pval negative sort, pval positive sort)
+  databases:
+    - name: tmod
+      file: tmod
+      title: "Co-expression gene sets (tmod)"
+      description:
+        Gene sets derived from clustering expression profiles from human blood
+        collected for various immune conditions. These gene sets are included
+        in the tmod package by default. Check tmod documentation for further 
+        information.
+      taxonID: 9606
+      primaryID: SYMBOL
+      annotationDBI: org.Hs.eg.db
+    - name: msigdb_reactome
+      file: msigdb
+      title: "Reactome gene sets (MSigDB)"
+      description:
+        Reactome gene sets
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      primaryID: ENTREZID
+      subset: "Category=C2,Subcategory=CP:REACTOME"
+    - name: msigdb_hallmark
+      file: msigdb
+      title: "Hallmark gene sets (MSigDB)"
+      description:
+        Hallmark gene sets
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      primaryID: ENTREZID
+      subset: "Category=H"
+    - name: msigdb_kegg
+      file: msigdb
+      title: "KEGG pathways (MSigDB)"
+      description:
+        KEGG pathways from 
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      primaryID: ENTREZID
+      subset: "Category=C2,Subcategory=CP:KEGG"
+    - name: msigdb_mir
+      file: msigdb
+      title: "MIR targets (MSigDB)"
+      description:
+        MIR targets from
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      primaryID: ENTREZID
+      subset: "Category=C3,Subcategory=MIR:MIRDB"
+    - name: msigdb_go_bp
+      file: msigdb
+      title: "GO Biological Process (MSigDB)"
+      description:
+        GO Biological Process definitions from
+        the Molecular Signatures DB 
+        (https://www.gsea-msigdb.org/gsea/msigdb/).
+      primaryID: ENTREZID
+      subset: "Category=C5,Subcategory=GO:BP"
+      

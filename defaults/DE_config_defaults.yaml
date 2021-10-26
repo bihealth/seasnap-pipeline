@@ -182,70 +182,7 @@ report:
     #- time_series_comparison: __defaults__
     #- Export_files.Rmd  ## export files for clients to export_files directory
 #
-#---------------------------------------- configuration for tmod
-
-tmod:
-  tmod_db_path: "./"
-  sort_by: pval 
-#,pval_n,pval_p
-  databases:
-    - name: tmod
-      file: tmod
-      title: "Co-expression gene sets (tmod)"
-      description:
-        Gene sets derived from clustering expression profiles from human blood
-        collected for various immune conditions. These gene sets are included
-        in the tmod package by default. Check tmod documentation for further 
-        information.
-      taxonID: 9606
-      primaryID: SYMBOL
-      annotationDBI: org.Hs.eg.db
-    - name: msigdb_reactome
-      file: msigdb
-      title: "Reactome gene sets (MSigDB)"
-      description:
-        Reactome gene sets
-        the Molecular Signatures DB 
-        (https://www.gsea-msigdb.org/gsea/msigdb/).
-      primaryID: ENTREZID
-      subset: "Category=C2,Subcategory=CP:REACTOME"
-    - name: msigdb_hallmark
-      file: msigdb
-      title: "Hallmark gene sets (MSigDB)"
-      description:
-        Hallmark gene sets
-        the Molecular Signatures DB 
-        (https://www.gsea-msigdb.org/gsea/msigdb/).
-      primaryID: ENTREZID
-      subset: "Category=H"
-    - name: msigdb_kegg
-      file: msigdb
-      title: "KEGG pathways (MSigDB)"
-      description:
-        KEGG pathways from 
-        the Molecular Signatures DB 
-        (https://www.gsea-msigdb.org/gsea/msigdb/).
-      primaryID: ENTREZID
-      subset: "Category=C2,Subcategory=CP:KEGG"
-    - name: msigdb_mir
-      file: msigdb
-      title: "MIR targets (MSigDB)"
-      description:
-        MIR targets from
-        the Molecular Signatures DB 
-        (https://www.gsea-msigdb.org/gsea/msigdb/).
-      primaryID: ENTREZID
-      subset: "Category=C3,Subcategory=MIR:MIRDB"
-    - name: msigdb_go_bp
-      file: msigdb
-      title: "GO Biological Process (MSigDB)"
-      description:
-        GO Biological Process definitions from
-        the Molecular Signatures DB 
-        (https://www.gsea-msigdb.org/gsea/msigdb/).
-      primaryID: ENTREZID
-      subset: "Category=C5,Subcategory=GO:BP"
-       
+  
 
 #---------------------------------------- configuration for export
 export:
