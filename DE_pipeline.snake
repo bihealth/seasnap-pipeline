@@ -191,6 +191,7 @@ rule pk_dba:
 		library(DiffBind)
 		library(dplyr)
 		library(tibble)
+		library(BiocParallel)
 
 		{R_SESSION_INFO}
 		#----- variables
@@ -767,6 +768,7 @@ rule annotation:
 			# ----------------------------------------
 			library(orthomapper)
 			library(dplyr)
+			library(ChIPseeker)
 
 			config <- yaml::yaml.load_file(conf.f)
 			gene_ids <- rownames(readRDS(dds))
@@ -1067,6 +1069,7 @@ rule one_dreme:
 		if [[ -s {input.sign} && -s {input.nsign} ]] ; then
 			echo dreme -oc {output.out_dir} -p {input.sign} -n {input.nsign}  -mink 8 -maxk 14 -png
 			dreme -oc {output.out_dir} -p {input.sign} -n {input.nsign}  -mink 8 -maxk 14 -png
+			#streme -oc {output.out_dir} --p {input.sign} -n {input.nsign}  -minw 8 -maxw 14 -png
 			echo "Everything is fine"
 		else
 			echo "Input files empty, no results will be produced"

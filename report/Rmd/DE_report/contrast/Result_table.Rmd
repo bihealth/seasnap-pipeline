@@ -6,8 +6,12 @@ library(DT)
 library(magrittr)
 
 #----- load results
-res <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
-results_table <- as.data.frame(res); ids <- is.element(colnames(results_table), c("entrez", "symbol"))
+res   <- readRDS("{{contrast-rds-{{ENTRY_ID}}}}")
+annot <- readRDS(subset(file_tab, step=="annotation" & extension=="rds" & contrast=="all")$filename)
+results_table <- as.data.frame(res) 
+results_table <- merge(annot, results_table, by.x="PrimaryID", by.y=0)
+
+ids <- is.element(colnames(results_table), c("entrez", "symbol"))
 results_table <- results_table[,c(which(ids), which(!ids))]
 #
 #----- filter results

@@ -29,11 +29,16 @@ autoCplot <- function(sizes=NULL, sizes.t=NULL, frag.min=75, frag.max=1000, lag.
 
   sizes.n <- as.numeric(names(sizes.t))
   sizes.v <- as.numeric(sizes.t)
+  ord <- order(sizes.n)
+  sizes.n <- sizes.n[ord]
+  sizes.v <- sizes.v[ord]
 
   sel <- sizes.n %in% frag.min:frag.max
   if(!is.na(min.count.fract)) {
     sel <- sel & sizes.v > max(sizes.v) * min.count.fract
   }
+
+
 
 
   if(log) sizes.v <- log(sizes.v)
@@ -70,6 +75,20 @@ for(i in names(isizes)) {
 }
 
 ```
+
+**Fig.** Overal fragment length distribution.
+
+```{r fig.width=14,fig.height=7}
+isiz <- map(isizes, ~ as.matrix(.) %>% as.data.frame() %>% rownames_to_column("Length") %>% rename(count="V1"))
+isiz <- Reduce(function(x, y) merge(x, y, by="Length"), isiz)
+
+isiz.tab <- as.table(rowSums(isiz[,-1]))
+names(isiz.tab) <- isiz[["Length"]]
+
+autoCplot(sizes.t=isiz.tab, title="", frag.max=1500, min.count.fract=NA)
+
+```
+
 
 ## Peak distribution
 
