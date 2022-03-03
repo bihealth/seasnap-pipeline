@@ -113,7 +113,7 @@ dodr:
 report:
   #merge: null
   #
-  path: null
+  path: "snippets"
 
   snippet_parameters:
     Normalisation_QC:

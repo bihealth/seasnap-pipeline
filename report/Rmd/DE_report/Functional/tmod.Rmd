@@ -109,7 +109,7 @@ tmod was performed.
 
 ```{r tmod_dbs_overview_table}
 dbstat <- function(db) {
-  n <- nrow(db$dbobj$MODULES)
+  n <- length(db$dbobj)
   data.frame(ID=db$name, Name=db$title, Description=db$description, TaxonID=db$taxonID, N=n)
 }
 
@@ -254,7 +254,11 @@ gene_colors <- lapply(names(gl), function(.gl) {
 })
 names(gene_colors) <- names(gl)
 
-mlabs <- tmod_labels(ids, db$dbobj$MODULES[ids, 'Title' ], max.length=35, nlines=2)
+if(is(db$dbobj, 'tmodGS')) {
+  mlabs <- tmod_labels(ids, tmod_titles(db$dbobj[ids]), max.length=35, nlines=2)
+} else {
+  mlabs <- tmod_labels(ids, db$dbobj$MODULES[ids, 'Title' ], max.length=35, nlines=2)
+}
 
 gsymbols <- NULL
 if('SYMBOL' %in% colnames(annot)) {
@@ -269,7 +273,7 @@ for(id in ids) {
   for(.c in names(gl)) {
 		for(.s in names(gl[[.c]])) {
 			glabs <- gl[[.c]][[.s]] # gene labels
-			glabs <- glabs[ glabs %in% db$dbobj$MODULES2GENES[[id]] ]
+			#glabs <- glabs[ glabs %in% db$dbobj$MODULES2GENES[[id]] ]
 			if(!is.null(gsymbols)) {
 				gene_labs <- gsymbols[ names(glabs) ]
 			} else {
