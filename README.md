@@ -50,12 +50,18 @@ After cloning this git repository:
 ```
 git clone git@cubi-gitlab.bihealth.org:CUBI/Pipelines/sea-snap.git
 ```
+or
+```
+git clone https://github.com/bihealth/seasnap-pipeline.git
+```
+
 
 all required tools and packages can be installed via conda.
 Download and install them into a new environment called `sea_snap`:
 
 ```
-conda env create -f conda_env.yaml
+conda install mamba -n base -c conda-forge
+mamba env create -f seasnap-pipeline/conda_env.yaml
 ```
 
 The file `conda_env.yaml` is located in the main directory of the git repository.
@@ -70,7 +76,7 @@ conda activate sea_snap
 **set up a working directory**
 
 Set up a working directory to store the results produced by the pipeline.
-(For CUBI projects create a project directory in the cluster under `/fast/groups/cubi/projects/`).
+(For CUBI projects create a project directory in the cluster under `/fast/groups/cubi/work/projects/`).
 To create a directory and copy required files for the configuration of your pipeline run:
 
 ```
