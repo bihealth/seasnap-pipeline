@@ -61,14 +61,14 @@ Download and install them into a new environment called `sea_snap`:
 
 ```
 conda install mamba -n base -c conda-forge
-mamba env create -f seasnap-pipeline/conda_env.yaml
+mamba env create -f seasnap-pipeline/sea_snap4_environment.yaml
 ```
 
 The file `conda_env.yaml` is located in the main directory of the git repository.
 Each time before using SeA-SnaP, activate the environment with:
 
 ```
-conda activate sea_snap
+conda activate sea_snap4
 ```
 
 ### Running the pipeline
