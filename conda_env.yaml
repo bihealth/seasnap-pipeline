@@ -5,7 +5,29 @@ channels:
   - defaults
 dependencies:
   - python
-  - r=3.5.1 #=5.1 for bioconductor
+  - r
+
+  - bamtools
+  - bedtools
+  - fastqc
+  - macs2
+  - multiqc
+  - picard
+  - preseq
+  - qualimap
+  - rna-seqc
+  - rsa
+  - rsem
+  - rseqc
+  - salmon
+  - samtools
+  - sqlite
+  - star
+  - subread
+  - tpmcalculator
+  - trimadap
+  - vim
+  - rpy2
 
   - bioconductor-deseq2
   - bioconductor-genomicfeatures
@@ -16,30 +38,39 @@ dependencies:
   - bioconductor-goseq
   - bioconductor-apeglm
   - bioconductor-dupradar
+  - bioconductor-biomart
+  - bioconductor-enrichplot
   - bioconductor-clusterprofiler
-  - r-blob=1.2.0 #for deseq2
+  - bioconductor-go.db
+  - bioconductor-limma
+  - bioconductor-rsamtools
+  - bioconductor-rsubread
+  - bioconductor-rtracklayer
+  - r-blob
+  - r-cairo
+  - r-cellranger
+  - r-cowplot
+  - r-crayon
+  - r-devtools
+  - r-ggplot2
+  - r-ggrepel
+  - r-ggplotify
   - r-readr
+  - r-readxl
+  - r-roxygen2
+  - r-tidyr
+  - r-tidyselect
+  - r-testthat
   - r-ashr
   - r-pheatmap
   - r-shiny
   - r-msigdbr
   - r-dplyr
-  - rpy2
+  - r-biocmanager
+  - r-xml2
+  - r-xopen
 
   - drmaa
   - snakemake
 
-  - star
-  - samtools
-  - fastqc
-  - picard
-  - rsem
-  - rna-seqc
-  - qualimap
-  - preseq
-  - bedtools
-  - subread
-  - trimadap=r9
-  - salmon
-  - rseqc
-  - multiqc
+

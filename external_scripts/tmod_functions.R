@@ -251,16 +251,7 @@ msig2tmod <- function(taxon=NULL) {
   df2tmod(df, gene_id_col=ncol(df), module_id_col=2, module_title_col=1)
 }
 
-#' Convert a tmod object to a data frame with one row per gene set
-#' 
-#' @param sep separator to join the gene ids
-#' @param x a tmod object
-#' @return a data frame with one row per module
-tmod2df <- function(x, sep=";") {
-  require(tmod, quietly=TRUE)
-  g <- sapply(x$MODULES2GENES, function(xx) paste(xx, collapse=sep))
-  cbind(x$MODULES, Genes=g, stringsAsFactors=FALSE)
-}
+
 
 #' Convert a CSV file to tmod format
 #'
@@ -332,7 +323,11 @@ csv_bycol2tmod <- function(file, header=TRUE, row.names=NULL, stringsAsFactors=F
 #' @return a tmod object
 subset_tmod <- function(x, subset=NULL) {
   if(is.null(subset)) return(x)
-  m <- x$MODULES
+  if(is(x, "tmodGS")) {
+    m <- x$gs
+  } else {
+    m <- x$MODULES
+  }
 
   s <- strsplit(subset, split=" *, *")[[1]]
 
@@ -468,7 +463,7 @@ process_dbs <- function(config) {
 
     x$dbobj <- dbobj
 
-    if(nrow(dbobj$MODULES) < 1L) {
+    if(length(dbobj) < 1L) {
       warning(sprintf("process_dbs: database %s contains no gene sets and will be removed", x$name))
       x$dbobj <- NULL
     } else {
