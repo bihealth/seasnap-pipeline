@@ -134,37 +134,58 @@ rule cellranger_count:
     """ run cellranger count """
 	input:
 		reads = lambda wildcards: pph.get_fastq_pairs(wildcards, mate="*"),
-		transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
+    transcriptome = config["pipeline_param"]["transcriptome"]	
+    #transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
 	output:
-		#outdir = directory(pph.out_dir_name(step="cellranger_count")+"/cellranger_wd"),
-		#links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
+		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/cellranger_wd"),
+		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
 		done = touch(pph.file_path(step="cellranger_count", extension="done"))
 	log:
 		out = pph.file_path(step = "cellranger_count", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["cellranger_count"]["cmd_opt"],
 		feature_ref = config["pipeline_param"]["feature_ref"],
-		cellranger_exec = config["pipeline_param"]["cellranger_executable"]
+		vdj_ref = config["pipeline_param"]["vdj_ref"],
+		cellranger_exec = config["pipeline_param"]["cellranger_executable"],
+    transcriptome = config["pipeline_param"]["transcriptome"],
+    #transcriptome = config["organism"]["files"]["cellranger_transcriptome"],
+    
 	run:
 		# using feature barcodes ?
 		feature_ref = str(Path(params.feature_ref).resolve()) if params.feature_ref else ""
-
+    # using VDJ reference ?
+		vdj_ref = str(Path(params.vdj_ref).resolve()) if params.vdj_ref else ""
+		chemistry = config["sample_info"][wildcards.sample]["chemistry"]
+		
 		# create libraries file
+		# gene expression section
+
+		#lib_file_content = [f"[gene-expression]\nreference,{params.transcriptome}\nchemistry,"+chemistry+"\n"]
 		lib_file_content = ["fastqs, sample, library_type"]
-		prefixes = [p for p, t in config["sample_info"][wildcards.sample]["lib_type"]]
-		pref_dup = len(prefixes) != len(set(prefixes))
-		for lpref, ltype in config["sample_info"][wildcards.sample]["lib_type"]:
-			for lp in lpref.split(","):
-				# in some cases the same prefix is annotated in ISA tab for feature and GEX
-				# in this case use the trick of duplicating links to fastqs and
-				# adding tag_ to the prefix
-				if pref_dup and ltype != "Gene Expression":
-					lib_file_content.append(f"{Path(output.links).resolve()}, tag_{lp}, {ltype}")
-				else:
-					lib_file_content.append(f"{Path(output.links).resolve()}, {lp}, {ltype}")
-		pref_dup = "true" if pref_dup else "false"
+
+		# feature-ref section
+		#if params.feature_ref:
+	    #		lib_file_content.append("[feature]\nreference,"+feature_ref+"\n")
+		
+		# vdj-ref section
+		#if params.vdj_ref:
+	   	#	lib_file_content.append("[vdj]\nreference,"+vdj_ref+"\n")
+			
+		# libraries section
+		#lib_file_content.append("[libraries]\nfastq_id,fastqs,feature_types")
+		#prefixes = [p for p, t in config["sample_info"][wildcards.sample]["lib_type"]]
+		for ltype, libs in config["sample_info"][wildcards.sample]["lib_type"].items():
+			for lib in libs:
+			    lib_file_content.append(f"{Path(output.links).resolve()}, {lib}, {ltype}")
+				#lib_file_content.append(f"{lib},{Path(output.links).resolve()},{ltype}")
 		lib_file_content = "\n".join(lib_file_content)
 
+        #lib_file_content.append("[libraries]\nfastq_id,fastqs,feature_types")
+        #for ltype, libs in config["sample_info"][wildcards.sample]["lib_type"].items():
+        #    for lib in libs:
+        #        lib_file_content.append(f"{lib},{Path(output.links).resolve()},{ltype}")
+
+	
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
@@ -173,14 +194,7 @@ rule cellranger_count:
 		#----- collect fastq input links
 		mkdir {output.links}
 		ln -sf $(readlink -f {input.reads}) {output.links}
-		# if names are the same for feature and GEX fastqs,
-		# duplicate links with different name:
-		if {pref_dup}; then
-		  for f in {output.links}/*; do
-		    cp -av "$f" "$(dirname $f)/tag_$(basename $f)"
-		  done
-		fi
-
+		
 		#----- Cellranger counting
 		mkdir -p {output.outdir}; cd {output.outdir}; ls -lh
 		#-- write libraries file
