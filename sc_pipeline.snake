@@ -135,7 +135,6 @@ rule cellranger_count:
 	input:
 		reads = lambda wildcards: pph.get_fastq_pairs(wildcards, mate="*"),
     transcriptome = config["pipeline_param"]["transcriptome"]	
-    #transcriptome = config["organism"]["files"]["cellranger_transcriptome"]
 	output:
 		outdir = directory(pph.out_dir_name(step="cellranger_count")+"/cellranger_wd"),
 		links  = directory(pph.out_dir_name(step="cellranger_count")+"/input_links"),
@@ -148,7 +147,6 @@ rule cellranger_count:
 		vdj_ref = config["pipeline_param"]["vdj_ref"],
 		cellranger_exec = config["pipeline_param"]["cellranger_executable"],
     transcriptome = config["pipeline_param"]["transcriptome"],
-    #transcriptome = config["organism"]["files"]["cellranger_transcriptome"],
     
 	run:
 		# using feature barcodes ?
@@ -160,31 +158,11 @@ rule cellranger_count:
 		# create libraries file
 		# gene expression section
 
-		#lib_file_content = [f"[gene-expression]\nreference,{params.transcriptome}\nchemistry,"+chemistry+"\n"]
-		lib_file_content = ["fastqs, sample, library_type"]
-
-		# feature-ref section
-		#if params.feature_ref:
-	    #		lib_file_content.append("[feature]\nreference,"+feature_ref+"\n")
-		
-		# vdj-ref section
-		#if params.vdj_ref:
-	   	#	lib_file_content.append("[vdj]\nreference,"+vdj_ref+"\n")
-			
-		# libraries section
-		#lib_file_content.append("[libraries]\nfastq_id,fastqs,feature_types")
-		#prefixes = [p for p, t in config["sample_info"][wildcards.sample]["lib_type"]]
+		lib_file_content = ["fastqs, sample, library_type"]	
 		for ltype, libs in config["sample_info"][wildcards.sample]["lib_type"].items():
 			for lib in libs:
 			    lib_file_content.append(f"{Path(output.links).resolve()}, {lib}, {ltype}")
-				#lib_file_content.append(f"{lib},{Path(output.links).resolve()},{ltype}")
 		lib_file_content = "\n".join(lib_file_content)
-
-        #lib_file_content.append("[libraries]\nfastq_id,fastqs,feature_types")
-        #for ltype, libs in config["sample_info"][wildcards.sample]["lib_type"].items():
-        #    for lib in libs:
-        #        lib_file_content.append(f"{lib},{Path(output.links).resolve()},{ltype}")
-
 	
 		script = textwrap.dedent(r"""
 		#----- prepare
