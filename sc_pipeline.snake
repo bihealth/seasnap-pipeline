@@ -144,17 +144,17 @@ rule cellranger_count:
 	params:
 		options = config["rule_options"]["cellranger_count"]["cmd_opt"],
 		feature_ref = config["pipeline_param"]["feature_ref"],
-		vdj_ref = config["pipeline_param"]["vdj_ref"],
+		#vdj_ref = config["pipeline_param"]["vdj_ref"],
 		cellranger_exec = config["pipeline_param"]["cellranger_executable"],
     transcriptome = config["pipeline_param"]["transcriptome"],
     
 	run:
 		# using feature barcodes ?
 		feature_ref = str(Path(params.feature_ref).resolve()) if params.feature_ref else ""
-    # using VDJ reference ?
-		vdj_ref = str(Path(params.vdj_ref).resolve()) if params.vdj_ref else ""
-		chemistry = config["sample_info"][wildcards.sample]["chemistry"]
-		
+#    # using VDJ reference ?
+#		vdj_ref = str(Path(params.vdj_ref).resolve()) if params.vdj_ref else ""
+#		chemistry = config["sample_info"][wildcards.sample]["chemistry"]
+#		
 		# create libraries file
 		# gene expression section
 
