@@ -209,6 +209,8 @@ df2tmod <- function(df, gene_id_col=ncol(df), module_id_col=1, module_title_col=
   colnames(df)[module_id_col] <- "ID"
   colnames(df)[module_title_col] <- "Title"
 
+  df <- df[ match(names(m2g), df$ID), ]
+
   makeTmod(modules=df, modules2genes=m2g)
 }
 
