@@ -123,6 +123,9 @@ report:
 
   ## to choose other snippet parameters,
   ## take a look at sea-snap/defaults/DE_config_defaults.yaml
+
+  ## Additional directory with RMD snippets
+  path: "snippets"
  
   defaults:
     ## this is a special construct
