@@ -73,8 +73,6 @@ contrasts:
 
   ## by default: run tmod and cluster_profiler, but not tmod_pca
   defaults:
-    tmod: true 
-    tmod_pca: false
     cluster_profiler:
       run: true
   
