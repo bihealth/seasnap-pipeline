@@ -1,4 +1,4 @@
-name: sea_snap
+name: sea_snap_development
 channels:
   - bioconda
   - conda-forge
