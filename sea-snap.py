@@ -17,11 +17,16 @@ CONFIGS = dict(
 	sc="sc_config.yaml",
 )
 
-CLUSTER_CONFIG = "cluster_config.json"
+CLUSTER_CONFIG = dict(
+        sge="cluster_config_sge.json",
+        drmaa="cluster_config_drmaa.json",
+        slurm="cluster_config_slurm.json",
+)
 
 CLUSTER_START = dict(
 	sge="export /opt/sge/lib/lx-amd64/libdrmaa.so; qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
-	slurm="unset DRMAA_LIBRARY_PATH; unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	drmaa="unset DRMAA_LIBRARY_PATH; unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	slurm="unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
 )
 
 
@@ -49,8 +54,9 @@ def setup_working_directory(args):
 	for configf in config_files:
 		shutil.copy(str(configf), str(working_dir / configf.name))
 		
-	cl_config = SCRIPT_DIR / CLUSTER_CONFIG
-	shutil.copy(str(cl_config), str(working_dir / cl_config.name))
+	# copy cluster config files
+	for _, cl_config in CLUSTER_CONFIG.items():
+	    shutil.copy(str(SCRIPT_DIR / cl_config), str(working_dir / cl_config))
 
 	# symlink to wrapper
 	(working_dir / "sea-snap").symlink_to(SCRIPT_DIR / "sea-snap.py")
@@ -187,20 +193,17 @@ def run_pipeline(snakefile, args):
 			command += " " + " ".join(args.snake_options)
 	# cluster command
 	elif args.mode in ["cluster", "c"]:
-		with open(CLUSTER_CONFIG, "r") as json_file:
+		method = args.submit
+		with open(CLUSTER_CONFIG[method], "r") as json_file:
 			data = json.load(json_file)
 		Path("cluster_log").mkdir(exist_ok=True)
 		run_script = Path("run_pipeline.sh")
 		s_command  = "#!/bin/bash\nsnakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
 		s_command += " " + data["__set_run_command__"]["snake_opt"]
-		s_command += " " + "--cluster-config " + CLUSTER_CONFIG
-		if args.slurm:
-			s_command += " " + data["__set_run_command__"]["run_command_slurm"]
-		else:
-			s_command += " " + data["__set_run_command__"]["run_command_sge"]
+		s_command += " " + "--cluster-config " + CLUSTER_CONFIG[method] + " " + data["__set_run_command__"]["run_command"]
+		command = "set -e;" + CLUSTER_START[method]
 		run_script.write_text(s_command)
-		command = "set -e;" + CLUSTER_START["slurm" if args.slurm else "sge"]
 		print(command)
 	# run
 	os.system(command)
@@ -283,21 +286,21 @@ parser_select_contrast.set_defaults(func=select_contrast)
 #--- parser for mapping pipeline
 parser_mapping = subparsers.add_parser('mapping', help="run mapping pipeline")
 parser_mapping.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_mapping.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
+parser_mapping.add_argument("--submit", choices=["sge", "drmaa", "slurm"], default="slurm", help="select jobs submission method")
 parser_mapping.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_mapping.set_defaults(func=run_mapping_pipeline)
 
 #--- parser for DE pipeline
 parser_DE = subparsers.add_parser('DE', help="run DE pipeline")
 parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
+parser_DE.add_argument("--submit", choices=["sge", "drmaa", "slurm"], default="slurm", help="select jobs submission method")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
 
 #--- parser for sc pipeline
 parser_DE = subparsers.add_parser('sc', help="run single cell pipeline")
 parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
+parser_DE.add_argument("--submit", choices=["sge", "drmaa", "slurm"], default="slurm", help="select jobs submission method")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_sc_pipeline)
 
