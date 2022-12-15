@@ -755,7 +755,7 @@ rule preseq_lc_extrap:
 	log:
 		out = pph.file_path(step="preseq_lc_extrap", extension="output.log", log=True)
 	run:
-		paired   = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired   = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -777,7 +777,7 @@ rule preseq_c_curve:
 	log:
 		out = pph.file_path(step="preseq_c_curve", extension="output.log", log=True)
 	run:
-		paired   = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired   = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
