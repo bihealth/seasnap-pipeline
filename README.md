@@ -50,17 +50,29 @@ git clone git@github.com:bihealth/seasnap-pipeline.git
 ```
 
 all required tools and packages can be installed via conda.
-Download and install them into a new environment called `sea_snap`:
+Download and install them into new environments, one for the mapping and for the DE pipeline. The default enviroment names are: `seasnap-mapping` and `seasnap-de`
 
 ```
-conda env create -f conda_env.yaml
+conda env create -f conda_env_mapping.yaml
+conda env create -f conda_env_DE.yaml
 ```
 
-The file `conda_env.yaml` is located in the main directory of the git repository.
+Currently the DE pipeline additionally depends on the orthomapper R package, which needs to be installed manually and requires access to the Cubi gitlab:
+```
+conda activate seasnap-de
+cd $HOME/scratch
+git clone git@cubi-gitlab.bihealth.org:january.weiner/orthomapper.git
+R CMD INSTALL orthomapper
+cd -
+```
+
+The files `conda_env_mapping.yaml` and `conda_env_DE.yaml` are located in the main directory of the git repository.
 Each time before using SeA-SnaP, activate the environment with:
 
 ```
-conda activate sea_snap
+conda activate seasnap-mapping
+# or
+conda activate seasnap-de
 ```
 
 ### Running the pipeline
