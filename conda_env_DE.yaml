@@ -1,4 +1,4 @@
-name: seasnap-mapping
+name: seasnap-de
 channels:
   - conda-forge
   - bioconda
@@ -58,6 +58,7 @@ dependencies:
   - r-plotly
   - r-pander
   - bioconductor-vsn
+  - r-tidyverse
 
 
   - drmaa
