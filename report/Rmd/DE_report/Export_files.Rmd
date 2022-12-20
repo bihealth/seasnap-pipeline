@@ -88,12 +88,19 @@ tmod_mods <- map(tmod_db_ids, ~ {
   if(length(ids) < 1) {
     return(NULL)
   }
-  db <- tmod_dbs[[.id]]$dbobj
 
-  df <- db$MODULES %>% dplyr::filter(ID %in% ids)
-  genes <- map(df$ID, ~ db$MODULES2GENES[[.]])
+  db <- tmod_dbs[[.id]]$dbobj
+  db <- db[ ids ]
   mapping <- tmod_map$maps[[ tmod_map$dbs[.id] ]]
+
+  df <- tmod2DataFrame(db)
+
+  # translate the gene IDs to the gene IDs (or, preferably, symbols) of the
+  # project
+  genes <- getModuleMembers(df$module_id, mset=db)
+
   genes <- map(genes, ~ names(mapping)[ mapping %in% .x ])
+
   if("SYMBOL" %in% colnames(annot)) {
     genes <- map(genes, ~ {
       sym <- annot$SYMBOL[ match(.x, annot$PrimaryID) ]
@@ -101,7 +108,7 @@ tmod_mods <- map(tmod_db_ids, ~ {
     })
   }
   genes <- map_chr(genes, paste, collapse=",")
-  df$Genes <- genes
+  df$feature_id <- genes
   return(df)
 })
 
