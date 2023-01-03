@@ -14,14 +14,13 @@ SCRIPT_DIR = Path(sys.path[0])
 CONFIGS = dict(
 	DE="DE_config.yaml",
 	mapping="mapping_config.yaml",
-	sc="sc_config.yaml",
 )
 
 CLUSTER_CONFIG = "cluster_config.json"
 
 CLUSTER_START = dict(
 	sge="export /opt/sge/lib/lx-amd64/libdrmaa.so; qsub -cwd -V -pe smp 1 -l h_vmem=4G -l h_rt=100:00:00 -P control -j y -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
-	slurm="unset DRMAA_LIBRARY_PATH; unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium -o pipeline_log.out -e pipeline_log.err run_pipeline.sh",
+	slurm="""unset DISPLAY; sbatch -c 1 --mem-per-cpu=4G -t 100:00:00 -p medium  -o pipeline_log.out -e pipeline_log.err run_pipeline.sh""",
 )
 
 
@@ -191,16 +190,15 @@ def run_pipeline(snakefile, args):
 			data = json.load(json_file)
 		Path("cluster_log").mkdir(exist_ok=True)
 		run_script = Path("run_pipeline.sh")
-		s_command  = "#!/bin/bash\nsnakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
+		s_command  = """#!/bin/bash\nexport SBATCH_DEFAULTS=" --output=logs/%x-%j.log"\nsnakemake --snakefile {sfile}""".format(sfile = str(SCRIPT_DIR / snakefile))
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
 		s_command += " " + data["__set_run_command__"]["snake_opt"]
-		s_command += " " + "--cluster-config " + CLUSTER_CONFIG
-		if args.slurm:
-			s_command += " " + data["__set_run_command__"]["run_command_slurm"]
+		if args.sge:
+			s_command += " --cluster-config " + CLUSTER_CONFIG + data["__set_run_command__"]["run_command_sge"]
 		else:
-			s_command += " " + data["__set_run_command__"]["run_command_sge"]
+			s_command += " --profile=cubi-dev"
 		run_script.write_text(s_command)
-		command = "set -e;" + CLUSTER_START["slurm" if args.slurm else "sge"]
+		command = "set -e;" + CLUSTER_START["sge" if args.sge else "slurm"]
 		print(command)
 	# run
 	os.system(command)
@@ -220,13 +218,6 @@ def run_DE_pipeline(args):
 	run_pipeline("DE_pipeline.snake", args)
 
 
-def run_sc_pipeline(args):
-	"""
-	run single cell pipeline
-	"""
-	run_pipeline("sc_pipeline.snake", args)
-
-
 ############################## DEFINE PARSER
 
 parser = argparse.ArgumentParser(description="run SeA-SnaP pipelines and helpers")
@@ -237,7 +228,7 @@ subparsers = parser.add_subparsers(title="subcommands",   metavar="COMMAND", hel
 #--- parser for setup_working_directory
 parser_working_dir = subparsers.add_parser('working_dir', help="setup a working directory for running the pipeline")
 parser_working_dir.add_argument('--dirname', '-d',   default="results_%Y_%m_%d/", help="name of directory")
-parser_working_dir.add_argument('--configs', '-c', nargs='+', default=["mapping", "DE", "sc"], choices=["mapping", "DE", "sc"], help="configs to be imported")
+parser_working_dir.add_argument('--configs', '-c', nargs='+', default=["mapping", "DE"], choices=["mapping", "DE"], help="configs to be imported")
 parser_working_dir.set_defaults(func=setup_working_directory)
 
 #--- parser for generate_sample_info
@@ -283,28 +274,20 @@ parser_select_contrast.set_defaults(func=select_contrast)
 #--- parser for mapping pipeline
 parser_mapping = subparsers.add_parser('mapping', help="run mapping pipeline")
 parser_mapping.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_mapping.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
+parser_mapping.add_argument('--sge', action='store_true', help="run using SGE; default is SLURM; only used in cluster mode")
 parser_mapping.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_mapping.set_defaults(func=run_mapping_pipeline)
 
 #--- parser for DE pipeline
 parser_DE = subparsers.add_parser('DE', help="run DE pipeline")
 parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
+parser_DE.add_argument('--sge', action='store_true', help="run using SGE; default is SLURM; only used in cluster mode")
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
-
-#--- parser for sc pipeline
-parser_DE = subparsers.add_parser('sc', help="run single cell pipeline")
-parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_DE.add_argument('--slurm', action='store_true', help="run using SLURM; default is SGE; only used in cluster mode")
-parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
-parser_DE.set_defaults(func=run_sc_pipeline)
 
 #--- parser for cleanup_cluster_log
 parser_cleanup_log = subparsers.add_parser('cleanup_log', help="delete log files from cluster execution")
 parser_cleanup_log.set_defaults(func=cleanup_cluster_log)
-
 
 ############################## PARSE ARGUMENTS
 

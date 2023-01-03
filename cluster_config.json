@@ -5,7 +5,7 @@
 
         "run_command_sge": "--drmaa=\" -cwd -V -l h_vmem={cluster.h_vmem}M -l h_rt={cluster.h_rt} -pe smp {cluster.pe} -j yes -o {cluster.output} -e {cluster.errors}\"",
 
-        "run_command_slurm": "--drmaa=\" --mem-per-cpu={cluster.h_vmem} -t {cluster.h_rt} -c {cluster.pe} -p medium -o {cluster.output} -e {cluster.errors}\""
+        "run_command_slurm": "--drmaa=\" --mem-per-cpu={cluster.h_vmem} -t {cluster.h_rt} -c {cluster.pe} -p medium -o {cluster.output} -e {cluster.output}\""
     },
     
     "__default__":
@@ -35,7 +35,7 @@
 
     "salmon":
     {
-        "h_vmem": "4000",
+         "h_vmem": "4000",
         "h_rt": "40:00:00",
         "pe": "8"
     },
@@ -110,20 +110,6 @@
         "pe": "4"
     },
 
-    "cellranger_count":
-    {
-        "h_vmem": "4000",
-        "h_rt": "40:00:00",
-        "pe": "1"
-    },
-
-    "velocyto_run":
-    {
-        "h_vmem": "20000",
-        "h_rt": "40:00:00",
-        "pe": "8"
-    },
-	
     "cluster_profiler":
     {   "h_vmem": "20000",
         "h_rt": "10:00:00",

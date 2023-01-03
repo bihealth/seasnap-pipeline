@@ -225,8 +225,8 @@ rule fastqc:
 
 rule star_index:
 	input:
-		genome = config["organism"]["files"]["genome"],
-		gtf    = config["organism"]["files"]["gtf"]
+		genome = lambda wildcards: config["organism"]["files"]["genome"] if wildcards.sample=="all_samples" else config["sample_info"][wildcards.sample]["genome"],
+                gtf = lambda wildcards: config["organism"]["files"]["gtf"] if wildcards.sample=="all_samples" else config["sample_info"][wildcards.sample]["gtf"]
 	output:
 		index = pph.out_dir_name(step = "star_index")+"/SA"
 	log:
@@ -234,6 +234,9 @@ rule star_index:
 	params:
 		options = config["rule_options"]["star_index"]["cmd_opt"]
 	threads: 8
+        resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -249,9 +252,29 @@ rule star_index:
 		script_file = pph.log(log.out, snakemake_format(script), step="star_index", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+
+def get_star_index (wildcards):
+	"""get star index or compute one for all or specific samples"""
+	# if there's a sample-specific star index (precomputed)
+	if "star_index" in config["sample_info"][wildcards.sample]:
+		#print("using pre-computed star index for "+wildcards.sample)
+		return config["sample_info"][wildcards.sample]["star_index"]+"/SA"
+	# if there's a sample-specific genome and gtf
+	elif "genome" in config["sample_info"][wildcards.sample] and "gtf" in config["sample_info"][wildcards.sample]:
+		#print("using newly computed star index for "+wildcards.sample)
+		return pph.out_dir_name(step = "star_index", fix="!sample", sample = wildcards.sample)+"/SA"
+	# otherwise
+	else:
+		if "star_index" in config["organism"]["files"]:
+			#print("using pre-computed global star index for "+wildcards.sample)
+			return config["organism"]["files"]["star_index"]+"/SA"
+		else:
+			#print("using newly computed global star index for "+wildcards.sample)
+			return pph.out_dir_name(step = "star_index", fix="!sample", sample = "all_samples")+"/SA"
+
 rule star:
 	input:
-		index = pph.out_dir_name(step = "star_index", fix="all")+"/SA",
+		index = get_star_index,
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unstranded
 	output:
@@ -265,6 +288,9 @@ rule star:
 		options = config["rule_options"]["star"]["cmd_opt"],
 		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False
 	threads: 16
+        resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		# prepare read input
 		reads = ",".join(input.reads1)
