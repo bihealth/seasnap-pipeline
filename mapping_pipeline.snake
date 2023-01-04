@@ -72,9 +72,9 @@ def get_inputs_all():
 	# mapping results
 	mapping_choices = config["pipeline_param"]["mapping_results"]
 	if "star-gene_counts" in mapping_choices: 
-		inputs += pph.expand_path("star",           "bam",            fix="!sample")
+		inputs += pph.expand_path("star",	    "bam",	      fix="!sample")
 		inputs += pph.expand_path("feature_counts", "feature_counts", fix="!sample")
-		inputs += pph.expand_path("tpm_calculator", "tsv",            fix="!sample")
+		inputs += pph.expand_path("tpm_calculator", "tsv",	      fix="!sample")
 	if "salmon-transcript_counts" in mapping_choices: 
 		inputs += pph.expand_path("salmon", "sf", fix="!sample")
 	if "ciri-circRNA" in mapping_choices:
@@ -88,9 +88,9 @@ def get_inputs_all():
 	if "fastqc" in qc_choices: 
 		inputs += pph.expand_path("fastqc", "zip_names.txt")
 	if "star-gene_counts" in mapping_choices: 
-		if "dupradar"         in qc_choices: 
+		if "dupradar"	      in qc_choices: 
 			inputs += pph.expand_path("dupradar", "done", fix="!sample")
-		if "rna_seqc"         in qc_choices: 
+		if "rna_seqc"	      in qc_choices: 
 			inputs += pph.expand_path("rna_seqc", "done", fix="!sample")
 		if "preseq_lc_extrap" in qc_choices: 
 			inputs += pph.expand_path("preseq_lc_extrap", "future_yield.txt", fix="!sample")
@@ -102,7 +102,7 @@ def get_inputs_all():
 			inputs += pph.expand_path("qualimap_bamqc",   "done", fix="!sample")
 		if "infer_experiment" in qc_choices: 
 			inputs += pph.expand_path("infer_experiment", "strand_stat.txt", fix="!sample")
-		if "qc"               in qc_choices: 
+		if "qc"		      in qc_choices: 
 			inputs += pph.expand_path("qc", "done", fix="!sample")
 		if "bw_from_bam"      in qc_choices:
 			inputs += pph.expand_path("bw_from_bam", "bw", fix="!sample")
@@ -129,9 +129,9 @@ rule all:
 		quality_control = "".join(["- {}\n".format(qc) for qc in config["pipeline_param"]["QC_results"]])
 		loctime = asctime(localtime(time()))
 		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", fix="all")
-		summary        = pph.file_path("pipeline_report", "summary.csv",        fix="all")
-		version_info   = pph.file_path("pipeline_report", "version_info.txt",   fix="all")
-		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",     fix="all")
+		summary        = pph.file_path("pipeline_report", "summary.csv",	fix="all")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt",	fix="all")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",	fix="all")
 		dag = rule_execution.split("/")[-1]
 		shell("conda list > {}".format(version_info))
 		shell("conda info > {}".format(conda_info))
@@ -198,9 +198,11 @@ rule fastqc:
 	log:
 		out  = pph.file_path(step="fastqc", extension="output.log", log=True)
 	params:
-		outdir  = pph.out_dir_name(step="fastqc")
-	threads:
-		2
+		outdir	= pph.out_dir_name(step="fastqc")
+	threads: 2
+	resources:
+		mem_mb=4000,
+		h_rt="24:00:00"
 	run:
 		reads = " ".join(input)
 		
@@ -226,7 +228,7 @@ rule fastqc:
 rule star_index:
 	input:
 		genome = lambda wildcards: config["organism"]["files"]["genome"] if wildcards.sample=="all_samples" else config["sample_info"][wildcards.sample]["genome"],
-                gtf = lambda wildcards: config["organism"]["files"]["gtf"] if wildcards.sample=="all_samples" else config["sample_info"][wildcards.sample]["gtf"]
+		gtf = lambda wildcards: config["organism"]["files"]["gtf"] if wildcards.sample=="all_samples" else config["sample_info"][wildcards.sample]["gtf"]
 	output:
 		index = pph.out_dir_name(step = "star_index")+"/SA"
 	log:
@@ -234,8 +236,8 @@ rule star_index:
 	params:
 		options = config["rule_options"]["star_index"]["cmd_opt"]
 	threads: 8
-        resources:
-		mem_mb=32000,
+	resources:
+		mem_mb=64000,
 		h_rt="24:00:00"
 	run:
 		script = textwrap.dedent(r"""
@@ -258,19 +260,19 @@ def get_star_index (wildcards):
 	# if there's a sample-specific star index (precomputed)
 	if "star_index" in config["sample_info"][wildcards.sample]:
 		#print("using pre-computed star index for "+wildcards.sample)
-		return config["sample_info"][wildcards.sample]["star_index"]+"/SA"
+		return config["sample_info"][wildcards.sample]["star_index"] + "/SA"
 	# if there's a sample-specific genome and gtf
 	elif "genome" in config["sample_info"][wildcards.sample] and "gtf" in config["sample_info"][wildcards.sample]:
 		#print("using newly computed star index for "+wildcards.sample)
-		return pph.out_dir_name(step = "star_index", fix="!sample", sample = wildcards.sample)+"/SA"
+		return pph.out_dir_name(step = "star_index", fix="!sample", sample = wildcards.sample) + "/SA"
 	# otherwise
 	else:
-		if "star_index" in config["organism"]["files"]:
+		if "star_index" in config["organism"] and config["organism"]["star_index"] is not None:
 			#print("using pre-computed global star index for "+wildcards.sample)
-			return config["organism"]["files"]["star_index"]+"/SA"
+			return config["organism"]["star_index"] + "/SA"
 		else:
 			#print("using newly computed global star index for "+wildcards.sample)
-			return pph.out_dir_name(step = "star_index", fix="!sample", sample = "all_samples")+"/SA"
+			return pph.out_dir_name(step = "star_index", fix="all") + "/SA"
 
 rule star:
 	input:
@@ -278,9 +280,9 @@ rule star:
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
 		reads2 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=1) #identical if unstranded
 	output:
-		bam         =      pph.file_path(step="star", extension="bam"),
+		bam	    =	   pph.file_path(step="star", extension="bam"),
 		usrt_bam    = temp(pph.file_path(step="star", extension="unsorted.bam")),
-		gene_counts =      pph.file_path(step="star", extension="gene_counts.tab")
+		gene_counts =	   pph.file_path(step="star", extension="gene_counts.tab")
 	log:
 		out = pph.file_path(step="star", extension="output.log", log=True)
 	params:
@@ -288,8 +290,8 @@ rule star:
 		options = config["rule_options"]["star"]["cmd_opt"],
 		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False
 	threads: 16
-        resources:
-		mem_mb=32000,
+	resources:
+		mem_mb=48000,
 		h_rt="24:00:00"
 	run:
 		# prepare read input
@@ -365,6 +367,9 @@ rule bw_from_bam:
 		pph.file_path(step="bw_from_bam", extension="bw")
 	log:
 		out = pph.file_path(step="bw_from_bam", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="4:00:00"
 	run:
 		genome_size=config["organism"]["genome_size"]
 		script = textwrap.dedent(r"""
@@ -393,6 +398,9 @@ rule macs2:
 		pn=pph.file_path(step="macs2", extension="peaks.narrowPeak")
 	log:
 		out = pph.file_path(step="macs2", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		genome_abbr=config["organism"]["abbreviation"]
 		script = textwrap.dedent(r"""
@@ -429,6 +437,9 @@ rule tpm_calculator:
 		out = pph.file_path(step="tpm_calculator", extension="output.log", log=True)
 	params:
 		nsrt_bam = pph.file_path(step="tpm_calculator", extension="name_sorted.bam")
+	resources:
+		mem_mb=4000,
+		h_rt="4:00:00"
 	run:
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -459,6 +470,9 @@ rule bwa_index:
 		out = pph.file_path(step="bwa_index", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["bwa_index"]["cmd_opt"]
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		db_prefix = os.path.join(output.index, GENOME_FILE_NAME)
 		
@@ -494,6 +508,9 @@ rule bwa:
 		trim = True if config["rule_options"]["bwa"]["trim"]=="yes" else False,
 		run_stats = "true" if config["rule_options"]["bwa"]["run_stats"] else "false"
 	threads: 8
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		db_prefix = os.path.join(params.index_dir, GENOME_FILE_NAME)
 
@@ -556,6 +573,9 @@ rule ciri:
 		sam = pph.file_path(step="ciri", extension="sam"),
 		options = config["rule_options"]["ciri"]["cmd_opt"]
 	threads: 8
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		samtools_threads = threads//2
 
@@ -586,6 +606,9 @@ rule generate_transcriptome:
 	log:
 		out = pph.file_path(step = "generate_transcriptome", extension="output.log", log=True)
 	threads: 8
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -603,13 +626,16 @@ rule generate_transcriptome:
 rule salmon_index:
 	input:
 		transcriptome = pph.out_dir_name(step = "generate_transcriptome")+"/transcriptome.fa",
-		genome        = config["organism"]["files"]["genome"]
+		genome	      = config["organism"]["files"]["genome"]
 	output:
 		index = pph.out_dir_name(step = "salmon_index")+"/pos.bin"
 	log:
 		out = pph.file_path(step = "salmon_index", extension="output.log", log=True)
 	params:
 		options = config["rule_options"]["salmon_index"]["cmd_opt"]
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -648,6 +674,9 @@ rule salmon:
 		options = config["rule_options"]["salmon"]["cmd_opt"],
 		trim = True if config["rule_options"]["salmon"]["trim"]=="yes" else False
 	threads: 8
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		# prepare read input and trimming
 		unpaired = input.reads1 == input.reads2
@@ -690,11 +719,14 @@ rule feature_counts:
 		out = pph.file_path(step="feature_counts", extension="output.log", log=True)
 	params:
 		nsrt_bam = pph.file_path(step="feature_counts", extension="name_sorted.bam"),
-                options = config["rule_options"]["feature_counts"]["cmd_opt"]
+		options = config["rule_options"]["feature_counts"]["cmd_opt"]
 	threads: 2
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
-		paired   = "-p" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired	 = "-p" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -725,9 +757,12 @@ rule dupradar:
 	log:
 		out = pph.file_path(step="dupradar", extension="output.log", log=True)
 	threads: 8
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		protocol = {"unstranded":0, "forward":1, "reverse":2}[config["sample_info"][wildcards.sample]["stranded"]]
-		paired  = "TRUE" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "FALSE"
+		paired	= "TRUE" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "FALSE"
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -759,6 +794,9 @@ rule infer_experiment:
 		pph.file_path(step="infer_experiment", extension="strand_stat.txt")
 	log:
 		out = pph.file_path(step="infer_experiment", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -780,8 +818,11 @@ rule preseq_lc_extrap:
 		pph.file_path(step="preseq_lc_extrap", extension="future_yield.txt")
 	log:
 		out = pph.file_path(step="preseq_lc_extrap", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
-		paired   = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired	 = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -802,8 +843,11 @@ rule preseq_c_curve:
 		pph.file_path(step="preseq_c_curve", extension="complexity.txt")
 	log:
 		out = pph.file_path(step="preseq_c_curve", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
-		paired   = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired	 = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -829,10 +873,11 @@ rule qualimap_rnaseq:
 	log:
 		out = pph.file_path(step="qualimap_rnaseq", extension="output.log", log=True)
 	resources:
-		mem_mb = 24000
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
-		paired   = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired	 = "-pe" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -860,7 +905,8 @@ rule qualimap_bamqc:
 	log:
 		out = pph.file_path(step="qualimap_bamqc", extension="output.log", log=True)
 	resources:
-		mem_mb = 24000
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		protocol = {"unstranded":"non-strand-specific", "forward":"strand-specific-forward", "reverse":"strand-specific-reverse"}[config["sample_info"][wildcards.sample]["stranded"]]
 		
@@ -891,6 +937,9 @@ rule collapse_annotation:
 		pph.file_path(step="collapse_annotation", extension="genes.gtf")
 	log:
 		out = pph.file_path(step="collapse_annotation", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	run:
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -911,11 +960,14 @@ rule rna_seqc:
 		touch(pph.file_path(step="rna_seqc", extension="done"))
 	log:
 		out = pph.file_path(step="rna_seqc", extension="output.log", log=True)
+	resources:
+		mem_mb=32000,
+		h_rt="24:00:00"
 	params:
 		options = config["rule_options"]["rna_seqc"]["cmd_opt"]
 	run:
 		protocol = {"unstranded":"", "forward":"--stranded=FR", "reverse":"--stranded=RF"}[config["sample_info"][wildcards.sample]["stranded"]]
-		paired   = "" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "--unpaired"
+		paired	 = "" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else "--unpaired"
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -944,6 +996,9 @@ rule qc:
 		touch(pph.file_path(step="qc", extension="done"))
 	log:
 		out = pph.file_path(step="qc", extension="output.log", log=True)
+	resources:
+		mem_mb=4000,
+		h_rt="4:00:00"
 	run:
 		paired = '' if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else '-e'
 		
@@ -968,8 +1023,11 @@ rule multiqc:
 	output:
 		pph.file_path(step="multiqc", extension="qc_report.html")
 	log:
-		out            = pph.file_path(step="multiqc", extension="output.log",        log=True),
+		out	       = pph.file_path(step="multiqc", extension="output.log",	      log=True),
 		multiqc_config = pph.file_path(step="multiqc", extension="multiqc_conf.yaml", log=True)
+	resources:
+		mem_mb=4000,
+		h_rt="4:00:00"
 	run:
 		# compile multiqc config
 		multiqc_dict = config["report"]["multiqc"]
@@ -1004,6 +1062,9 @@ rule circRNA_report:
 		get_inputs_all()
 	output:
 		pph.file_path("circRNA_report", "Rmd", sample="all_samples", flowcell="all_flowcells", lane="all_lanes", mate="all_mates", library="all_libraries")
+	resources:
+		mem_mb=4000,
+		h_rt="4:00:00"
 	run:
 		rt = ReportTool(pph, profile="circRNA")
 		report_text = rt.generate_report()
@@ -1015,7 +1076,7 @@ rule circRNA_report:
 			pph.log_generated_files(save_to=file_table, path_pattern=path)
 			id_suffix, _ = rt.get_id_suffix(tag, num)
 			text_sub["file_tab"] += (f'file_tab{id_suffix} <- data.frame(read.table("{file_table}", sep="\\t", header=TRUE))\n'
-			                         f'file_tab{id_suffix}$filename <- as.character(file_tab{id_suffix}$filename)\n')
+						 f'file_tab{id_suffix}$filename <- as.character(file_tab{id_suffix}$filename)\n')
 			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
 
 		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)

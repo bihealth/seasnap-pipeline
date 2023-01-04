@@ -190,7 +190,7 @@ def run_pipeline(snakefile, args):
 			data = json.load(json_file)
 		Path("cluster_log").mkdir(exist_ok=True)
 		run_script = Path("run_pipeline.sh")
-		s_command  = """#!/bin/bash\nexport SBATCH_DEFAULTS=" --output=logs/%x-%j.log"\nsnakemake --snakefile {sfile}""".format(sfile = str(SCRIPT_DIR / snakefile))
+		s_command  = "#!/bin/bash\nsnakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
 		s_command += " " + data["__set_run_command__"]["snake_opt"]
 		if args.sge:
