@@ -164,7 +164,7 @@ def cleanup_cluster_log(args):
 					item.unlink()
 			dir_path.rmdir()
 
-	rmdir("cluster_log")
+	rmdir("logs")
 	for p in Path(".").glob("temp_snakemake*.sh"): p.unlink()
 	for p in Path(".").glob("run_pipeline.sh"): p.unlink()
 	for p in Path(".").glob("core.*"): p.unlink()
@@ -188,7 +188,7 @@ def run_pipeline(snakefile, args):
 	elif args.mode in ["cluster", "c"]:
 		with open(CLUSTER_CONFIG, "r") as json_file:
 			data = json.load(json_file)
-		Path("cluster_log").mkdir(exist_ok=True)
+		#Path("cluster_log").mkdir(exist_ok=True)
 		run_script = Path("run_pipeline.sh")
 		s_command  = "#!/bin/bash\nsnakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
