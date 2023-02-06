@@ -73,18 +73,19 @@
     * edit other options and parameters to your taste, but basically you
       ready to go.
 
- 4. Generate the file `samples.info` using the command `sea-snap.py sample_info`
+ 4. Generate the file `sample_info.yaml` using the command `sea-snap.py sample_info`
 
     * If you have a custom extension to your read files, then use the
       `--add_ext` option.
     * A common problem is that the `in_path_pattern` defined in the
       `mapping_config.yaml` file does not match the actual file paths. 
     * After successfully running this step, make sure that the
-      automatically generated `samples.info` file is correct.
+      automatically generated `sample_info.yaml` file is correct.
 
  5. Run the pipeline with `./sea-snap mapping l` on a local machine or
-    `./sea-snap mapping c` on the computing cluster. To run on SLURM nodes,
-    run `./sea-snap mapping --slurm c`.
+    `./sea-snap mapping c` on the computing cluster. 
+    
+    To run using SGE scheduler, run `./sea-snap mapping --sge c` (deprecated; check DRMAA config)
  
  6. So, where is the report? Where is the QC? Just take a look at
     `mapping/multiqc/all_samples.all_mates/out/multiqc.all_samples.all_mates.qc_report.html`,
