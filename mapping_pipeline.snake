@@ -822,7 +822,7 @@ rule preseq_lc_extrap:
 		mem_mb=32000,
 		h_rt="24:00:00"
 	run:
-		paired	 = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired	 = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
@@ -847,7 +847,7 @@ rule preseq_c_curve:
 		mem_mb=32000,
 		h_rt="24:00:00"
 	run:
-		paired	 = "-P -l 10000000" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
+		paired	 = "-P" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"])>1 else ""
 		
 		script = textwrap.dedent(r"""
 		#----- prepare
