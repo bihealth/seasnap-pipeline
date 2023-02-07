@@ -61,19 +61,19 @@ and `sea_snap_de`:
 
 ```
 conda env create -f conda_env_mapping.yaml
-conda env create -f conda_env_de.yaml
+conda env create -f conda_env_DE.yaml
 ```
 
-The files `conda_env_mapping.yaml` and `conda_env_de.yaml` are located in the main directory of the git repository.
+The files `conda_env_mapping.yaml` and `conda_env_DE.yaml` are located in the main directory of the git repository.
 Each time before using SeA-SnaP, activate the environment with:
 
 ```
-conda activate sea_snap_mapping
+conda activate seasnap-mapping
 ```
 
 or 
 ```
-conda activate sea_snap_de
+conda activate seasnap-de
 ```
 
 ### Running the pipeline

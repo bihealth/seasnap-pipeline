@@ -1,35 +1,13 @@
-name: sea_snap
+name: seasnap-de
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
-  - python
-  - r
-
-  - bamtools
-  - bedtools
-  - fastqc
-  - macs2
-  - multiqc
-  - picard
-  - preseq
-  - qualimap
-  - rna-seqc
-  - rsa
-  - rsem
-  - rseqc
-  - salmon
-  - samtools
-  - sqlite
-  - star
-  - subread
-  - tpmcalculator
-  - trimadap
-  - vim
-  - rpy2
-
-  - bioconductor-deseq2
+  - python>=3.9
+  - snakemake=7.19
+  - r-base>=4.1
+  - bioconductor-deseq2=1.38
   - bioconductor-genomicfeatures
   - bioconductor-annotationdbi
   - bioconductor-org.hs.eg.db # annotation for human
@@ -37,7 +15,6 @@ dependencies:
   - bioconductor-tximport
   - bioconductor-goseq
   - bioconductor-apeglm
-  - bioconductor-dupradar
   - bioconductor-biomart
   - bioconductor-enrichplot
   - bioconductor-clusterprofiler
@@ -48,7 +25,6 @@ dependencies:
   - bioconductor-rtracklayer
   - r-blob
   - r-cairo
-  - r-cellranger
   - r-cowplot
   - r-crayon
   - r-devtools
@@ -57,6 +33,7 @@ dependencies:
   - r-ggplotify
   - r-readr
   - r-readxl
+  - r-writexl
   - r-roxygen2
   - r-tidyr
   - r-tidyselect
@@ -64,13 +41,17 @@ dependencies:
   - r-ashr
   - r-pheatmap
   - r-shiny
-  - r-msigdbr
+  - r-msigdbr>=7.4
   - r-dplyr
   - r-biocmanager
   - r-xml2
   - r-xopen
-
+  - r-tmod>=0.50.11
+# Required for the actual report
+  - r-dt
+  - r-purrr
+  - r-plotly
+  - r-pander
+  - bioconductor-vsn
+  - r-tidyverse
   - drmaa
-  - snakemake
-
-
