@@ -21,7 +21,6 @@ dependencies:
   - sqlite
   - star=2.7.3a
   - subread=2.0
-  - tpmcalculator
   - trimadap
   - drmaa
   - bioconductor-dupradar
