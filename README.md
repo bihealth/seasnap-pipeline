@@ -76,6 +76,13 @@ or
 conda activate seasnap-de
 ```
 
+Finally, run the following command in the seasnap-de environment:
+
+```
+conda activate seasnap-de
+Rscript install_r_packages.R
+```
+
 ### Running the pipeline
 
 **set up a working directory**
