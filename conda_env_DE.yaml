@@ -38,6 +38,7 @@ dependencies:
   - r-tidyr
   - r-tidyselect
   - r-testthat
+  - r-remotes
   - r-ashr
   - r-pheatmap
   - r-shiny
