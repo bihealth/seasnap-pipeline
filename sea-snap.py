@@ -289,13 +289,6 @@ parser_DE.add_argument("--submit", choices=["sge", "drmaa", "slurm"], default="s
 parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
 parser_DE.set_defaults(func=run_DE_pipeline)
 
-#--- parser for sc pipeline
-parser_DE = subparsers.add_parser('sc', help="run single cell pipeline")
-parser_DE.add_argument('mode', choices=["local","l","cluster","c"], help="run locally or on cluster?")
-parser_DE.add_argument("--submit", choices=["sge", "drmaa", "slurm"], default="slurm", help="select jobs submission method")
-parser_DE.add_argument('snake_options', nargs=argparse.REMAINDER, help="pass options to snakemake (...)")
-parser_DE.set_defaults(func=run_sc_pipeline)
-
 #--- parser for cleanup_cluster_log
 parser_cleanup_log = subparsers.add_parser('cleanup_log', help="delete log files from cluster execution")
 parser_cleanup_log.set_defaults(func=cleanup_cluster_log)
