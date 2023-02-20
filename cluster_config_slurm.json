@@ -20,14 +20,14 @@
     "star":
     {
         "mem": "60000M",
-        "time": "40:00:00",
+        "time": "8:00:00",
         "cpus-per-task": 8
     },
 
     "star_index":
     {
         "mem": "40000M",
-        "time": "40:00:00",
+        "time": "8:00:00",
         "cpus-per-task": 8
     },
 
@@ -136,9 +136,19 @@
     "tmod_dbs":
     {
         "mem": "16000M",
-        "time": "40:00:00",
+        "time": "8:00:00",
+        "cpus-per-task": 8
+    },
+
+    "cluster_profiler":
+    {
+        "mem": "8000M",
+        "time": "4:00:00",
         "cpus-per-task": 8
     }
 
+
 }
+
+
 
