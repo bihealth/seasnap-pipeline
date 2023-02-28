@@ -4,7 +4,8 @@ library(glue)
 #' Volcano plots with ggplot
 ggvolcano <- function(lfc, pvals, symbol=NULL, xlim=NULL, ylim=NULL, pval.thr=.05, lfc.thr=1) {
 
-  require(tidyverse)
+  require(dplyr)
+  require(purrr)
   require(ggplot2)
 
   p.t <- pval.thr
@@ -52,7 +53,8 @@ tmod_filter_format_res <- function(res, pval.thr=.05, AUC.thr=.65) {
 
   if(is.null(res)) { return(res) }
 
-  require(tidyverse)
+  require(dplyr)
+  require(purrr)
   require(DT)
 
   res <- res %>% 
