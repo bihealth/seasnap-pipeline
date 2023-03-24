@@ -42,7 +42,7 @@ pipeline_param:
     mapping:
       - import_gene_counts
       - import_sf
-      - import_feature_counts
+      - import_featurecounts
 
 
 
