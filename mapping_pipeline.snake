@@ -341,7 +341,7 @@ rule star:
 		mv {params.outdir}/Aligned.out.bam {output.usrt_bam}
 		
 		#----- mark duplicates
-		picard MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir}
+		picard -Xmx48G MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir}
 		mv {params.outdir}/{wildcards.sample}.mdup.bam {output.bam}
 
 		#----- generate BAM index (.bai)
