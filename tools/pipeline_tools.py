@@ -1445,7 +1445,6 @@ class SampleInfoTool(PipelinePathHandler):
 			if comb.sample not in sample_info:
 				sample_info[comb.sample] = {"stranded": library_default, "read_extension": comb.read_extension}
 				sample_info[comb.sample]["paired_end_extensions"] = [getattr(comb, "mate", "")]
-				sample_info[comb.sample]["lib_types"] = {comb.lib_type: None} if hasattr(comb, "lib_type") else {}
 			else:
 				if hasattr(comb, "mate"):
 					paired_end_ext = getattr(comb, "mate", "")
@@ -1457,14 +1456,6 @@ class SampleInfoTool(PipelinePathHandler):
 					if paired_end_ext not in paired_end_ext_lst:
 						paired_end_ext_lst.append(paired_end_ext)
 						paired_end_ext_lst.sort()
-				if hasattr(comb, "lib_type"):
-					lib_types = sample_info[comb.sample]["lib_types"]
-					if lib_types == {}:
-						raise ValueError(
-							"Error compiling sample information: sample {} has names with and without library type information".format(
-								comb.lib_type))
-					if comb.lib_type not in lib_types:
-						lib_types[comb.lib_type] = None
 		if add:
 			# add missing fields
 			self._add_info_fields(sample_info)

@@ -14,7 +14,6 @@ SCRIPT_DIR = Path(sys.path[0])
 CONFIGS = dict(
 	DE="DE_config.yaml",
 	mapping="mapping_config.yaml",
-	sc="sc_config.yaml",
 )
 
 CLUSTER_CONFIG = dict(
@@ -171,7 +170,7 @@ def cleanup_cluster_log(args):
 					item.unlink()
 			dir_path.rmdir()
 
-	rmdir("cluster_log")
+	rmdir("logs")
 	for p in Path(".").glob("temp_snakemake*.sh"): p.unlink()
 	for p in Path(".").glob("run_pipeline.sh"): p.unlink()
 	for p in Path(".").glob("core.*"): p.unlink()
@@ -196,7 +195,7 @@ def run_pipeline(snakefile, args):
 		method = args.submit
 		with open(CLUSTER_CONFIG[method], "r") as json_file:
 			data = json.load(json_file)
-		Path("cluster_log").mkdir(exist_ok=True)
+		#Path("cluster_log").mkdir(exist_ok=True)
 		run_script = Path("run_pipeline.sh")
 		s_command  = "#!/bin/bash\nsnakemake --snakefile {sfile}".format(sfile = str(SCRIPT_DIR / snakefile))
 		if args.snake_options: s_command += " " + " ".join(args.snake_options)
@@ -223,13 +222,6 @@ def run_DE_pipeline(args):
 	run_pipeline("DE_pipeline.snake", args)
 
 
-def run_sc_pipeline(args):
-	"""
-	run single cell pipeline
-	"""
-	run_pipeline("sc_pipeline.snake", args)
-
-
 ############################## DEFINE PARSER
 
 parser = argparse.ArgumentParser(description="run SeA-SnaP pipelines and helpers")
@@ -240,7 +232,7 @@ subparsers = parser.add_subparsers(title="subcommands",   metavar="COMMAND", hel
 #--- parser for setup_working_directory
 parser_working_dir = subparsers.add_parser('working_dir', help="setup a working directory for running the pipeline")
 parser_working_dir.add_argument('--dirname', '-d',   default="results_%Y_%m_%d/", help="name of directory")
-parser_working_dir.add_argument('--configs', '-c', nargs='+', default=["mapping", "DE", "sc"], choices=["mapping", "DE", "sc"], help="configs to be imported")
+parser_working_dir.add_argument('--configs', '-c', nargs='+', default=["mapping", "DE"], choices=["mapping", "DE"], help="configs to be imported")
 parser_working_dir.set_defaults(func=setup_working_directory)
 
 #--- parser for generate_sample_info
@@ -307,7 +299,6 @@ parser_DE.set_defaults(func=run_sc_pipeline)
 #--- parser for cleanup_cluster_log
 parser_cleanup_log = subparsers.add_parser('cleanup_log', help="delete log files from cluster execution")
 parser_cleanup_log.set_defaults(func=cleanup_cluster_log)
-
 
 ############################## PARSE ARGUMENTS
 

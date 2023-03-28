@@ -46,21 +46,39 @@ Quick-Start
 After cloning this git repository:
 
 ```
-git clone git@cubi-gitlab.bihealth.org:CUBI/Pipelines/sea-snap.git
+git clone git@cubi-gitlab.bihealth.org:CUBI/Pipelines/seasnap-pipeline.git
 ```
 
 all required tools and packages can be installed via conda.
-Download and install them into a new environment called `sea_snap`:
+
+Currently there are two separate conda environments, one for the mapping
+pipeline and one for the DE pipeline
+
+Download and install them into new environments called `sea_snap_mapping`
+and `sea_snap_de`:
 
 ```
-conda env create -f conda_env.yaml
+conda env create -f conda_env_mapping.yaml
+conda env create -f conda_env_DE.yaml
 ```
 
-The file `conda_env.yaml` is located in the main directory of the git repository.
+The files `conda_env_mapping.yaml` and `conda_env_DE.yaml` are located in the main directory of the git repository.
 Each time before using SeA-SnaP, activate the environment with:
 
 ```
-conda activate sea_snap
+conda activate seasnap-mapping
+```
+
+or 
+```
+conda activate seasnap-de
+```
+
+Finally, run the following command in the seasnap-de environment:
+
+```
+conda activate seasnap-de
+Rscript install_r_packages.R
 ```
 
 ### Running the pipeline
@@ -90,7 +108,6 @@ The next steps depend on, whether you want to run:
 
 - [**`The mapping pipeline`**](documentation/run_mapping.md)
 - [**`The DE pipeline`**](documentation/run_DE.md)
-- [**`The sc pipeline`**](documentation/run_sc.md)
 
 The results of an analysis can also be [`exported`](documentation/export.md) to a new folder structure, e.g. to upload them to SODAR.
 

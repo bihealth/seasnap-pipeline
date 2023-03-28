@@ -1,0 +1,28 @@
+name: seasnap-mapping
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python>=3.9
+  - snakemake=7.19
+  - bamtools
+  - bedtools
+  - fastqc
+  - macs2
+  - multiqc
+  - picard
+  - preseq
+  - qualimap
+  - rna-seqc
+  - rsem
+  - salmon
+  - samtools=1.16
+  - sqlite
+  - star=2.7.3a
+  - subread=2.0
+  - trimadap
+  - drmaa
+  - bioconductor-dupradar
+  - rseqc
+  - bwa

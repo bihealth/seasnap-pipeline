@@ -98,6 +98,8 @@ Feel free to extend the config file and push it back to gitlab. In this way the 
 
 For an explanation how to export to SODAR see [`SODAR export`](export.md).
 
+**Note: to use sample-specific STAR indices, add entries `star_index: /path/to/star_index/` (careful: must be compatible with STAR version in the pipeline!) or `genome: /path/to/genome.fa` and `gtf: /path/to/gtf` for auto-creation to the `sample_info.yaml`**
+
 ---
 
 [Back](../README.md) to main doc.
