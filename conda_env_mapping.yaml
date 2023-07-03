@@ -4,6 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - bwa
   - python>=3.9
   - snakemake=7.19
   - bamtools

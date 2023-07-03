@@ -109,6 +109,8 @@ def get_inputs_all():
 	# ATAC-seq
 	if "ATAC_Seq" in config["pipeline_param"]:
 		atacseq_choices = config["pipeline_param"]["ATAC_Seq"]
+		inputs += pph.expand_path("bwa", "bam", fix="!sample")
+		inputs += pph.expand_path("sorted_bam", "bam", fix="!sample")
 		if "macs2" in atacseq_choices:
 			inputs += pph.expand_path("macs2", "summits.bed", fix="!sample")
 	
@@ -128,9 +130,9 @@ rule all:
 		quality_control = "".join(["- {}\n".format(qc) for qc in config["pipeline_param"]["QC_results"]])
 		loctime = asctime(localtime(time()))
 		rule_execution = pph.file_path("pipeline_report", "rule_execution.png", fix="all")
-		summary        = pph.file_path("pipeline_report", "summary.csv",	fix="all")
-		version_info   = pph.file_path("pipeline_report", "version_info.txt",	fix="all")
-		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",	fix="all")
+		summary        = pph.file_path("pipeline_report", "summary.csv",      fix="all")
+		version_info   = pph.file_path("pipeline_report", "version_info.txt", fix="all")
+		conda_info     = pph.file_path("pipeline_report", "conda_info.txt",   fix="all")
 		dag = rule_execution.split("/")[-1]
 		shell("conda list > {}".format(version_info))
 		shell("conda info > {}".format(conda_info))
@@ -361,7 +363,7 @@ rule star:
 ## -----------------------------------------------------------------------------------
 rule bw_from_bam:
 	input:
-		bam = pph.file_path(step="star", extension="bam"),
+		bam = pph.file_path(step="sorted_bam", extension="bam"),
 	output:
 		pph.file_path(step="bw_from_bam", extension="bw")
 	log:
@@ -383,6 +385,33 @@ rule bw_from_bam:
 		script_file = pph.log(log.out, snakemake_format(script), step="bw_from_bam", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+## We need to sort the BWA bams for bamCoverage. We need BWA because MACS2
+## doesn't work with STAR for some reason.
+rule sorted_bam:
+	input:
+		bam = pph.file_path(step="bwa", extension="bam"),
+	output:
+		bam = pph.file_path(step="sorted_bam", extension="bam"),
+		csv = pph.file_path(step="sorted_bam", extension="csv")
+	log:
+		out = pph.file_path(step="sorted_bam", extension="output.log", log=True)
+	threads: 6
+	resources:
+		mem_mb=32000,
+		h_rt="4:00:00"
+	run:
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+
+		samtools sort -@ {threads} -O bam -o {output.bam} {input.bam}
+		samtools index {output.bam}
+    samtools view -f66 {output.bam} | cut -f 9 > {output.csv}
+		""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="sorted_bam", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
 
 
 
@@ -391,7 +420,8 @@ rule bw_from_bam:
 ## -----------------------------------------------------------------------------------
 rule macs2:
 	input:
-		bam = pph.file_path(step="star", extension="bam"),
+		#bam = pph.file_path(step="star", extension="bam"),
+		bam = pph.file_path(step="bwa", extension="bam")
 	output:
 		bed=pph.file_path(step="macs2", extension="summits.bed"),
 		pn=pph.file_path(step="macs2", extension="peaks.narrowPeak")
