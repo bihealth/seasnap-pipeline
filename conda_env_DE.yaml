@@ -23,6 +23,10 @@ dependencies:
   - bioconductor-rsamtools
   - bioconductor-rsubread
   - bioconductor-rtracklayer
+  - bioconductor-biocparallel
+  - bioconductor-diffbind
+  - bioconductor-chipseeker
+  - bioconductor-genomicranges
   - r-blob
   - r-cairo
   - r-cowplot

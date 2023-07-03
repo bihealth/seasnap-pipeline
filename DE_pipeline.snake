@@ -60,11 +60,12 @@ onstart:
 def get_inputs_all():
 	#contrasts
 	inputs = pph.expand_path(step="contrast", extension="rds")
+ 	inputs.append(pph.expand_path(step="motif_search_meme", extension="rds", if_set = dict(meme=dict(run=True))))
+ 	inputs.append(pph.file_path(step="isizes", extension="rds", contrast = "all"))
 	
 	#functional annotation
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
-	#inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
   # XXX uncomment the following line to run tmod_pca
@@ -175,6 +176,107 @@ rule TxDb_from_GTF:
 ##-------------------- import -------------------------------------------------------------------------------
 
 DESIGN = config["experiment"]["design_formula"]
+
+## ------------------ for ATAC-Seq ---------------------------------------------------
+rule pk_dba:
+	""" use DiffBind to import peaks and their counts from macs2 output """
+	input:
+		samples = config["experiment"]["covariate_file"]["macs2"]
+	output:
+		rds=pph.file_path("pk_dba", "rds", contrast="all")
+	log:
+		out=pph.file_path("pk_dba", "output.log", contrast="all", log=True)
+	run:
+		script = textwrap.dedent(r"""
+		library(DiffBind)
+		library(dplyr)
+		library(tibble)
+		library(BiocParallel)
+
+		#----- variables
+		sample_f  <- "{input.samples}"
+		output.rds <- "{output.rds}"
+		options(mc.cores=2)
+		MulticoreParam()
+
+		sample_df <- read.table(sample_f, header=TRUE) 
+		pksamples <- sample_df %>% 
+		  dplyr::select(SampleID=label, Tissue=group, Treatment=group, bamReads=bam, Peaks=macs2) %>% 
+			mutate(PeakFormat="narrow")
+		pkdba <- dba(sampleSheet=pksamples, minOverlap=3)
+		pkdba$config$cores <- 6
+		pkdba <- dba.count(pkdba, summits=50, minOverlap=3)
+		saveRDS(pkdba, output.rds)
+
+		{R_SESSION_INFO}
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="pk_dba", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
+
+
+rule import_macs2:
+	input:
+		rds=pph.file_path("pk_dba", "rds", contrast="all"),
+		samples = config["experiment"]["covariate_file"]["macs2"]
+	output:
+		rds=pph.file_path("import_macs2", "rds", contrast="all"),
+		peak_list=pph.file_path("import_macs2", "csv", contrast="all")
+	log:
+		out=pph.file_path("import_macs2", "output.log", contrast="all", log=True)
+	run:
+		column_lvl = config["experiment"]["columns"] if "columns" in config["experiment"] else {}
+		level_list = "list({})".format(",".join("{}=c({})".format( n, ",".join('"'+s+'"' for s in l) ) for n,l in column_lvl.items()))
+		script = textwrap.dedent(r"""
+
+		library(DiffBind)
+		library(DESeq2)
+		library(dplyr)
+		library(purrr)
+		library(tibble)
+
+		{R_SESSION_INFO}
+		#----- variables
+		input.rds        <- "{input.rds}"
+		input.samples    <- "{input.samples}"
+		output.rds       <- "{output.rds}"
+		output.peak_list <- "{output.peak_list}"
+		level_cols <- {level_list}
+
+		# ----------------------------------------
+		# No Snakemake wildcards beyond this point
+		# ----------------------------------------
+
+		pkdba <- readRDS(input.rds)
+		pkids <- with(pkdba$peaks[[1]], sprintf("%s.%d.%d", Chr, Start, End))
+		stopifnot(all(map_lgl(pkdba$peaks, ~ all(with(.x, sprintf("%s.%d.%d", Chr, Start, End)) == pkids))))
+		count_dat <- map_dfc(pkdba$peaks, `[[`, "Reads") %>% data.matrix
+		rownames(count_dat) <- pkids
+		colnames(count_dat) <- pkdba$samples$SampleID
+
+		peak_list <- data.frame(ID=pkids, pkdba$peaks[[1]][ , c("Chr", "Start", "End") ], stringsAsFactors=FALSE)
+		write.csv(peak_list, file=output.peak_list)
+
+		sample_df <- read.table(input.samples, stringsAsFactors=FALSE, header=TRUE)
+
+		#----- change levels
+		for (col in names(level_cols)) {{
+			sample_df[,col] <- factor(sample_df[,col], levels = level_cols[[col]])
+		}}
+
+		#----- import counts in DESeq2
+		rownames(sample_df) <- sample_df$label
+		count_dat <- count_dat[, rownames(sample_df)]
+		dds <- DESeqDataSetFromMatrix(countData = count_dat, colData = sample_df, design = {DESIGN})
+		
+		#----- save as rds
+		saveRDS(dds, file=output.rds)
+
+		""")
+		
+		script_file = pph.log(log.out, snakemake_format(script), step="import_macs2", extension="R", contrast = "all", **wildcards)
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 
 rule import_gene_counts:
@@ -412,7 +514,8 @@ rule export_raw_counts:
 		rds = pph.choose_input(choice_name = "mapping", options = [
 		dict(step = "import_gene_counts",   extension = "rds", contrast = "all"),
 		dict(step = "import_featurecounts", extension = "rds", contrast = "all"),
-		dict(step = "import_sf",            extension = "rds", contrast = "all")
+		dict(step = "import_sf",            extension = "rds", contrast = "all"),
+		dict(step = "import_macs2",         extension = "rds", contrast = "all")
 		])
 	output:
 		xlsx = pph.file_path("export_raw_counts", "xlsx", contrast = "all"),
@@ -454,7 +557,8 @@ rule DESeq2:
 		pph.choose_input(choice_name = "mapping", options = [
 		dict(step = "import_gene_counts",   extension = "rds", contrast = "all"),
 		dict(step = "import_featurecounts", extension = "rds", contrast = "all"),
-		dict(step = "import_sf",            extension = "rds", contrast = "all")
+		dict(step = "import_sf",            extension = "rds", contrast = "all"),
+		dict(step = "import_macs2",         extension = "rds", contrast = "all")
 		])
 	output:
 		dds           = pph.file_path("DESeq2", "deseq2.rds", contrast = "all"),
@@ -643,7 +747,8 @@ rule annotation:
 	""" Adding annotation information """
 	input:
 		# we use dds as this is the most reliable source of the primary IDs
-		dds       = pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
+		txdb = pph.file_path("TxDb_from_GTF", "sqlite", contrast = "all"),
+		dds  = pph.file_path("DESeq2", "deseq2.rds", contrast = "all")
 	output:
 		res = pph.file_path(step = "annotation", extension = "rds", contrast="all"),
 		csv = pph.file_path(step = "annotation", extension = "csv", contrast="all")
@@ -655,6 +760,8 @@ rule annotation:
 			library(AnnotationDbi)
 			{R_SESSION_INFO}
 
+			txdb_f   <- "{input.txdb}"
+      dds      <- "{input.dds}"
 			res.file <- "{output.res}"
 			res.csv  <- "{output.csv}"
 			script.d <- "{SCRIPTDIR}"
@@ -672,6 +779,27 @@ rule annotation:
 
 			res <- data.frame(PrimaryID=gene_ids, stringsAsFactors=FALSE)
 			res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
+
+			## in case of MACS input, the rownames are *not* gene IDs
+			## but peak IDs and we need to annotate them to matching genes
+			if(config$pipeline_param$input_choice$mapping == "import_macs2") {{
+				require(ChIPseeker)
+				require(GenomicRanges)
+				res <- data.frame(PrimaryID=gene_ids,
+					chr=             gsub("(.*)\\.[0-9]*\\.[0-9]*$", "\\1", gene_ids),
+					start=as.numeric(gsub(".*\\.([0-9]*)\\.[0-9]*$", "\\1", gene_ids)),
+					end=  as.numeric(gsub(".*\\.[0-9]*\\.([0-9]*)$", "\\1", gene_ids)), 
+					stringsAsFactors=FALSE)
+				peak_gr <- with(res, GRanges(res$chr, IRanges(res$start, res$end)))
+				txdb    <- loadDb(txdb_f)
+				peak_anno <- as.data.frame(annotatePeak(peak=peak_gr, TxDb=txdb))
+				res <- cbind(PrimaryID=with(peak_anno, paste(seqnames, start, end, sep=".")), peak_anno)
+				res <- res[ match(gene_ids, res$PrimaryID), ]
+				res <- res %>% dplyr::rename(ENSEMBL=geneId, chr=seqnames)
+			}} else {{
+				res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
+			}}
+
 
 			annot <- orthomapper::entrez_annotate(res$ENSEMBL, taxon=as.numeric(config$organism$taxon),
 				keytype="ENSEMBL", column=c("SYMBOL", "ENTREZID", "REFSEQ", "GENENAME"))
@@ -831,6 +959,285 @@ rule tmod_dbs:
 		script_file = pph.log(log.out, snakemake_format(script), step="tmod_dbs", extension="R", contrast="all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
+## ------------------------ motif finding for ATAC-seq     ---------------------------
+
+
+rule motif_search_meme:
+	"""Collect output from dreme/tomtom"""
+	input:
+		dreme_up =[ pph.file_path("motif_search_meme", "dreme_output_dir")  + "/" + p["title"] + "/up/dreme.txt"  for p in config["meme"]["profiles"] ],
+		dreme_dw =[ pph.file_path("motif_search_meme", "dreme_output_dir")  + "/" + p["title"] + "/dw/dreme.txt"  for p in config["meme"]["profiles"] ],
+		tomtom_up=[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/up/tomtom.tsv" for p in config["meme"]["profiles"] ],
+		tomtom_dw=[ pph.file_path("motif_search_meme", "tomtom_output_dir") + "/" + p["title"] + "/dw/tomtom.tsv" for p in config["meme"]["profiles"] ]
+	output:
+		rds = pph.file_path("motif_search_meme", "rds"),
+		xlsx_dreme  = pph.file_path("motif_search_meme", "dreme.xlsx"),
+		xlsx_tomtom = pph.file_path("motif_search_meme", "tomtom.xlsx")
+	log:
+		out   = pph.file_path("motif_search_meme", "output.log", log=True)
+	run:
+		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
+		contrast    = yaml.dump(pph.get_contrast(wildcards.contrast))
+		dreme_dir   = pph.file_path("motif_search_meme", "dreme_output_dir",  contrast=wildcards.contrast)
+		tomtom_dir  = pph.file_path("motif_search_meme", "tomtom_output_dir", contrast=wildcards.contrast)
+		script      = textwrap.dedent(r"""
+			library(dplyr)
+			library(purrr)
+			library(writexl)
+
+			script.d    <- "{SCRIPTDIR}"
+			config_file <- "{config_file}"
+			output.rds  <- "{output.rds}"
+			out.d.xlsx  <- "{output.xlsx_dreme}"
+			out.t.xlsx  <- "{output.xlsx_tomtom}"
+			contrast    <- yaml::yaml.load("{contrast}")
+			dreme_dir   <- "{dreme_dir}"
+			tomtom_dir  <- "{tomtom_dir}"
+
+			# ----------------------------------------
+			# No Snakemake wildcards beyond this point
+			# ----------------------------------------
+
+			config    <- yaml::yaml.load_file(config_file)
+			meme_conf <- config$meme
+			profile_t <- map(meme_conf$profiles, `[[`, "title")
+			jaspar_d  <- meme_conf$motif_annotations
+
+			source(file.path(script.d, "motif_search.R"))
+
+			## ----------- read tomtom and dreme results
+			dreme_res <- map(set_names(profile_t), ~ {{
+				p <- .x
+				imap_dfr(set_names(c("up", "dw")), ~ {{
+					res <- read_dreme(file.path(dreme_dir, p, .x, "dreme.txt"))
+					if(!is.null(res)) {{
+						res <- res %>% dplyr::mutate(Direction=.y)
+					}}
+				}})
+			}})
+
+			tomtom_res <- map(set_names(profile_t), ~ {{
+				p <- .x
+				imap_dfr(set_names(c("up", "dw")), ~ {{
+					res <- read_tomtom(file.path(tomtom_dir, p, .x, "tomtom.tsv"), jaspar.dir=jaspar_d)
+					if(!is.null(res)) {{
+						res <- res %>% dplyr::mutate(Direction=.y)
+					}} 
+					return(res)
+				}})
+			}})
+
+			## ----------- save XLSX files
+			write_xlsx(dreme_res, path=out.d.xlsx)
+			write_xlsx(tomtom_res, path=out.t.xlsx)
+
+			## ----------- save RDS object
+			saveRDS(list(dreme=dreme_res, tomtom=tomtom_res), file=output.rds)
+
+			{R_SESSION_INFO}
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension="R", **wildcards)
+
+		# run R
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
+
+rule one_tomtom:
+	"""Run tomtom once. Uses motif_search_meme step for output."""
+	input:
+		dreme=pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/dreme.txt"
+	output:
+		out_done=           pph.file_path("motif_search_meme", "tomtom_output_dir") + "/{profile}/{updown}/tomtom.tsv",
+		out_dir = directory(pph.file_path("motif_search_meme", "tomtom_output_dir") + "/{profile}/{updown}/")
+	log:
+		out = pph.file_path(step = "motif_search_meme", extension="tomtom_{profile}_{updown}_output.log", log= True)
+	run:
+		prof=wildcards.profile
+		updown=wildcards.updown
+		database=config["meme"]["tomtom_database"]
+		script      = textwrap.dedent(r"""
+		mkdir -p {output.out_dir}
+		tomtom -oc {output.out_dir} -png -no-ssc -thresh 10 -evalue {input.dreme} {database}
+		touch {output.out_dir}/tomtom.tsv
+		echo "Everything is fine"
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension="tomtom" + prof + "_" + updown + ".sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+	
+rule one_dreme:
+	"""Run dreme once. Uses motif_search_meme step for output."""
+	input:
+		sign=pph.file_path("peak_seq", "dreme_input_dir") + "/{profile}/sign_{updown}.fasta",
+		nsign=pph.file_path("peak_seq", "dreme_input_dir") + "/{profile}/nsign.fasta"
+	output:
+		out_done=pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/dreme.txt",
+		out_dir = directory(pph.file_path("motif_search_meme", "dreme_output_dir") + "/{profile}/{updown}/")
+	log:
+		out = pph.file_path(step = "motif_search_meme", extension="dreme_{profile}_{updown}_output.log", log= True)
+	run:
+		prof=wildcards.profile
+		updown=wildcards.updown
+		script      = textwrap.dedent(r"""
+		mkdir -p {output.out_dir}
+		if [[ -s {input.sign} && -s {input.nsign} ]] ; then
+			echo dreme -oc {output.out_dir} -p {input.sign} -n {input.nsign}  -mink 8 -maxk 14 -png
+			dreme -oc {output.out_dir} -p {input.sign} -n {input.nsign}  -mink 8 -maxk 14 -png
+			#streme -oc {output.out_dir} --p {input.sign} -n {input.nsign}  -minw 8 -maxw 14 -png
+			echo "Everything is fine"
+		else
+			echo "Input files empty, no results will be produced"
+			touch {output.out_dir}/dreme.txt
+		fi
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="motif_search_meme", extension=prof + "_" + updown + ".sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
+
+
+
+rule isizes:
+	"""Calculate the insert sizes from each BAM"""
+	input:
+		samples = config["experiment"]["covariate_file"]["macs2"]
+	output:
+		rds = pph.file_path(step = "isizes", extension = "rds", contrast = "all")
+	log:
+		out = pph.file_path(step = "isizes", extension = "log", contrast = "all", log=True)
+	run:
+		script   = textwrap.dedent(r"""
+			output_rds  <- "{output.rds}"
+			sample_f    <- "{input.samples}"
+			
+			# ----------------------------------------
+			# No Snakemake wildcards beyond this point
+			# ----------------------------------------
+			#
+		  # First, we run samtools
+			#
+			# stop("dupa!")
+			sample_df <- read.table(sample_f, header=TRUE) 
+
+			ret <- lapply(sample_df[["bam"]], function(file) {{
+				file <- gsub(".bam$", ".csv", file)
+				isizes <- abs(read.csv(file, colClasses="integer", header=FALSE, stringsAsFactors=FALSE)[,1])
+				isizes <- isizes[ isizes < 550 ]
+				table(isizes)
+			}})
+
+			names(ret) <- sample_df[["label"]]
+			saveRDS(ret, file=output_rds)
+
+	  	{R_SESSION_INFO}
+""")
+
+		script_file = pph.log(log.out, snakemake_format(script), step="isizes", contrast = "all", extension="R", **wildcards)
+
+		# run R
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
+
+	
+rule peak_seq:
+	"""Extract peak sequences based on contrast information"""
+	input:
+		rds = pph.file_path("contrasts_full", "rds"),
+		annot = pph.file_path(step="annotation", extension="rds", contrast="all")
+	output:
+	  marker = pph.file_path(step = "peak_seq", extension = "dreme_input_done"),
+		out_dir      = directory(pph.file_path(step="peak_seq", extension="dreme_input_dir")),
+		out_fasta_up = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/sign_dw.fasta" for p in config["meme"]["profiles"] ],
+		out_fasta_dw = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/sign_up.fasta" for p in config["meme"]["profiles"] ],
+		out_fasta_ns = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/nsign.fasta"   for p in config["meme"]["profiles"] ],
+		out_xlsx     = [ pph.file_path("peak_seq", "dreme_input_dir") + "/" + p["title"] + "/peaks.xlsx"     for p in config["meme"]["profiles"] ]
+	log:
+		out = pph.file_path(step = "peak_seq", extension = "output.log", log=True)
+	run:
+		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
+		contrast    = pph.get_contrast(wildcards.contrast)
+		script      = textwrap.dedent(r"""
+			require(BSgenome)
+			require(Biostrings)
+			require(GenomeRanges)
+			require(writexl)
+			require(dplyr)
+
+			{R_SESSION_INFO}
+			config_file <- "{config_file}"
+			out_dir <- "{output.out_dir}"
+			out_marker <- "{output.marker}"
+			
+			input.rds            <- "{input.rds}"
+			annot_f   <- "{input.annot}"
+
+			# ----------------------------------------
+			# No Snakemake wildcards beyond this point
+			# ----------------------------------------
+
+			config <- yaml::yaml.load_file(config_file)
+			meme_conf <- config$meme
+			profiles <- meme_conf$profiles
+
+			pval.sign.thr <- as.numeric(meme_conf$true_positive_pval)
+			lfc.sign.thr  <- as.numeric(meme_conf$true_positive_lfc)
+			pval.ns.thr   <- NULL
+			lfc.ns.thr    <- NULL
+
+
+			ctr <- as.data.frame(readRDS(input.rds))
+			annot  <- readRDS(annot_f)
+			ctr <- merge(annot, ctr, by.x="PrimaryID", by.y=0)
+
+			message("Loading genome...")
+			genome <- readDNAStringSet(config$organism$files$genome)
+			names(genome) <- gsub(" .*", "", names(genome))
+
+			for(p in 1:length(profiles)) {{
+				prof <- profiles[[p]]
+				sel <- ctr$distanceToTSS < as.numeric(prof$end) & ctr$distanceToTSS > as.numeric(prof$start)
+
+				notna <- !is.na(ctr$log2FoldChange) & !is.na(ctr$padj)
+
+				sign.up <- notna & ctr$log2FoldChange >  lfc.sign.thr & ctr$padj < pval.sign.thr & sel
+				sign.dw <- notna & ctr$log2FoldChange < -lfc.sign.thr & ctr$padj < pval.sign.thr & sel
+
+				ns <- !sign.up & !sign.dw & sel
+				
+				if(!is.null(pval.ns.thr)) {{ ns <- ns & ctr$padj > pval.ns.thr }} 
+				if(!is.null(lfc.ns.thr))  {{ ns <- ns & abs(ctr$log2FoldChange) < lfc.ns.thr }}
+
+				peak_gr_sign_up <- with(ctr[sign.up, ], GRanges(chr, IRanges(start, end)))
+				peak_gr_sign_dw <- with(ctr[sign.dw, ], GRanges(chr, IRanges(start, end)))
+				peak_gr_ns      <- with(ctr[ns, ],      GRanges(chr, IRanges(start, end)))
+
+				peak_seq_sign_up <- getSeq(genome, peak_gr_sign_up)
+				peak_seq_sign_dw <- getSeq(genome, peak_gr_sign_dw)
+				peak_seq_ns      <- getSeq(genome, peak_gr_ns)
+				names(peak_seq_sign_up) <- ctr$PrimaryID[sign.up]
+				names(peak_seq_sign_dw) <- ctr$PrimaryID[sign.dw]
+				names(peak_seq_ns)      <- ctr$PrimaryID[ns]
+
+				prof_out_dir <- file.path(out_dir, prof$title)
+				dir.create(prof_out_dir, recursive=TRUE, showWarnings=TRUE)
+
+				message("writing to ", prof_out_dir)
+				writeXStringSet(peak_seq_sign_up, filepath=file.path(prof_out_dir, "sign_up.fasta"))
+				writeXStringSet(peak_seq_sign_dw, filepath=file.path(prof_out_dir, "sign_dw.fasta"))
+				writeXStringSet(peak_seq_ns,      filepath=file.path(prof_out_dir, "nsign.fasta"))
+				fileConn <- file(file.path(prof_out_dir, "dreme.input"))
+				writeLines(c("this is dreme input"), fileConn)
+				close(fileConn)
+				write_xlsx(list(sign_up=ctr[sign.up, ], sign_dw=ctr[sign.dw, ], nonsign=ctr[ns, ]), path=file.path(prof_out_dir, "peaks.xlsx"))
+			}}
+
+			fileConn <- file(out_marker)
+			writeLines(sapply(profiles, `[[`, "title"), fileConn)
+			close(fileConn)
+
+			""")
+		script_file = pph.log(log.out, snakemake_format(script), step="peak_seq", extension="R", **wildcards)
+
+		# run R
+		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
 
 
 
