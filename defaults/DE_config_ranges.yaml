@@ -11,7 +11,7 @@ pipeline_param:
   # define choices for choose_input()
   input_choice:
     mapping:
-      __opt__: ["import_gene_counts|import_sf|import_featurecounts", ["import_gene_counts|import_sf|import_featurecounts"]]
+      __opt__: ["import_gene_counts|import_sf|import_featurecounts|import_macs2", ["import_gene_counts|import_sf|import_featurecounts|import_macs2"]]
 
 #---------------------------------------- organism annotation (needs to be set)
 organism_defaults:
