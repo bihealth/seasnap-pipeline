@@ -626,19 +626,19 @@ rule DESeq2:
 		write.table(data.frame(
 			gene_id=rownames(rld_model),
 			assay(rld_model),
-			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
-			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+		#symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+		#              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+		#entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+		#              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
 			check.names=FALSE
 			), file="{output.rld_model_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		write.table(data.frame(
 			gene_id=rownames(rld_blind),
 			assay(rld_blind),
-			symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-			              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
-			entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
-			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
+		#symbol=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+		#              column="SYMBOL", keytype="ENSEMBL", multiVals="first"),
+		#entrez=mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(dds)), 
+		#              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
 			check.names=FALSE
 			), file="{output.rld_blind_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
 		""")
@@ -724,12 +724,12 @@ rule contrast:
 		#----- ranking
 		res <- res[order({rank_order}),]
 		
-		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
-		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
-		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
-		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
-		
+##	#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
+##	res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+##	                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+##	res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+##	                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+##	
 		#----- save as rds & csv
 		saveRDS(res, file="{output.rds}")
 		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
@@ -772,13 +772,12 @@ rule annotation:
 			# No Snakemake wildcards beyond this point
 			# ----------------------------------------
 			library(orthomapper)
+			library(dplyr)
+			library(ChIPseeker)
 
 			config <- yaml::yaml.load_file(conf.f)
-
 			gene_ids <- rownames(readRDS(dds))
-
 			res <- data.frame(PrimaryID=gene_ids, stringsAsFactors=FALSE)
-			res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
 
 			## in case of MACS input, the rownames are *not* gene IDs
 			## but peak IDs and we need to annotate them to matching genes
@@ -800,11 +799,10 @@ rule annotation:
 				res$ENSEMBL <- sub("\\..*$", "", res$PrimaryID)
 			}}
 
-
 			annot <- orthomapper::entrez_annotate(res$ENSEMBL, taxon=as.numeric(config$organism$taxon),
 				keytype="ENSEMBL", column=c("SYMBOL", "ENTREZID", "REFSEQ", "GENENAME"))
 
-		  if(!all(annot[,1] == res$ensembl)) 
+			if(!is.null(res$ensembl) && !all(annot[,1] == res$ensembl)) 
 				stop("object returned by entrez_annotate() does not match query")
 
 			## no need to duplicate columns
@@ -900,12 +898,12 @@ rule contrasts_full:
 		#----- ranking
 		res <- res[order({rank_order}),]
 		
-		#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
-		res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
-		                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
-		res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
-		                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
-		
+##	#----- annotation [BEWARE- the in case on multiple mapping, the first entry will be selected]
+##	res$symbol <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+##	                     column="SYMBOL", keytype="ENSEMBL", multiVals="first")
+##	res$entrez <- mapIds({params.annot_pkg}, keys=sub("\\.[0-9]+$", "", row.names(res)), 
+##	                     column="ENTREZID", keytype="ENSEMBL", multiVals="first")
+##	
 		#----- save as rds & csv
 		saveRDS(res, file="{output.rds}")
 		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
@@ -1120,9 +1118,11 @@ rule isizes:
 
 			ret <- lapply(sample_df[["bam"]], function(file) {{
 				file <- gsub(".bam$", ".csv", file)
-				isizes <- abs(read.csv(file, colClasses="integer", header=FALSE, stringsAsFactors=FALSE)[,1])
+				isizes <- abs(read.csv(file, colClasses="integer", header=FALSE, stringsAsFactors=FALSE, nrows=1e6)[[1]])
 				isizes <- isizes[ isizes < 550 ]
-				table(isizes)
+				ret <- table(isizes)
+        rm(isizes)
+        return(ret)
 			}})
 
 			names(ret) <- sample_df[["label"]]
