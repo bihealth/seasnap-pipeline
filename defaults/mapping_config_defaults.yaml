@@ -16,7 +16,7 @@ pipeline_param:
     - infer_experiment
     - qualimap_rnaseq
     - qualimap_bamqc
-    - rna_seqc
+    #- rna_seqc
     - preseq_c_curve
     - preseq_lc_extrap
     #- bw_from_bed
