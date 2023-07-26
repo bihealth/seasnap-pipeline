@@ -1,0 +1,125 @@
+<!---
+Autocorrelation and other diagnostic plots for ATAC-seq
+-->
+
+# ATAC-Seq diagnostic summary
+
+## ATAC-Seq autocorrelation plots
+
+Following plots show the distribution of insert sizes (left panel) and the
+autocorrelation (right panel). On the left panel, black line shows the raw
+insert size distribution, red line is the log-regression of insert size
+distribution, and blue line shows the residual from the log-regression model used to 
+generate the autocorrelation plot on the right panel.
+
+Ideally, the plots should show a clear periodicity of about 200 bp. If
+there is a strong dropdown 
+
+```{r autocor_atac_seq_{{ENTRY_ID}}_func}
+require(purrr)
+require(tibble)
+require(dplyr)
+
+#' Calculate and plot autocorrelation for fragment size distribution
+autoCplot <- function(sizes=NULL, sizes.t=NULL, frag.min=75, frag.max=1000, lag.max=1000, min.count.fract=5e-3, log=TRUE, plot=TRUE, title="Fragment size distribution", ...) {
+  
+  if(is.null(sizes.t)) {
+    sizes.t <- table(sizes)
+  }
+
+  sizes.n <- as.numeric(names(sizes.t))
+  sizes.v <- as.numeric(sizes.t)
+  ord <- order(sizes.n)
+  sizes.n <- sizes.n[ord]
+  sizes.v <- sizes.v[ord]
+
+  sel <- sizes.n %in% frag.min:frag.max
+  if(!is.na(min.count.fract)) {
+    sel <- sel & sizes.v > max(sizes.v) * min.count.fract
+  }
+
+
+
+
+  if(log) sizes.v <- log(sizes.v)
+  trend <- lm(sizes.v[sel] ~ sizes.n[sel])
+  sizes.r <- trend$residuals
+
+  #sel <- frag.min:frag.max
+
+  if(plot) {
+    par(mfrow=c(1,2))
+    if(log) ylab <- "log(Fragment count)"
+    else ylab <- "Fragment count"
+    plot(sizes.n[sel], sizes.v[sel], type="l", bty="n", xlab="Fragment size", ylab=ylab, main=title)
+    abline(trend, col="red")
+    par(new=TRUE)
+    plot(sizes.n[sel], sizes.r, col="blue", type="l", axes=F, xlab="", ylab="", bty="n", ylim=c(min(sizes.r), 2 * max(sizes.r)))
+    legend("topright", c("Fragment distribution", "Trend", "Residuals"), lty=1, col=c("black", "red", "blue"), bty="n")
+  }
+
+  ret <- acf(sizes.r, lag.max=lag.max, plot=plot, bty="n", ...)
+
+  invisible(list(acf=ret, sizes.n=sizes.n, sizes.r=sizes.r, sizes.v=sizes.v))
+}
+
+
+```
+
+
+```{r autocor_atac_seq_{{ENTRY_ID}}, fig.width=14, fig.height=7}
+isizes <- file_tab %>% filter(step == "isizes" & extension == "rds") %>% pull(filename) %>% readRDS
+
+for(i in names(isizes)) {
+  autoCplot(sizes.t=isizes[[i]], title=sprintf("Sample: %s", i), frag.max=config$report$snippet_parameters$ATAC_seq$max_fragment_size)
+}
+
+```
+
+**Fig.** Overal fragment length distribution.
+
+```{r fig.width=14,fig.height=7}
+isiz <- map(isizes, ~ as.matrix(.) %>% as.data.frame() %>% rownames_to_column("Length") %>% rename(count="V1"))
+isiz <- Reduce(function(x, y) merge(x, y, by="Length"), isiz)
+
+isiz.tab <- as.table(rowSums(isiz[,-1]))
+names(isiz.tab) <- isiz[["Length"]]
+
+autoCplot(sizes.t=isiz.tab, title="", frag.max=1500, min.count.fract=NA)
+
+```
+
+
+## Peak distribution
+
+**Fig.**  Distribution of peaks positions relative to transcription start
+site (TSS). X axis is the distance to TSS in base pairs. Ideally, there
+should be a clear peak visible in the middle.
+
+```{r}
+require(Rseasnap)
+pip <- load_de_pipeline("DE_config.yaml")
+annot <- get_annot(pip)
+dtss <- annot %>%
+  filter(abs(distanceToTSS) < 10000) %>% pull(distanceToTSS)
+plot(density(dtss), xlim=c(-5000, 5000), bty="n", ylab="Density", xlab="Distance to TSS (bp)")
+abline(v=0, col="grey", lty=3)
+```
+
+
+## Peak feature assignment
+
+**Fig.** Percentages of peaks assigned to different features based on the closest distance. 
+
+```{r peak_feature_annot_fig,fig.width=12,fig.height=4}
+require("ggplot2")
+p <- annot %>% mutate(n=n(), Feature=gsub("(Exon|Intron|Downstream) .*", "\\1", annotation))  %>% 
+  group_by(Feature) %>% summarise(Frequency=n()/n[1]) %>% tidyr::drop_na() %>%
+  mutate(Feature = factor(Feature, levels=rev(c("Promoter (2-3kb)", "Promoter (1-2kb)", "Promoter (<=1kb)", "5' UTR", "Exon",
+              "Intron", "3' UTR", "Downstream", "Distal Intergenic"))))
+ggplot(p, aes(x="", y=Frequency*100, fill=Feature)) + 
+  geom_bar(stat="identity") + coord_flip() + ylab("Percentage (%)") + xlab("") + theme_bw() + 
+  scale_fill_viridis_d(guide=guide_legend(rev=TRUE))
+```
+
+
