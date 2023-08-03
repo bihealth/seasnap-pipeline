@@ -145,9 +145,30 @@
         "mem": "8000M",
         "time": "4:00:00",
         "cpus-per-task": 8
+    },
+
+    "isizes": 
+    {
+         "mem": "64000M",
+         "time": "8:00:00",
+         "cpus-per-task": 8
+    },
+
+
+    "pk_dba": 
+    {
+         "mem": "128000M",
+         "time": "48:00:00",
+         "cpus-per-task": 8
+    },
+
+
+    "TxDb_from_GTF": 
+    {
+         "mem": "64000M",
+         "time": "8:00:00",
+         "cpus-per-task": 8
     }
-
-
 }
 
 
