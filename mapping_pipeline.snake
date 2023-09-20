@@ -287,7 +287,8 @@ rule star:
 	params:
 		outdir = pph.out_dir_name(step="star"),
 		options = config["rule_options"]["star"]["cmd_opt"],
-		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False
+		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False,
+		count_col = lambda wildcards: {"unstranded":2, "forward":3, "reverse":4}[config["sample_info"][wildcards.sample]["stranded"]]
 	threads: 16
 	resources:
 		mem_mb=48000,
