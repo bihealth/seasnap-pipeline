@@ -159,13 +159,15 @@ rule TxDb_from_GTF:
 		#----- import packages
 		library(GenomicFeatures)
 		
-		{R_SESSION_INFO}
 		
 		#----- make transcript to gene table
 		TxDb <- makeTxDbFromGFF("{input.gtf}", format="gtf", organism="{genus}", taxonomyId={taxon})
 		
 		#----- save Db
 		saveDb(TxDb, "{output}")
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="TxDb_from_GTF", extension="R", contrast = "all", **wildcards)
@@ -215,7 +217,6 @@ rule import_gene_counts:
 		library(AnnotationDbi)
 		library({params.annot_pkg})
 
-		{R_SESSION_INFO}
 
 		#----- variables
 		sample_f  <- "{input.samples}"
@@ -283,6 +284,9 @@ rule import_gene_counts:
 			colnames(tpm_dat) <- c("Symbol", "geneID", as.character(sample_df$label))
 			write_xlsx(tpm_dat, path=output_tpm_xlsx)
 		}}
+
+    # ----- session info 
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_gene_counts", extension="R", contrast = "all", **wildcards)
@@ -314,7 +318,6 @@ rule import_featurecounts:
 		#----- import packages
 		library(DESeq2)
 		
-		{R_SESSION_INFO}
 		
 		#----- import data
 		sample_df <- read.table("{input.samples}", header=TRUE)
@@ -340,6 +343,9 @@ rule import_featurecounts:
 		
 		#----- save as rds
 		saveRDS(dds, file="{output}")
+    
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="import_featurecounts", extension="R", contrast = "all", **wildcards)
@@ -375,7 +381,6 @@ rule import_sf:
 		library(readr)
 		library(AnnotationDbi)
 		
-		{R_SESSION_INFO}
 		
 		#----- make transcript to gene table
 		TxDb    <- loadDb(file = "{input.txdb}")
@@ -400,6 +405,9 @@ rule import_sf:
 		
 		#----- save as rds
 		saveRDS(dds, file="{output}")
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="import_sf", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -427,7 +435,6 @@ rule export_raw_counts:
     library(tibble)
     library(readr)
 
-		{R_SESSION_INFO}
 
 		#----- variables
 		output_xlsx <- "{output.xlsx}"
@@ -442,6 +449,9 @@ rule export_raw_counts:
 		colnames(count_dat)[-1] <- col_dat$label
     write_csv(count_dat, path=output_csv)
     write_xlsx(count_dat, path=output_xlsx)
+
+    # ----- session info
+		{R_SESSION_INFO}
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="export_raw_counts", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -478,7 +488,6 @@ rule DESeq2:
 		library(AnnotationDbi)
 		library({params.annot_pkg})
 		
-		{R_SESSION_INFO}
 
 		conf.f   <- "{config_file}"
 
@@ -537,6 +546,9 @@ rule DESeq2:
 			              column="ENTREZID", keytype="ENSEMBL", multiVals="first"),
 			check.names=FALSE
 			), file="{output.rld_blind_csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="DESeq2", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
@@ -593,7 +605,6 @@ rule contrast:
 		library(AnnotationDbi)
 		library({params.annot_pkg})
 		
-		{R_SESSION_INFO}
 		
 		#----- load DESeqDataSet
 		dds <- readRDS("{input}")
@@ -629,6 +640,9 @@ rule contrast:
 		#----- save as rds & csv
 		saveRDS(res, file="{output.rds}")
 		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="contrast", extension="R", **wildcards)
@@ -653,7 +667,6 @@ rule annotation:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		script = textwrap.dedent(r"""
 			library(AnnotationDbi)
-			{R_SESSION_INFO}
 
 			res.file <- "{output.res}"
 			res.csv  <- "{output.csv}"
@@ -684,6 +697,9 @@ rule annotation:
 
 			write.csv(res, row.names=FALSE, file=res.csv)
 	    saveRDS(res, file=res.file)
+
+      # ----- session info
+			{R_SESSION_INFO}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="annotation", extension="R", contrast="all", **wildcards)
@@ -742,7 +758,6 @@ rule contrasts_full:
 		library(DESeq2)
 		library({params.annot_pkg})
 		
-		{R_SESSION_INFO}
 
     
 		
@@ -781,6 +796,9 @@ rule contrasts_full:
 		#----- save as rds & csv
 		saveRDS(res, file="{output.rds}")
 		write.table(data.frame(gene_id=rownames(res), res), file="{output.csv}", sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="contrasts_full", extension="R", **wildcards)
@@ -803,7 +821,6 @@ rule tmod_dbs:
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all"),
 		script = textwrap.dedent(r"""
-			{R_SESSION_INFO}
 
 			res.file <- "{output.res}"
 			map.file <- "{output.map}"
@@ -826,6 +843,9 @@ rule tmod_dbs:
 			## provide mapping for the databases
 			map <- get_mapping(config, dbs, annot.f)
 			saveRDS(map, file=map.file)
+
+      # ----- session info
+			{R_SESSION_INFO}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="tmod_dbs", extension="R", contrast="all", **wildcards)
@@ -851,7 +871,6 @@ rule tmod:
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		script = textwrap.dedent(r"""
-			{R_SESSION_INFO}
 
 			script.d <- "{SCRIPTDIR}"
 			conf.f   <- "{config_file}"
@@ -914,6 +933,9 @@ rule tmod:
 			## remove if there were no results
 			res.short <- res.short[!sapply(res.short, is.null)]
 			write_xlsx(res.short, path=res.xlsx)
+
+      # ----- session info
+			{R_SESSION_INFO}
 			""")
 		script_file = pph.log(log.out, snakemake_format(script), step="tmod", extension="R", **wildcards)
 
@@ -937,7 +959,6 @@ rule tmod_pca:
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
 		script = textwrap.dedent(r"""
-			{R_SESSION_INFO}
 
 			script.d  <- "{SCRIPTDIR}"
 			conf.f    <- "{config_file}"
@@ -1001,6 +1022,9 @@ rule tmod_pca:
 			## for sorting keys, so we need to unlist – one level only
 			res.short <- unlist(unlist(res.short, recursive=FALSE), recursive=FALSE)
 			write_xlsx(res.short, path=res.xlsx)
+
+      # ----- session info
+			{R_SESSION_INFO}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="tmod_pca", contrast="all", extension="R", **wildcards)
@@ -1040,7 +1064,6 @@ rule goseq:
 		library(AnnotationDbi)
 		library({params.annot_pkg})
 		
-		{R_SESSION_INFO}
 		
 		#----- load results
 		res <- readRDS("{input.res}")
@@ -1076,6 +1099,9 @@ rule goseq:
 		
 		#----- save as rds
 		saveRDS(GO, file="{output.go}"); saveRDS(KEGG, file="{output.kegg}")
+    
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="goseq", extension="R", **wildcards)
@@ -1142,7 +1168,6 @@ rule cluster_profiler:
 		library(msigdbr)
 		library(dplyr)
 		
-		{R_SESSION_INFO}
 		
 		#----- load results
 		res <- readRDS("{input.res}")
@@ -1197,6 +1222,9 @@ rule cluster_profiler:
 		
 		#----- save as rds
 		saveRDS(tests, file="{output.rds}")
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		
 		script_file = pph.log(log.out, snakemake_format(script), step="cluster_profiler", extension="R", **wildcards)
@@ -1232,7 +1260,6 @@ rule rain:
 		library("rain")
 		library("AnnotationDbi")
 		library("{params.annot_pkg}")
-		{R_SESSION_INFO}
 
 		#----- params
 		period <- {params.period}
@@ -1292,6 +1319,9 @@ rule rain:
 			row.names = F,
 			file = "{output.tsv}"
 		)
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="rain", extension="R", **wildcards)
@@ -1333,7 +1363,6 @@ rule dodr:
 		library("DODR")
 		library("AnnotationDbi")
 		library("{params.annot_pkg}")
-		{R_SESSION_INFO}
 
 		#----- params
 		period <- {params.period}
@@ -1372,6 +1401,9 @@ rule dodr:
 		#----- write tsv
 		write.table(data.frame(ensembl=common_col, symbol=symbol, entrez=entrez, dodrresult$p.value.table),
 		            sep = "\t", quote = F, row.names = F, file = "{output.tsv}")
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 
 		script_file = pph.log(log.out, snakemake_format(script), step="dodr", extension="R", **wildcards)
@@ -1440,7 +1472,6 @@ rule contrast_summary:
 		library(writexl)
 		library(data.table)
 
-		{R_SESSION_INFO}
 
 		#----- variables
 		input_rds_list <- {rds_list}
@@ -1466,6 +1497,9 @@ rule contrast_summary:
 		#----- save as XLSX and tsv
 		write_xlsx(result_summary, path=output_xlsx)
 		write.table(result_summary, file=output_tsv, sep="\t", quote=F)
+
+    #----- session info
+		{R_SESSION_INFO}
 		""")
 		script_file = pph.log(log.out, snakemake_format(script), step="contrast_summary", extension="R", contrast = "all", **wildcards)
 		shell("Rscript --vanilla '{script_file}' &>> '{log.out}'")
