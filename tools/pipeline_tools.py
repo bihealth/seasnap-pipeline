@@ -224,7 +224,7 @@ class PipelinePathHandler:
 		return re.findall("{([^}]+)}", pattern)
 
 	def _make_name(self, description):
-		return re.sub("\.|/|-|\s", "_", description)
+		return re.sub(r"\.|/|-|\s", "_", description)
 
 	@staticmethod
 	def _md5(fname):
@@ -1398,7 +1398,7 @@ class SampleInfoTool(PipelinePathHandler):
 	def _convert_str_entries_to_lists(self, key="paired_end_extensions"):
 		""" for importing lists from table entries """
 		for smpl_info in self.sample_info.values():
-			smpl_info[key] = [s.replace("'", "").replace('"', "") for s in re.findall("[^\[\]\s,]+", smpl_info[key])]
+			smpl_info[key] = [s.replace("'", "").replace('"', "") for s in re.findall(r"[^\[\]\s,]+", smpl_info[key])]
 
 	def _add_info_fields(self, add_dict):
 		""" add fields from add_dict to self.sample_info if they are not already present """
@@ -1579,7 +1579,7 @@ class SampleInfoTool(PipelinePathHandler):
 
 class ReportTool(PipelinePathHandler):
 
-	entry_heading_pattern = "#HSTART.*\n([\s\S]*{{ENTRY_NAME}}[\s\S]*)\n.*#HEND"
+	entry_heading_pattern = r"#HSTART.*\n([\s\S]*{{ENTRY_NAME}}[\s\S]*)\n.*#HEND"
 	insert_pattern        = "#>.*INSERT.*<#"
 	entry_name_wildcard   = "{{ENTRY_NAME}}", "{{ENTRY_ID}}"
 
@@ -1829,8 +1829,8 @@ class ReportTool(PipelinePathHandler):
 
 				for i, results_path in (tup for tup in enumerate(self.use_results[results_key[1]]) if tup[0]==results_key[0] or results_key[0]<0):
 					snippet_prep = self._insert_entry_name(snippet_cont, entry, results_path)
-					requirements = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", snippet_prep)
-					snippet_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", snippet_prep)
+					requirements = re.findall(r"(?<=#REQUIRE)\s+{{(\S+)}}", snippet_prep)
+					snippet_prep = re.sub(    r"#REQUIRE\s+{{\S+}}\n+", "", snippet_prep)
 
 					if all(Path(self.path_handler.file_path( **dict(zip( self.req_fields, req.split("-") ), path_pattern=results_path) )).exists() for req in requirements):
 						snippet_text.append(self._edit_template(snippet_prep, results_path, results_key[1], i))
@@ -1878,8 +1878,8 @@ class ReportTool(PipelinePathHandler):
 						all_text = temp_begin + sub_section_text + temp_end
 
 						all_text_prep = self._insert_entry_name(all_text, entry, results_path)
-						requirements  = re.findall("(?<=#REQUIRE)\s+{{(\S+)}}", all_text_prep)
-						all_text_prep = re.sub(    "#REQUIRE\s+{{\S+}}\n+", "", all_text_prep)
+						requirements  = re.findall(r"(?<=#REQUIRE)\s+{{(\S+)}}", all_text_prep)
+						all_text_prep = re.sub(    r"#REQUIRE\s+{{\S+}}\n+", "", all_text_prep)
 
 						if all(
 							Path(
