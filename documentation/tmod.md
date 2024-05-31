@@ -105,7 +105,7 @@ Furthermore, you can provide a number of databases in one of the accepted
 formats, including RDS, CSV files and more. The tmod facility in sea-snap
 will import these files and run the analysis accordingly.
 
-Each database, including the default ones (tmod and msigdb) will require
+Each database, including the default ones (tmod, cell signatures and msigdb) will require
 some kind of a minimal setup, described further in the document.
 
 
@@ -149,6 +149,7 @@ Following databases are predefined in
 |Database ID            |Description                                                        |
 |--------               |-----------                                                        |
 |`tmod`                 |Transcriptional modules based on gene co-expression in human blood |
+|`cell_signatures`      |Cell signatures from Cellmarker, CIBERSORT and PanglaoDB           |
 |`msigdb_go_bp`         |Gene ontology / Biological Process from MSigDB                     |
 |`msigdb_reactome`      |Reactome pathways from MSigDB                                      |
 |`msigdb_hallmark`      |Hallmark gene sets from MSigDB                                     |

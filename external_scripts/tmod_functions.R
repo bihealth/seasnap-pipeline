@@ -423,6 +423,7 @@ process_dbs <- function(config) {
   msig    <- NULL
   msig_mm <- NULL
   tmod    <- NULL
+  cell_signatures <- NULL
 
   if(is.null(config$file_path)) config$file_path <- "./"
   
@@ -453,6 +454,13 @@ process_dbs <- function(config) {
       dbobj <- tmod
       if(is.null(x$PrimaryID)) { x$PrimaryID <- "SYMBOL" }
     # if a file is provided, a format is required
+    } else if(x$file == "cell_signatures") {
+      if(is.null(cell_signatures)) {
+        data("cell_signatures", envir=environment())
+        cell_signatures <<- cell_signatures
+      }
+      dbobj <- cell_signatures
+      if(is.null(x$PrimaryID)) { x$PrimaryID <- "SYMBOL" }
     } else if(is.null(x$format)) {
       stop("Processing tmod db configuration: if file path provided, format must not be empty")
     } else {
