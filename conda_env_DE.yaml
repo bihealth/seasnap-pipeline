@@ -1,4 +1,4 @@
-name: seasnap-de-p311
+name: seasnap-de
 channels:
   - conda-forge
   - bioconda
