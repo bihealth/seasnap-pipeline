@@ -7,6 +7,7 @@ require(purrr)
 require(DESeq2)
 require(edgeR)
 require(pander)
+require(tmod)
 
 export_dir <- config$report$snippet_parameters$Export_files$export_dir
 if(is.null(export_dir)) {
@@ -20,7 +21,9 @@ counts_f        <- file.path(export_dir, "counts.xlsx")
 gene_expr_res_f <- file.path(export_dir, "differential_expression_results.xlsx")
 covariate_f     <- file.path(export_dir, "covariate_file.xlsx")
 tmod_annotation_f <- file.path(export_dir, "gene_set_annotation_significant.xlsx")
+readme_f          <- file.path(export_dir, "README.txt")
 ```
+
 
 
 
@@ -114,8 +117,6 @@ tmod_mods <- map(tmod_db_ids, ~ {
 
 tmod_mods <- tmod_mods[!map_lgl(tmod_mods, is.null)]
 write_xlsx(tmod_mods, path=tmod_annotation_f)
-
-
 ```
 
 **Table.** Following files have been exported to the `r export_dir` directory.
@@ -137,6 +138,31 @@ export_ft_2 <- tmod_ft %>%
 
 export_ft <- rbind(export_ft, export_ft_2)
 pander(export_ft)
+```
+
+
+
+```{r}
+.f <- c(covariate_f, counts_f, gene_expr_res_f)
+export_ft <- data.frame(
+  Description=c(
+    "Covariate file",
+    "Raw counts, log CPM and rlog counts",
+    "Results of differential expression analysis for all contrasts"),
+  File=sprintf("%s", basename(.f)),
+  stringsAsFactors=FALSE)
+export_ft_2 <- tmod_ft %>%
+  mutate(Description=sprintf("Results of gene enrichment analysis with tmod for contrast %s", contrast),
+         File=sprintf("%s", basename(filename))) %>%
+  dplyr::select(Description, File)
+
+export_ft <- rbind(export_ft, export_ft_2) %>% select(File, Description)
+ 
+# paste the rows of export_ft together
+export_ft <- paste(export_ft$File, export_ft$Description, sep=": ") %>% paste(collapse="\n")
+
+
+writeLines(export_ft, readme_f)
 ```
 
 
