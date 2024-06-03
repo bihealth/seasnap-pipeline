@@ -184,6 +184,14 @@ tmod:
       taxonID: 9606
       primaryID: SYMBOL
       annotationDBI: org.Hs.eg.db
+    - name: cell_signatures
+      file: cell_signatures
+      title: "Cell signatures (tmod)"
+      description:
+        Cell signatures from CellMarker, CIBERSORT and PanglaoDB.
+      taxonID: 9606
+      primaryID: SYMBOL
+      annotationDBI: org.Hs.eg.db
     - name: msigdb_reactome
       file: msigdb
       title: "Reactome gene sets (MSigDB)"
