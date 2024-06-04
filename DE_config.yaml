@@ -14,10 +14,14 @@
 # 6. Test the configuration with `sea-snap DE l -np`
 # 7. Run the pipeline locally (e.g. `sea-snap DE l --cores 4`), or
 #    on the cluster (`sea-snap DE --slurm c`).
+#
+# --------------------- NOTES --
+# You can specify an alternative DE_config file with adding the following
+# to the sea-snap command after the `l` or `c` flag:
+# --config file_name=my_DE_config.yaml
 
 
 # 1. --- organism annotation
-
 organism_defaults: ### FILL HERE ###  (e.g. Homo_sapiens.yaml) 
 
 organism:
@@ -30,11 +34,13 @@ pipeline_param:
   __options__: [out_path_pattern, log_path_pattern, in_path_pattern, report_snippets, input_choice]
 
   in_path_pattern: ### FILL HERE ###
-  out_path_pattern: DE/{contrast}/{step}/out/{step}.{contrast}.{extension}
-  log_path_pattern: DE/{contrast}/{step}/report/{step}.{contrast}.{extension}
   ## Notes:
   ## The in_path_pattern can be the same as the out_path_pattern of the mapping pipeline
   ## You should be able to safely leave the predefined {out,log}_path_pattern[s].
+
+  # you can leave that as it is
+  out_path_pattern: DE/{contrast}/{step}/out/{step}.{contrast}.{extension}
+  log_path_pattern: DE/{contrast}/{step}/report/{step}.{contrast}.{extension}
 
   # define choices for choose_input()
   # select the one that suits you
@@ -52,6 +58,10 @@ experiment:
   __options__: [covariate_file, design_formula, columns]
   
   design_formula: ### FILL HERE ###  (e.g. "~ group")
+
+# covariate_file:
+#   star: covariate_file.txt
+#   salmon: covariate_file.txt
 
 ## the following allows you define the orders of levels in the factor
 ## variables
@@ -163,6 +173,7 @@ report:
     - Functional:
       - tmod.Rmd
       - cluster_profiler_summary.Rmd
+    - Export_files.Rmd
       # - Disco.Rmd
       
 # ---------------------------------------- configuration for tmod

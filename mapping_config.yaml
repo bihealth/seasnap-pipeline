@@ -30,30 +30,37 @@ pipeline_param:
   # 2. configure the paths
 
   in_path_pattern: ### FILL HERE ###  (path pattern where fastq files are stored, without fastq.gz extension)
-  out_path_pattern: ### FILL HERE ###
-  log_path_pattern: ### FILL HERE ###
+  out_path_pattern: mapping/{step}/{sample}/out/{step}.{sample}.{extension}
+  log_path_pattern: mapping/{step}/{sample}/report/{step}.{sample}.{extension}
   # Note: 
   # you need to use every wildcard from `in_path_pattern` both in folder names and file names 
-  # of the output patterns.
+  # of the output patterns (out_path_pattern and log_path_pattern).
+  #
+  # Note that you should ignore the .fastq.gz (or another) extension of the
+  # file names. This will be handled by sea-snap covariate_file (see options
+  # of sea-snap covariate_file).
   #
   # Examples:
   # in_path_pattern: ../fastq/{sample}/{sample}
+  # ## or: in_path_pattern: fastq/{sample}
   # out_path_pattern: mapping/{step}/{sample}/out/{step}.{sample}.{extension}
   # log_path_pattern: mapping/{step}/{sample}/report/{step}.{sample}.{extension}
+  #
+  # in_path_pattern: ../fastq/{sample}_{mate}_001
+  # out_path_pattern: mapping/{step}/{sample}/{mate}/out/{step}.{sample}.{mate}.{extension}
+  # log_path_pattern: mapping/{step}/{sample}/{mate}/report/{step}.{sample}.{mate}.{extension}
   #
   # in_path_pattern: input/{sample}/HLFFWDRXX/{lane}/{sample}_{library}_{lane}_{mate}_001
   # out_path_pattern: mapping/{step}/{lane}/{library}/{mate}/{sample}/out/{step}.{lane}.{library}.{mate}.{sample}.{extension}
   # log_path_pattern: mapping/{step}/{lane}/{library}/{mate}/{sample}/report/{step}.{lane}.{library}.{mate}.{sample}.{extension}
   # Default output patterns:
-  out_path_pattern: mapping/{step}/{sample}/out/{step}.{sample}.{extension}
-  log_path_pattern: mapping/{step}/{sample}/report/{step}.{sample}.{extension}
 
 
   # 3. adjust to select which steps to perform
   mapping_results:
-    - salmon-transcript_counts
+  # - salmon-transcript_counts
     - star-gene_counts
-    - ciri-circRNA
+  # - ciri-circRNA
   ## The QC results will be summarized by the multiqc step
   ## You will find the output under  
   ## mapping/multiqc/.../out/multiqc....html
@@ -66,7 +73,7 @@ pipeline_param:
     - rna_seqc
     - preseq_c_curve
     - preseq_lc_extrap
-    #- bw_from_bed
+  # - bw_from_bed
     
   #ATAC_Seq:
   #  - macs2
