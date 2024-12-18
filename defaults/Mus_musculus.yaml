@@ -8,16 +8,16 @@ organism:
   genome_size: "2652783500"
   
   files:
-    genome: /fast/projects/cubit/18.12/static_data/reference/GRCm38/p5.chr_scaff/GRCm38.p5.genome.chr_scaff.fa
+    genome: /data/cephfs-1/work/projects/cubit/20.05/static_data/reference/GRCm38/p5.chr_scaff/GRCm38.p5.genome.chr_scaff.fa
     transcriptome: ""
-    gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.gtf
+    gtf: /data/cephfs-1/work/projects/cubit/20.05/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.gtf
 
     cellranger_transcriptome: ""
     cellranger_gtf: ""
     velocyto_mask_gtf: ""
     
-    bed: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.bed                                   # required for infer_experiment
-    seqc_gtf: /fast/projects/cubit/18.12/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.no_genes.protein_coding.rRNA.gtf # required for qc
+    bed: /data/cephfs-1/work/projects/cubit/20.05/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.bed                                   # required for infer_experiment
+    seqc_gtf: /data/cephfs-1/work/projects/cubit/20.05/static_data/annotation/GENCODE/M12/GRCm38/gencode.vM12.chr_scaff.annotation.no_genes.protein_coding.rRNA.gtf # required for qc
     
   star_index: null
   salmon_index: null
