@@ -7,6 +7,7 @@ require(purrr)
 require(DESeq2)
 require(edgeR)
 require(pander)
+require(tmod)
 
 export_dir <- config$report$snippet_parameters$Export_files$export_dir
 if(is.null(export_dir)) {
