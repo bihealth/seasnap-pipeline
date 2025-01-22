@@ -141,7 +141,7 @@ def show_matrix(args):
 			print(exc)
 	design = config_dict["experiment"]["design_formula"]
 	print(f"design formula: {design}")
-	col_names = re.findall("[^~()/:*+\s0-9\-]+", design)
+	col_names = re.findall("[^~()/:*+\\s0-9\\-]+", design)
 	print(f"column names: {str(col_names)}")
 	cov_data = pd.read_csv(args.covariate_file, sep="\t", header=0, dtype=str)
 	expressions = ["-e \"{} <- c('{}')\"".format(col_name, "','".join(cov_data[col_name])) for col_name in col_names]

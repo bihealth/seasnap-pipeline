@@ -427,7 +427,7 @@ rule macs2:
 GENOME_FILE_NAME = os.path.basename(config["organism"]["files"]["genome"])
 
 rule bwa_index:
-    """ create index for BWA """
+	""" create index for BWA """
 	input:
 		genome = config["organism"]["files"]["genome"]
 	output:
@@ -459,7 +459,7 @@ rule bwa_index:
 
 
 rule bwa:
-    """ run BWA mem """
+	""" run BWA mem """
 	input:
 		index_present = pph.file_path(step="bwa_index", extension="done", fix="all"),
 		reads1 = lambda wildcards: pph.get_fastq_pairs(wildcards, mate_key="paired_end_extensions", mate=0),
