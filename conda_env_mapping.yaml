@@ -2,7 +2,7 @@ name: seasnap-mapping
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
   - python>=3.9
   - snakemake=7.19
