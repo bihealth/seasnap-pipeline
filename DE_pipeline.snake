@@ -470,8 +470,10 @@ rule DESeq2:
 		annot_pkg  = config["organism"]["R"]["annotations"]
 	run:
 		config_file = pph.file_path(step="pipeline_report", extension="yaml", contrast="all")
-		count_threshold       = config["filters"]["low_counts"]
-		normalized_expression = config["normalization"]["normalized_expression"]
+		count_threshold       =           config["filters"]["low_counts"]
+		deseq2_parameters     =           config["normalization"]["DESeq2_parameters"]
+		deseq2_parameter_useT = "TRUE" if config["normalization"]["DESeq2_parameters"]["useT"] else "FALSE"
+		normalized_expression =           config["normalization"]["normalized_expression"]
 		script = textwrap.dedent(r"""
 		#----- import packages
 		library(DESeq2)
@@ -500,8 +502,17 @@ rule DESeq2:
 		dds  <- dds[keep,]; print(dds)
 		
 		#----- DESeq2
-		dds <- DESeq(dds, betaPrior=FALSE, test="Wald")
-
+		deseq_args <- list(
+            object=dds,
+			test="Wald",
+			betaPrior=FALSE,
+			fitType="{deseq2_parameters[fitType]}",
+			sfType="{deseq2_parameters[sfType]}",
+			useT={deseq2_parameter_useT},
+			minReplicatesForReplace={deseq2_parameters[minReplicatesForReplace]},
+			minmu={deseq2_parameters[minmu]}
+		)
+		dds <- do.call(DESeq, args=deseq_args)
 		# ----- Normalised expression values
 		rld_blind <- switch("{normalized_expression}",
 			"rld"=rlog(dds, blind=TRUE),

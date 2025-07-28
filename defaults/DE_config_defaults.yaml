@@ -49,7 +49,11 @@ filters:
 #---------------------------------------- normalization parameters
 normalization:
   DESeq2_parameters:
-    min_mu: 0
+    fitType: parametric
+    sfType: ratio
+    minReplicatesForReplace: 7
+    useT: false
+    minmu: 0.5
   normalized_expression: vst
 
 #---------------------------------------- description of contrasts
