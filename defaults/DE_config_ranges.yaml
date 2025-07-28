@@ -50,18 +50,22 @@ filters:
 #---------------------------------------- normalization parameters
 normalization:
   DESeq2_parameters:
-    min_mu: {"__num__": [0, null]}
+    fitType: parametric|local|mean|glmGamPoi
+    sfType: ratio|poscounts|iterate
+    minReplicatesForReplace: {"__num__": [0, null]}
+    useT: {"__opt__": [true, false]}
+    minmu: {"__num__": [0, null]}
   normalized_expression: vst|rld
 
 #---------------------------------------- description of contrasts
 contrasts:
   defaults:
     max_p_adj: {"__num__": [0, 1]}
-    ranking_by: log2FoldChange|pvalue|padj
+    ranking_by: log2FoldChange|stat|pvalue|padj
     ranking_order: .*
     results_parameters:
       lfcThreshold: {"__num__": [0, null]}
-      altHypothesis: greaterAbs|lessAbs|greater|less
+      altHypothesis: greaterAbs|lessAbs|greater|less|greaterAbs2014
       independentFiltering:
         __opt__: [true, false]
     lfcShrink_parameters:
