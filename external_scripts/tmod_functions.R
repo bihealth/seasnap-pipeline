@@ -221,11 +221,18 @@ df2tmod <- function(df, gene_id_col=ncol(df), module_id_col=1, module_title_col=
 #'
 #' Use the Msigdb from the msigdbr package to generate a tmod object
 #' @return a tmod object
-msig2tmod <- function(taxon=NULL) {
+msig2tmod <- function(taxon=NULL, db_species = "HS") {
 
   if(is.null(taxon)) stop("taxon is null")
 
   if(!require(msigdbr, quietly=TRUE)) stop("Package msigdbr not installed! Cannot proceed")
+
+  # newer msigdbr have a different structure!
+  message("msigdb version: ", as.character(packageVersion("msigdbr")))
+  if (packageVersion("msigdbr") < "25.1.1") {
+      stop("Need msigdbr >= 25.1.1")
+  }
+
 
   organism <- "Homo sapiens"
 
@@ -238,7 +245,7 @@ msig2tmod <- function(taxon=NULL) {
       stop(sprintf("Taxon %s not in msigdbr!  use another taxonID (human or mouse, preferably)", taxon))
     }
     organism <- sptab[["species"]][ match(taxon, sptab[["taxonID"]]) ]
-    if(!organism %in% msigdbr::msigdbr_show_species()) {
+    if(!organism %in% msigdbr::msigdbr_species()[["species_name"]]) {
       stop(sprintf("Species %s not in msigdbr! Use another species (human or mouse, preferably)", organism))
     }
   }
@@ -247,9 +254,12 @@ msig2tmod <- function(taxon=NULL) {
   if(is.null(organism)) {
     warning("organism is null")
   }
+
   message("msigdb, reading organism: ", organism)
-  df <- as.data.frame(msigdbr::msigdbr(species=organism))
-  df <- df[ !is.na(df$entrez_gene), c("gs_name", "gs_id", "gs_cat", "gs_subcat", "entrez_gene") ]
+
+  df <- as.data.frame(msigdbr::msigdbr(db_species=db_species, species=organism))
+  df <- df[ !is.na(df$ncbi_gene), c("gs_name", "gs_id", "gs_collection", "gs_subcollection", "ncbi_gene") ]
+
   colnames(df) <- c("Title", "ID", "Category", "Subcategory", "GeneID")
 
   df2tmod(df, gene_id_col=ncol(df), module_id_col=2, module_title_col=1)
@@ -420,8 +430,7 @@ process_dbs <- function(config) {
   dbs <- lapply(1:length(dbs), function(i) .fill_missing(dbs[[i]], i)) 
 
   dbs.names <- sapply(dbs, function(x) x$name)
-  msig    <- NULL
-  msig_mm <- NULL
+  msig    <- list()
   tmod    <- NULL
   cell_signatures <- NULL
 
@@ -440,11 +449,15 @@ process_dbs <- function(config) {
     # two special keywords: msigdb and tmod define databases configured
     # from within the script
     if(x$file == "msigdb") {
-      if(is.null(msig)) {
-        message("reading msigdb")
-        msig <<- msig2tmod(taxon=x$taxonID)
+      if(is.null(x$db_species)) {
+        x$db_species <- "HS"
       }
-      dbobj <- msig
+
+      if(is.null(msig[[x$db_species]])) {
+        message("reading msigdb")
+        msig[[x$db_species]] <- msig2tmod(taxon=x$taxonID, db_species = x$db_species)
+      }
+      dbobj <- msig[[x$db_species]]
       if(is.null(x$PrimaryID)) { x$PrimaryID <- "ENTREZID" }
     } else if(x$file == "tmod") {
       if(is.null(tmod)) {
