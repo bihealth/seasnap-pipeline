@@ -415,11 +415,22 @@ tmod_read_file <- function(x, format) {
 #' @return object containing all tmod databases
 process_dbs <- function(config) {
 
-  config_full <- config
-  config <- config$tmod
+  taxonID <- config$organism$taxon 
+
+  dbs <- config$tmod$databases
+  file_path <- config$tmod$file_path
+
+  if(is.null(file_path)) file_path <- "./"
+
+
+  process_dbs_main(taxonID=taxonID, dbs=dbs, file_path=file_path)
+
+}
+
+process_dbs_main <- function(taxonID, dbs, file_path) {
+
   require(tmod, quietly=TRUE)
 
-  dbs <- config$databases
   if(is.null(dbs)) {
     message("job tmod defined, but no databases configured!")
     warning("job tmod defined, but no databases configured!")
@@ -443,7 +454,7 @@ process_dbs <- function(config) {
     dbobj <- NULL
     x$PROCESSED <- TRUE
     if(is.null(x$taxonID)) { 
-      x$taxonID <- config_full$organism$taxon 
+      x$taxonID <- taxonID
     }
     
     # two special keywords: msigdb and tmod define databases configured
@@ -454,7 +465,7 @@ process_dbs <- function(config) {
       }
 
       if(is.null(msig[[x$db_species]])) {
-        message("reading msigdb")
+        message("reading msigdb, file ", x$file, ", species ", x$db_species)
         msig[[x$db_species]] <- msig2tmod(taxon=x$taxonID, db_species = x$db_species)
       }
       dbobj <- msig[[x$db_species]]
@@ -477,7 +488,7 @@ process_dbs <- function(config) {
     } else if(is.null(x$format)) {
       stop("Processing tmod db configuration: if file path provided, format must not be empty")
     } else {
-      x$file <- file.path(config$file_path, x$file)
+      x$file <- file.path(file_path, x$file)
       dbobj <- tmod_read_file(x$file, x$format)
     }
 

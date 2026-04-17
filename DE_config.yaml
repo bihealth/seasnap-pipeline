@@ -229,7 +229,7 @@ tmod:
         the Molecular Signatures DB 
         (https://www.gsea-msigdb.org/gsea/msigdb/).
       primaryID: ENTREZID
-      subset: "Category=C2,Subcategory=CP:KEGG"
+      subset: "Category=C2,Subcategory=CP:KEGG_LEGACY"
     - name: msigdb_mir
       file: msigdb
       title: "MIR targets (MSigDB)"
