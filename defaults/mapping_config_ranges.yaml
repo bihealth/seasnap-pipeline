@@ -32,6 +32,11 @@ rule_options:
     trim: {__opt__: [true, false]}
   rna_seqc:
     cmd_opt: .*
+  umi_tools:
+    use_umi: {__opt__: [true, false]}
+    bc_pattern: .*
+    extract_cmd_opt: .*
+    dedup_cmd_opt: .*
 
 #---------------------------------------- parameters for the report
 report:

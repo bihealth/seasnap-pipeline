@@ -285,9 +285,12 @@ rule star:
 	log:
 		out = pph.file_path(step="star", extension="output.log", log=True)
 	params:
-		outdir = pph.out_dir_name(step="star"),
-		options = config["rule_options"]["star"]["cmd_opt"],
-		trim = True if config["rule_options"]["star"]["trim"]=="yes" else False
+		outdir          = pph.out_dir_name(step="star"),
+		options         = config["rule_options"]["star"]["cmd_opt"],
+		trim            = True if config["rule_options"]["star"]["trim"]=="yes" else False,
+		use_umi         = config["rule_options"]["umi_tools"]["use_umi"],
+		bc_pattern      = config["rule_options"]["umi_tools"]["bc_pattern"],
+		umi_extract_opt = config["rule_options"]["umi_tools"]["extract_cmd_opt"]
 	threads: 16
 	resources:
 		mem_mb=48000,
@@ -321,28 +324,64 @@ rule star:
 			if fc or ln: read_group_line += ' "PU:{}.{}"'.format(input_wildcards["flowcell"] if fc else "", input_wildcards["lane"] if ln else "")
 			read_group_lines.append(read_group_line)
 		read_groups = "--outSAMattrRGline" + " , ".join(read_group_lines)
-		
+		reads1_space = " ".join(input.reads1)
+		reads2_space = " ".join(input.reads2)
+		paired_str   = "true" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"]) > 1 else "false"
+		use_umi_str  = "true" if params.use_umi else "false"
+		cat_cmd      = "zcat" if file_ext == "gz" else "cat"
+
 		script = textwrap.dedent(r"""
 		#----- prepare
 		set -eux
 		rm -fr {params.outdir}/*
 		STAR --version
 		samtools --version
-		
+
+		#----- UMI extraction (before STAR, if enabled)
+		if [ "{use_umi_str}" = "true" ]; then
+		    mkdir -p {params.outdir}/umi_extract
+		    umi_tools --version
+		    if [ "{paired_str}" = "true" ]; then
+		        {cat_cmd} {reads1_space} | umi_tools extract \
+		            --bc-pattern={params.bc_pattern} {params.umi_extract_opt} \
+		            --stdin=/dev/stdin \
+		            --stdout={params.outdir}/umi_extract/R1.fastq.gz \
+		            --read2-in=<({cat_cmd} {reads2_space}) \
+		            --read2-out={params.outdir}/umi_extract/R2.fastq.gz
+		    else
+		        {cat_cmd} {reads1_space} | umi_tools extract \
+		            --bc-pattern={params.bc_pattern} {params.umi_extract_opt} \
+		            --stdin=/dev/stdin \
+		            --stdout={params.outdir}/umi_extract/R1.fastq.gz
+		    fi
+		fi
+
 		#----- run STAR mapping
-		STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} \
-		     --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} {read_groups}
+		if [ "{use_umi_str}" = "true" ]; then
+		    if [ "{paired_str}" = "true" ]; then
+		        star_reads="{params.outdir}/umi_extract/R1.fastq.gz {params.outdir}/umi_extract/R2.fastq.gz"
+		    else
+		        star_reads="{params.outdir}/umi_extract/R1.fastq.gz"
+		    fi
+		    STAR --quantMode GeneCounts --readFilesIn $star_reads --genomeDir $(dirname {input.index}) --runThreadN {threads} \
+		         --outFileNamePrefix {params.outdir}/ {params.options} --readFilesCommand zcat {read_groups}
+		else
+		    STAR --quantMode GeneCounts --readFilesIn {reads} --genomeDir $(dirname {input.index}) --runThreadN {threads} \
+		         --outFileNamePrefix {params.outdir}/ {params.options} {trim_cmd} {read_groups}
+		fi
 		cut -f1,{count_col} {params.outdir}/ReadsPerGene.out.tab > {output.gene_counts}
 		mv {params.outdir}/ReadsPerGene.out.tab {params.outdir}/{wildcards.sample}.ReadsPerGene.out.tab #for multiqc
 		mv {params.outdir}/Log.final.out {params.outdir}/{wildcards.sample}.Log.final.out #for multiqc
-		
+
 		#----- sort BAM (coordinate sort)
 		samtools sort -@ $(expr {threads} / 2) -m $(expr 10000 / {threads})M -T {params.outdir}/sort -o {output.bam} {params.outdir}/Aligned.out.bam
 		mv {params.outdir}/Aligned.out.bam {output.usrt_bam}
-		
-		#----- mark duplicates
-		picard -Xmx48G MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir}
-		mv {params.outdir}/{wildcards.sample}.mdup.bam {output.bam}
+
+		#----- mark duplicates (skipped when using UMI dedup)
+		if [ "{use_umi_str}" = "false" ]; then
+		    picard -Xmx48G MarkDuplicates I={output.bam} O={params.outdir}/{wildcards.sample}.mdup.bam M={params.outdir}/{wildcards.sample}.metrics.out TMP_DIR={params.outdir}
+		    mv {params.outdir}/{wildcards.sample}.mdup.bam {output.bam}
+		fi
 
 		#----- generate BAM index (.bai)
 		samtools index {output.bam}
@@ -674,11 +713,48 @@ rule salmon:
 		script_file = pph.log(log.out, snakemake_format(script), step="salmon", extension="sh", **wildcards)
 		shell("bash '{script_file}' &>> '{log.out}'")
 
+##-------------------- UMI dedup ----------------------------------------------------------------------------
+
+rule umi_dedup:
+	input:
+		bam = pph.file_path(step="star", extension="bam")
+	output:
+		bam = pph.file_path(step="umi_dedup", extension="bam")
+	log:
+		out = pph.file_path(step="umi_dedup", extension="output.log", log=True)
+	params:
+		options = config["rule_options"]["umi_tools"]["dedup_cmd_opt"]
+	threads: 4
+	resources:
+		mem_mb=16000,
+		h_rt="24:00:00"
+	run:
+		paired = "--paired" if len(config["sample_info"][wildcards.sample]["paired_end_extensions"]) > 1 else ""
+		script = textwrap.dedent(r"""
+		#----- prepare
+		set -eux
+		umi_tools --version
+		samtools --version
+
+		#----- UMI deduplication
+		umi_tools dedup -I {input.bam} -S {output.bam} {paired} {params.options}
+
+		#----- generate BAM index (.bai)
+		samtools index {output.bam}
+
+		#----- compute statistics
+		samtools flagstat {output.bam} > $(dirname {log.out})/umi_dedup.{wildcards.sample}.flagstat.log
+		""")
+		script_file = pph.log(log.out, snakemake_format(script), step="umi_dedup", extension="sh", **wildcards)
+		shell("bash '{script_file}' &>> '{log.out}'")
+
 ##-------------------- feature counts -----------------------------------------------------------------------
 
 rule feature_counts:
 	input:
-		bam = pph.file_path(step="star", extension="unsorted.bam"),
+		bam = (pph.file_path(step="umi_dedup", extension="bam")
+		       if config["rule_options"]["umi_tools"]["use_umi"]
+		       else pph.file_path(step="star", extension="unsorted.bam")),
 		gtf = config["organism"]["files"]["gtf"]
 	output:
 		pph.file_path(step="feature_counts", extension="feature_counts")
