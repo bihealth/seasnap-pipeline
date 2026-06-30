@@ -55,6 +55,11 @@ rule_options:
     cmd_opt: ""
   feature_counts:
     cmd_opt: ""
+  umi_tools:
+    use_umi: false
+    bc_pattern: "NNNNNNNNNNNN"
+    extract_cmd_opt: ""
+    dedup_cmd_opt: ""
 
 #---------------------------------------- parameters for the report
 report:
