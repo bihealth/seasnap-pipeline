@@ -64,7 +64,7 @@ def get_inputs_all():
 	#functional annotation
 	inputs.append(pph.expand_path(step = "goseq", extension = "go.rds",   if_set = dict(goseq=True) ))
 	inputs.append(pph.expand_path(step = "goseq", extension = "kegg.rds", if_set = dict(goseq=True) ))
-	#inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
+	inputs.append(pph.file_path(step = "annotation", extension = "rds", contrast="all"))
 	inputs.append(pph.file_path(step = "export_raw_counts", extension = "xlsx", contrast = "all"))
 	inputs.append(pph.expand_path(step = "cluster_profiler", extension = "rds", if_set = dict(cluster_profiler=dict(run=True)) ))
   # XXX uncomment the following line to run tmod_pca
@@ -1395,8 +1395,8 @@ rule report:
 			config_file = pph.file_path("pipeline_report", "yaml", contrast="all", path_pattern=path)
 			pph.log_generated_files(save_to=file_table, path_pattern=path)
 			id_suffix, _ = rt.get_id_suffix(tag, num)
-			text_sub["file_tab"] += (f'file_tab{id_suffix} <- read.table("{file_table}", sep="\\t", header=TRUE, stringsAsFactors=FALSE)\n')
-			text_sub["config"]   += f'config{id_suffix} <- yaml.load_file("{config_file}")\n'
+			text_sub["file_tab"] += 'file_tab{id_suffix} <- read.table("{file_table}", sep="\\t", header=TRUE, stringsAsFactors=FALSE)\n'.format(id_suffix=id_suffix, file_table=file_table)
+			text_sub["config"]   += 'config{id_suffix} <- yaml.load_file("{config_file}")\n'.format(id_suffix=id_suffix, config_file=config_file)
 
 		report_text = report_text.replace("{{WORKING_DIRECTORY}}", os.getcwd() + os.sep)
 		report_text = report_text.replace("{{R_COMMON}}", str(rt.report_snippet_base_dir/"../R_common"))
